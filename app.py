@@ -180,12 +180,16 @@ if page == "🎯 Draft Assistant":
         if selected_preset:
             preset = get_preset_composition(selected_preset)
             if preset:
+                st.markdown("---")
                 st.markdown(f"**📝 Description:** {preset['description']}")
                 st.markdown(f"**⚔️ Stratégie:** {preset['strategy']}")
-                with st.expander("👥 Champions de cette composition"):
-                    for i, champ_id in enumerate(preset['blue_team']):
-                        lane = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'][i]
-                        st.write(f"• **{lane}**: {champ_id}")
+                st.markdown("**👥 Champions:**")
+                cols = st.columns(5)
+                for i, champ_id in enumerate(preset['blue_team']):
+                    lane = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'][i]
+                    with cols[i]:
+                        st.markdown(f"**{lane}**")
+                        st.write(champ_id)
 
     st.markdown("---")
 
