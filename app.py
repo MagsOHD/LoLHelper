@@ -97,6 +97,10 @@ if 'blue_recommendations' not in st.session_state:
     st.session_state.blue_recommendations = []
 if 'red_recommendations' not in st.session_state:
     st.session_state.red_recommendations = []
+if 'blue_recs_lane' not in st.session_state:
+    st.session_state.blue_recs_lane = None
+if 'red_recs_lane' not in st.session_state:
+    st.session_state.red_recs_lane = None
 if 'edit_mode_blue' not in st.session_state:
     st.session_state.edit_mode_blue = False
 if 'edit_mode_red' not in st.session_state:
@@ -149,7 +153,7 @@ if page == "🎯 Draft Assistant":
         st.markdown("### Charger une composition prédéfinie")
         st.markdown("*Utilisez des compositions optimales pour différentes stratégies*")
 
-        col_preset1, col_preset2, col_preset3 = st.columns([3, 1, 1])
+        col_preset1, col_preset2 = st.columns([4, 1])
 
         with col_preset1:
             preset_names = [""] + get_preset_names()
@@ -165,16 +169,10 @@ if page == "🎯 Draft Assistant":
                 if preset:
                     st.session_state.blue_team = preset['blue_team'].copy()
                     st.session_state.blue_recommendations = []
+                    st.session_state.blue_recs_lane = None
                     st.session_state.edit_mode_blue = False
                     st.success(f"✅ '{selected_preset}' chargée!")
                     st.rerun()
-
-        with col_preset3:
-            if selected_preset:
-                preset = get_preset_composition(selected_preset)
-                if preset:
-                    if st.button("ℹ️ Info", key="preset_info", use_container_width=True):
-                        pass  # Le contenu s'affiche en dessous
 
         # Afficher les informations de la composition sélectionnée
         if selected_preset:
@@ -212,6 +210,7 @@ if page == "🎯 Draft Assistant":
                 if st.button("🔄 Réinitialiser", key="reset_blue_btn", use_container_width=True):
                     st.session_state.blue_team = []
                     st.session_state.blue_recommendations = []
+                    st.session_state.blue_recs_lane = None
                     st.session_state.edit_mode_blue = False
                     st.rerun()
             st.markdown("---")
@@ -268,12 +267,14 @@ if page == "🎯 Draft Assistant":
                         current_lane,
                         top_n=5
                     )
-                    # Stocker les recommandations pour qu'elles persistent entre les reruns
+                    # Stocker les recommandations et la lane pour qu'elles persistent entre les reruns
                     st.session_state.blue_recommendations = recs if recs else []
+                    st.session_state.blue_recs_lane = current_lane
                     st.rerun()
 
-            # Afficher les recommandations stockées (en dehors du if button pour qu'elles persistent)
-            if st.session_state.blue_recommendations:
+            # Afficher les recommandations stockées seulement si elles sont pour la lane actuelle
+            if (st.session_state.blue_recommendations and
+                st.session_state.blue_recs_lane == current_lane):
                 recs = st.session_state.blue_recommendations
                 st.markdown("#### 🎯 Top 5 Recommandations:")
 
@@ -342,9 +343,6 @@ if page == "🎯 Draft Assistant":
                             st.session_state.blue_team.append(champ['id'])
                             st.session_state.blue_recommendations = []
                             st.rerun()
-            elif st.session_state.get('blue_recommendations') is not None and len(st.session_state.blue_recommendations) == 0 and st.session_state.get('_just_calculated_recs'):
-                st.warning("❌ Aucune recommandation disponible pour cette lane")
-                st.info("💡 Cela peut arriver si tous les champions appropriés sont bannis ou déjà sélectionnés")
 
             # Sélection manuelle
             all_champions = sorted(champion_manager.champion_list)
@@ -354,7 +352,7 @@ if page == "🎯 Draft Assistant":
                 key="blue_manual"
             )
 
-            if selected and st.button("Ajouter à l'équipe bleue"):
+            if selected and st.button("➕ Ajouter à l'équipe bleue", key="add_blue_manual"):
                 # Trouver l'ID du champion sélectionné
                 champion_id = None
                 for champ_id, champ in champion_manager.champions.items():
@@ -364,6 +362,7 @@ if page == "🎯 Draft Assistant":
 
                 if champion_id and champion_id not in st.session_state.blue_team:
                     st.session_state.blue_team.append(champion_id)
+                    st.session_state.blue_recommendations = []  # Effacer les recommandations
                     st.rerun()
 
     with col2:
@@ -380,6 +379,7 @@ if page == "🎯 Draft Assistant":
                 if st.button("🔄 Réinitialiser", key="reset_red_btn", use_container_width=True):
                     st.session_state.red_team = []
                     st.session_state.red_recommendations = []
+                    st.session_state.red_recs_lane = None
                     st.session_state.edit_mode_red = False
                     st.rerun()
             st.markdown("---")
@@ -436,12 +436,14 @@ if page == "🎯 Draft Assistant":
                         current_lane,
                         top_n=5
                     )
-                    # Stocker les recommandations pour qu'elles persistent entre les reruns
+                    # Stocker les recommandations et la lane pour qu'elles persistent entre les reruns
                     st.session_state.red_recommendations = recs if recs else []
+                    st.session_state.red_recs_lane = current_lane
                     st.rerun()
 
-            # Afficher les recommandations stockées (en dehors du if button pour qu'elles persistent)
-            if st.session_state.red_recommendations:
+            # Afficher les recommandations stockées seulement si elles sont pour la lane actuelle
+            if (st.session_state.red_recommendations and
+                st.session_state.red_recs_lane == current_lane):
                 recs = st.session_state.red_recommendations
                 st.markdown("#### 🎯 Top 5 Recommandations:")
 
@@ -510,9 +512,6 @@ if page == "🎯 Draft Assistant":
                             st.session_state.red_team.append(champ['id'])
                             st.session_state.red_recommendations = []
                             st.rerun()
-            elif st.session_state.get('red_recommendations') is not None and len(st.session_state.red_recommendations) == 0 and st.session_state.get('_just_calculated_recs'):
-                st.warning("❌ Aucune recommandation disponible pour cette lane")
-                st.info("💡 Cela peut arriver si tous les champions appropriés sont bannis ou déjà sélectionnés")
 
             # Sélection manuelle pour l'équipe rouge
             all_champions = sorted(champion_manager.champion_list)
@@ -522,7 +521,7 @@ if page == "🎯 Draft Assistant":
                 key="red_manual"
             )
 
-            if selected and st.button("Ajouter à l'équipe rouge"):
+            if selected and st.button("➕ Ajouter à l'équipe rouge", key="add_red_manual"):
                 # Trouver l'ID du champion sélectionné
                 champion_id = None
                 for champ_id, champ in champion_manager.champions.items():
@@ -532,6 +531,7 @@ if page == "🎯 Draft Assistant":
 
                 if champion_id and champion_id not in st.session_state.red_team:
                     st.session_state.red_team.append(champion_id)
+                    st.session_state.red_recommendations = []  # Effacer les recommandations
                     st.rerun()
 
     # Bans
