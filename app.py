@@ -14,6 +14,7 @@ from src.analysis.advanced_comparison import AdvancedChampionComparator
 from src.recommendations.pick_recommender import PickRecommender
 from src.visualizations.charts import ChartGenerator
 from src.visualizations.stats_viewer import StatsViewer
+from src.data.preset_compositions import get_preset_names, get_preset_composition
 
 # Configuration de la page
 st.set_page_config(
@@ -92,6 +93,14 @@ if 'red_team' not in st.session_state:
     st.session_state.red_team = []
 if 'bans' not in st.session_state:
     st.session_state.bans = []
+if 'blue_recommendations' not in st.session_state:
+    st.session_state.blue_recommendations = []
+if 'red_recommendations' not in st.session_state:
+    st.session_state.red_recommendations = []
+if 'edit_mode_blue' not in st.session_state:
+    st.session_state.edit_mode_blue = False
+if 'edit_mode_red' not in st.session_state:
+    st.session_state.edit_mode_red = False
 
 # En-tête
 st.title("⚔️ LoL Team Composition Helper")
@@ -135,6 +144,47 @@ if page in help_texts:
 if page == "🎯 Draft Assistant":
     st.header("Assistant de Draft")
 
+    # Section des compositions prédéfinies
+    with st.expander("📋 Compositions Prédéfinies", expanded=False):
+        st.markdown("### Charger une composition prédéfinie")
+        st.markdown("*Utilisez des compositions optimales pour différentes stratégies*")
+
+        col_preset1, col_preset2, col_preset3 = st.columns([3, 1, 1])
+
+        with col_preset1:
+            preset_names = [""] + get_preset_names()
+            selected_preset = st.selectbox(
+                "Choisir une composition:",
+                preset_names,
+                key="preset_selector"
+            )
+
+        with col_preset2:
+            if selected_preset and st.button("📥 Charger",  key="load_preset", use_container_width=True):
+                preset = get_preset_composition(selected_preset)
+                if preset:
+                    st.session_state.blue_team = preset['blue_team'].copy()
+                    st.session_state.blue_recommendations = []
+                    st.session_state.edit_mode_blue = False
+                    st.success(f"✅ '{selected_preset}' chargée!")
+                    st.rerun()
+
+        with col_preset3:
+            if selected_preset:
+                preset = get_preset_composition(selected_preset)
+                if preset:
+                    with st.popover("ℹ️ Info"):
+                        st.markdown(f"**Description:**")
+                        st.write(preset['description'])
+                        st.markdown(f"**Stratégie:**")
+                        st.write(preset['strategy'])
+                        st.markdown(f"**Champions:**")
+                        for i, champ_id in enumerate(preset['blue_team']):
+                            lane = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'][i]
+                            st.write(f"• **{lane}**: {champ_id}")
+
+    st.markdown("---")
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -143,16 +193,60 @@ if page == "🎯 Draft Assistant":
         # Lanes pour l'équipe bleue
         lanes = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']
 
-        for i, lane in enumerate(lanes):
-            if len(st.session_state.blue_team) > i:
-                champ = champion_manager.get_champion_by_id(st.session_state.blue_team[i])
-                if champ:
-                    st.markdown(f"**{lane}**: {champ['name']}")
-            else:
-                st.markdown(f"**{lane}**: *Vide*")
+        # Boutons d'action si l'équipe a des champions
+        if st.session_state.blue_team:
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("✏️ " + ("Terminer" if st.session_state.edit_mode_blue else "Modifier"), key="toggle_edit_blue", use_container_width=True):
+                    st.session_state.edit_mode_blue = not st.session_state.edit_mode_blue
+                    st.rerun()
+            with col_btn2:
+                if st.button("🔄 Réinitialiser", key="reset_blue_btn", use_container_width=True):
+                    st.session_state.blue_team = []
+                    st.session_state.blue_recommendations = []
+                    st.session_state.edit_mode_blue = False
+                    st.rerun()
+            st.markdown("---")
 
-        # Ajouter un champion
-        if len(st.session_state.blue_team) < 5:
+        # Mode édition ou affichage normal
+        if st.session_state.edit_mode_blue and st.session_state.blue_team:
+            st.markdown("**✏️ Mode Édition - Modifiez les champions par lane:**")
+            for i, lane in enumerate(lanes):
+                if len(st.session_state.blue_team) > i:
+                    champ = champion_manager.get_champion_by_id(st.session_state.blue_team[i])
+                    if champ:
+                        # Obtenir la liste des noms de champions
+                        all_champ_names = sorted([c['name'] for c in champion_manager.champions.values()])
+                        current_idx = all_champ_names.index(champ['name']) if champ['name'] in all_champ_names else 0
+
+                        new_champ_name = st.selectbox(
+                            f"**{lane}:**",
+                            all_champ_names,
+                            index=current_idx,
+                            key=f"edit_blue_{lane}_{i}"
+                        )
+
+                        # Si changement, trouver l'ID et mettre à jour
+                        if new_champ_name != champ['name']:
+                            for champ_id, c in champion_manager.champions.items():
+                                if c['name'] == new_champ_name:
+                                    st.session_state.blue_team[i] = champ_id
+                                    st.rerun()
+                                    break
+        else:
+            # Affichage normal
+            for i, lane in enumerate(lanes):
+                if len(st.session_state.blue_team) > i:
+                    champ = champion_manager.get_champion_by_id(st.session_state.blue_team[i])
+                    if champ:
+                        st.markdown(f"**{lane}**: {champ['name']}")
+                else:
+                    st.markdown(f"**{lane}**: *Vide*")
+
+        st.markdown("---")
+
+        # Ajouter un champion (seulement si pas en mode édition)
+        if not st.session_state.edit_mode_blue and len(st.session_state.blue_team) < 5:
             current_lane = lanes[len(st.session_state.blue_team)]
             st.markdown(f"### Sélectionner pour {current_lane}")
 
@@ -166,76 +260,83 @@ if page == "🎯 Draft Assistant":
                         current_lane,
                         top_n=5
                     )
+                    # Stocker les recommandations pour qu'elles persistent entre les reruns
+                    st.session_state.blue_recommendations = recs if recs else []
+                    st.rerun()
 
-                    if recs:
-                        st.markdown("#### 🎯 Top 5 Recommandations:")
+            # Afficher les recommandations stockées (en dehors du if button pour qu'elles persistent)
+            if st.session_state.blue_recommendations:
+                recs = st.session_state.blue_recommendations
+                st.markdown("#### 🎯 Top 5 Recommandations:")
 
-                        # Afficher un aperçu en colonnes
-                        rec_cols = st.columns(5)
-                        for idx, rec in enumerate(recs):
-                            champ = rec['champion']
-                            prob = rec['probability']
+                # Afficher un aperçu en colonnes
+                rec_cols = st.columns(5)
+                for idx, rec in enumerate(recs):
+                    champ = rec['champion']
+                    prob = rec['probability']
 
-                            with rec_cols[idx]:
-                                st.markdown(f"""
-                                <div style="border: 2px solid #C89B3C; border-radius: 10px; padding: 10px; text-align: center; margin: 5px;">
-                                    <h4>{idx+1}. {champ['name']}</h4>
-                                    <p><strong>{prob:.1f}%</strong> de succès</p>
-                                    <p><small>{', '.join(champ['tags'][:2])}</small></p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                    with rec_cols[idx]:
+                        st.markdown(f"""
+                        <div style="border: 2px solid #C89B3C; border-radius: 10px; padding: 10px; text-align: center; margin: 5px;">
+                            <h4>{idx+1}. {champ['name']}</h4>
+                            <p><strong>{prob:.1f}%</strong> de succès</p>
+                            <p><small>{', '.join(champ['tags'][:2])}</small></p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                                if st.button(f"Choisir", key=f"quick_pick_blue_{champ['id']}"):
-                                    st.session_state.blue_team.append(champ['id'])
-                                    st.rerun()
+                        if st.button(f"Choisir", key=f"quick_pick_blue_{champ['id']}_{idx}"):
+                            st.session_state.blue_team.append(champ['id'])
+                            st.session_state.blue_recommendations = []
+                            st.rerun()
 
-                        st.markdown("---")
+                st.markdown("---")
 
-                        # Détails complets
-                        for idx, rec in enumerate(recs, 1):
-                            champ = rec['champion']
-                            prob = rec['probability']
+                # Détails complets
+                for idx, rec in enumerate(recs, 1):
+                    champ = rec['champion']
+                    prob = rec['probability']
 
-                            with st.expander(f"📋 Détails - {champ['name']} ({prob:.1f}%)"):
-                                detail_col1, detail_col2 = st.columns(2)
+                    with st.expander(f"📋 Détails - {champ['name']} ({prob:.1f}%)"):
+                        detail_col1, detail_col2 = st.columns(2)
 
-                                with detail_col1:
-                                    st.markdown("**🏷️ Informations**")
-                                    st.write(f"• **Rôles**: {', '.join(champ['tags'])}")
-                                    st.write(f"• **Probabilité**: {prob:.1f}%")
+                        with detail_col1:
+                            st.markdown("**🏷️ Informations**")
+                            st.write(f"• **Rôles**: {', '.join(champ['tags'])}")
+                            st.write(f"• **Probabilité**: {prob:.1f}%")
 
-                                    st.markdown("**📊 Scores Détaillés**")
-                                    st.write(f"• **Meta**: {rec['score_breakdown']['meta']:.1f}/25")
-                                    st.write(f"• **Synergie**: {rec['score_breakdown']['synergy']:.1f}/20")
-                                    st.write(f"• **Counter**: {rec['score_breakdown']['counter']:.1f}/25")
-                                    st.write(f"• **Composition**: {rec['score_breakdown']['composition']:.1f}/20")
-                                    st.write(f"• **Lane Fit**: {rec['score_breakdown']['lane_fit']:.1f}/10")
+                            st.markdown("**📊 Scores Détaillés**")
+                            st.write(f"• **Meta**: {rec['score_breakdown']['meta']:.1f}/25")
+                            st.write(f"• **Synergie**: {rec['score_breakdown']['synergy']:.1f}/20")
+                            st.write(f"• **Counter**: {rec['score_breakdown']['counter']:.1f}/25")
+                            st.write(f"• **Composition**: {rec['score_breakdown']['composition']:.1f}/20")
+                            st.write(f"• **Lane Fit**: {rec['score_breakdown']['lane_fit']:.1f}/10")
 
-                                with detail_col2:
-                                    # Graphique de scores
-                                    scores = rec['score_breakdown']
-                                    score_names = list(scores.keys())
-                                    score_values = [scores[name] for name in score_names]
+                        with detail_col2:
+                            # Graphique de scores
+                            scores = rec['score_breakdown']
+                            score_names = list(scores.keys())
+                            score_values = [scores[name] for name in score_names]
 
-                                    import plotly.express as px
-                                    import pandas as pd
+                            import plotly.express as px
+                            import pandas as pd
 
-                                    df = pd.DataFrame({
-                                        'Critère': score_names,
-                                        'Score': score_values
-                                    })
+                            df = pd.DataFrame({
+                                'Critère': score_names,
+                                'Score': score_values
+                            })
 
-                                    fig = px.bar(df, x='Critère', y='Score',
-                                               title=f"Scores pour {champ['name']}")
-                                    fig.update_layout(height=300)
-                                    st.plotly_chart(fig, use_container_width=True)
+                            fig = px.bar(df, x='Critère', y='Score',
+                                       title=f"Scores pour {champ['name']}")
+                            fig.update_layout(height=300)
+                            st.plotly_chart(fig, use_container_width=True)
 
-                                if st.button(f"✅ Sélectionner {champ['name']}", key=f"pick_blue_detailed_{champ['id']}"):
-                                    st.session_state.blue_team.append(champ['id'])
-                                    st.rerun()
-                    else:
-                        st.warning("❌ Aucune recommandation disponible pour cette lane")
-                        st.info("💡 Cela peut arriver si tous les champions appropriés sont bannis ou déjà sélectionnés")
+                        if st.button(f"✅ Sélectionner {champ['name']}", key=f"pick_blue_detailed_{champ['id']}_{idx}"):
+                            st.session_state.blue_team.append(champ['id'])
+                            st.session_state.blue_recommendations = []
+                            st.rerun()
+            elif st.session_state.get('blue_recommendations') is not None and len(st.session_state.blue_recommendations) == 0 and st.session_state.get('_just_calculated_recs'):
+                st.warning("❌ Aucune recommandation disponible pour cette lane")
+                st.info("💡 Cela peut arriver si tous les champions appropriés sont bannis ou déjà sélectionnés")
 
             # Sélection manuelle
             all_champions = sorted(champion_manager.champion_list)
@@ -257,25 +358,63 @@ if page == "🎯 Draft Assistant":
                     st.session_state.blue_team.append(champion_id)
                     st.rerun()
 
-        # Bouton pour réinitialiser
-        if st.session_state.blue_team:
-            if st.button("🔄 Réinitialiser équipe bleue"):
-                st.session_state.blue_team = []
-                st.rerun()
-
     with col2:
         st.subheader("🔴 Équipe Rouge")
 
-        for i, lane in enumerate(lanes):
-            if len(st.session_state.red_team) > i:
-                champ = champion_manager.get_champion_by_id(st.session_state.red_team[i])
-                if champ:
-                    st.markdown(f"**{lane}**: {champ['name']}")
-            else:
-                st.markdown(f"**{lane}**: *Vide*")
+        # Boutons d'action si l'équipe a des champions
+        if st.session_state.red_team:
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("✏️ " + ("Terminer" if st.session_state.edit_mode_red else "Modifier"), key="toggle_edit_red", use_container_width=True):
+                    st.session_state.edit_mode_red = not st.session_state.edit_mode_red
+                    st.rerun()
+            with col_btn2:
+                if st.button("🔄 Réinitialiser", key="reset_red_btn", use_container_width=True):
+                    st.session_state.red_team = []
+                    st.session_state.red_recommendations = []
+                    st.session_state.edit_mode_red = False
+                    st.rerun()
+            st.markdown("---")
 
-        # Ajouter un champion
-        if len(st.session_state.red_team) < 5:
+        # Mode édition ou affichage normal
+        if st.session_state.edit_mode_red and st.session_state.red_team:
+            st.markdown("**✏️ Mode Édition - Modifiez les champions par lane:**")
+            for i, lane in enumerate(lanes):
+                if len(st.session_state.red_team) > i:
+                    champ = champion_manager.get_champion_by_id(st.session_state.red_team[i])
+                    if champ:
+                        # Obtenir la liste des noms de champions
+                        all_champ_names = sorted([c['name'] for c in champion_manager.champions.values()])
+                        current_idx = all_champ_names.index(champ['name']) if champ['name'] in all_champ_names else 0
+
+                        new_champ_name = st.selectbox(
+                            f"**{lane}:**",
+                            all_champ_names,
+                            index=current_idx,
+                            key=f"edit_red_{lane}_{i}"
+                        )
+
+                        # Si changement, trouver l'ID et mettre à jour
+                        if new_champ_name != champ['name']:
+                            for champ_id, c in champion_manager.champions.items():
+                                if c['name'] == new_champ_name:
+                                    st.session_state.red_team[i] = champ_id
+                                    st.rerun()
+                                    break
+        else:
+            # Affichage normal
+            for i, lane in enumerate(lanes):
+                if len(st.session_state.red_team) > i:
+                    champ = champion_manager.get_champion_by_id(st.session_state.red_team[i])
+                    if champ:
+                        st.markdown(f"**{lane}**: {champ['name']}")
+                else:
+                    st.markdown(f"**{lane}**: *Vide*")
+
+        st.markdown("---")
+
+        # Ajouter un champion (seulement si pas en mode édition)
+        if not st.session_state.edit_mode_red and len(st.session_state.red_team) < 5:
             current_lane = lanes[len(st.session_state.red_team)]
             st.markdown(f"### Sélectionner pour {current_lane}")
 
@@ -289,76 +428,83 @@ if page == "🎯 Draft Assistant":
                         current_lane,
                         top_n=5
                     )
+                    # Stocker les recommandations pour qu'elles persistent entre les reruns
+                    st.session_state.red_recommendations = recs if recs else []
+                    st.rerun()
 
-                    if recs:
-                        st.markdown("#### 🎯 Top 5 Recommandations:")
+            # Afficher les recommandations stockées (en dehors du if button pour qu'elles persistent)
+            if st.session_state.red_recommendations:
+                recs = st.session_state.red_recommendations
+                st.markdown("#### 🎯 Top 5 Recommandations:")
 
-                        # Afficher un aperçu en colonnes
-                        rec_cols = st.columns(5)
-                        for idx, rec in enumerate(recs):
-                            champ = rec['champion']
-                            prob = rec['probability']
+                # Afficher un aperçu en colonnes
+                rec_cols = st.columns(5)
+                for idx, rec in enumerate(recs):
+                    champ = rec['champion']
+                    prob = rec['probability']
 
-                            with rec_cols[idx]:
-                                st.markdown(f"""
-                                <div style="border: 2px solid #C89B3C; border-radius: 10px; padding: 10px; text-align: center; margin: 5px;">
-                                    <h4>{idx+1}. {champ['name']}</h4>
-                                    <p><strong>{prob:.1f}%</strong> de succès</p>
-                                    <p><small>{', '.join(champ['tags'][:2])}</small></p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                    with rec_cols[idx]:
+                        st.markdown(f"""
+                        <div style="border: 2px solid #C89B3C; border-radius: 10px; padding: 10px; text-align: center; margin: 5px;">
+                            <h4>{idx+1}. {champ['name']}</h4>
+                            <p><strong>{prob:.1f}%</strong> de succès</p>
+                            <p><small>{', '.join(champ['tags'][:2])}</small></p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                                if st.button(f"Choisir", key=f"quick_pick_red_{champ['id']}"):
-                                    st.session_state.red_team.append(champ['id'])
-                                    st.rerun()
+                        if st.button(f"Choisir", key=f"quick_pick_red_{champ['id']}_{idx}"):
+                            st.session_state.red_team.append(champ['id'])
+                            st.session_state.red_recommendations = []
+                            st.rerun()
 
-                        st.markdown("---")
+                st.markdown("---")
 
-                        # Détails complets
-                        for idx, rec in enumerate(recs, 1):
-                            champ = rec['champion']
-                            prob = rec['probability']
+                # Détails complets
+                for idx, rec in enumerate(recs, 1):
+                    champ = rec['champion']
+                    prob = rec['probability']
 
-                            with st.expander(f"📋 Détails - {champ['name']} ({prob:.1f}%)"):
-                                detail_col1, detail_col2 = st.columns(2)
+                    with st.expander(f"📋 Détails - {champ['name']} ({prob:.1f}%)"):
+                        detail_col1, detail_col2 = st.columns(2)
 
-                                with detail_col1:
-                                    st.markdown("**🏷️ Informations**")
-                                    st.write(f"• **Rôles**: {', '.join(champ['tags'])}")
-                                    st.write(f"• **Probabilité**: {prob:.1f}%")
+                        with detail_col1:
+                            st.markdown("**🏷️ Informations**")
+                            st.write(f"• **Rôles**: {', '.join(champ['tags'])}")
+                            st.write(f"• **Probabilité**: {prob:.1f}%")
 
-                                    st.markdown("**📊 Scores Détaillés**")
-                                    st.write(f"• **Meta**: {rec['score_breakdown']['meta']:.1f}/25")
-                                    st.write(f"• **Synergie**: {rec['score_breakdown']['synergy']:.1f}/20")
-                                    st.write(f"• **Counter**: {rec['score_breakdown']['counter']:.1f}/25")
-                                    st.write(f"• **Composition**: {rec['score_breakdown']['composition']:.1f}/20")
-                                    st.write(f"• **Lane Fit**: {rec['score_breakdown']['lane_fit']:.1f}/10")
+                            st.markdown("**📊 Scores Détaillés**")
+                            st.write(f"• **Meta**: {rec['score_breakdown']['meta']:.1f}/25")
+                            st.write(f"• **Synergie**: {rec['score_breakdown']['synergy']:.1f}/20")
+                            st.write(f"• **Counter**: {rec['score_breakdown']['counter']:.1f}/25")
+                            st.write(f"• **Composition**: {rec['score_breakdown']['composition']:.1f}/20")
+                            st.write(f"• **Lane Fit**: {rec['score_breakdown']['lane_fit']:.1f}/10")
 
-                                with detail_col2:
-                                    # Graphique de scores
-                                    scores = rec['score_breakdown']
-                                    score_names = list(scores.keys())
-                                    score_values = [scores[name] for name in score_names]
+                        with detail_col2:
+                            # Graphique de scores
+                            scores = rec['score_breakdown']
+                            score_names = list(scores.keys())
+                            score_values = [scores[name] for name in score_names]
 
-                                    import plotly.express as px
-                                    import pandas as pd
+                            import plotly.express as px
+                            import pandas as pd
 
-                                    df = pd.DataFrame({
-                                        'Critère': score_names,
-                                        'Score': score_values
-                                    })
+                            df = pd.DataFrame({
+                                'Critère': score_names,
+                                'Score': score_values
+                            })
 
-                                    fig = px.bar(df, x='Critère', y='Score',
-                                               title=f"Scores pour {champ['name']}")
-                                    fig.update_layout(height=300)
-                                    st.plotly_chart(fig, use_container_width=True)
+                            fig = px.bar(df, x='Critère', y='Score',
+                                       title=f"Scores pour {champ['name']}")
+                            fig.update_layout(height=300)
+                            st.plotly_chart(fig, use_container_width=True)
 
-                                if st.button(f"✅ Sélectionner {champ['name']}", key=f"pick_red_detailed_{champ['id']}"):
-                                    st.session_state.red_team.append(champ['id'])
-                                    st.rerun()
-                    else:
-                        st.warning("❌ Aucune recommandation disponible pour cette lane")
-                        st.info("💡 Cela peut arriver si tous les champions appropriés sont bannis ou déjà sélectionnés")
+                        if st.button(f"✅ Sélectionner {champ['name']}", key=f"pick_red_detailed_{champ['id']}_{idx}"):
+                            st.session_state.red_team.append(champ['id'])
+                            st.session_state.red_recommendations = []
+                            st.rerun()
+            elif st.session_state.get('red_recommendations') is not None and len(st.session_state.red_recommendations) == 0 and st.session_state.get('_just_calculated_recs'):
+                st.warning("❌ Aucune recommandation disponible pour cette lane")
+                st.info("💡 Cela peut arriver si tous les champions appropriés sont bannis ou déjà sélectionnés")
 
             # Sélection manuelle pour l'équipe rouge
             all_champions = sorted(champion_manager.champion_list)
@@ -379,12 +525,6 @@ if page == "🎯 Draft Assistant":
                 if champion_id and champion_id not in st.session_state.red_team:
                     st.session_state.red_team.append(champion_id)
                     st.rerun()
-
-        # Bouton pour réinitialiser
-        if st.session_state.red_team:
-            if st.button("🔄 Réinitialiser équipe rouge"):
-                st.session_state.red_team = []
-                st.rerun()
 
     # Bans
     st.markdown("---")
