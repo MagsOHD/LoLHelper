@@ -88,14 +88,14 @@ class ItemDataManager:
 
     def _is_purchasable_item(self, item_info: Dict) -> bool:
         """Détermine si un item est achetable dans le jeu."""
-        # Exclure les items sans coût ou avec des coûts spéciaux
+        # Exclure les items sans coût ou marqués comme non achetables
         gold = item_info.get('gold', {})
         if not gold or gold.get('purchasable', True) == False:
             return False
 
-        # Exclure les items de démarrage spéciaux et les consommables de base
+        # Exclure uniquement les items vraiment inutilisables
         item_name = item_info.get('name', '').lower()
-        excluded_keywords = ['trinket', 'starting', 'deprecated', 'boots of speed']
+        excluded_keywords = ['trinket', 'deprecated', 'enchantment', 'quick charge', 'scorchclaw pup']
 
         for keyword in excluded_keywords:
             if keyword in item_name:
@@ -104,6 +104,11 @@ class ItemDataManager:
         # Vérifier que l'item est disponible sur la Faille de l'invocateur (map 11)
         maps = item_info.get('maps', {})
         if '11' in maps and not maps['11']:
+            return False
+
+        # Exclure les items avec un coût total de 0 (sauf les boots et les starter items)
+        total_cost = gold.get('total', 0)
+        if total_cost == 0 and 'boots' not in item_name and 'starting' not in item_name:
             return False
 
         return True

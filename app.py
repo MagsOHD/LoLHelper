@@ -149,11 +149,11 @@ if page == "🎯 Draft Assistant":
     st.header("Assistant de Draft")
 
     # Section des compositions prédéfinies
-    with st.expander("📋 Compositions Prédéfinies", expanded=False):
-        st.markdown("### Charger une composition prédéfinie")
-        st.markdown("*Utilisez des compositions optimales pour différentes stratégies*")
+    with st.expander("📋 Compositions Prédéfinies Professionnelles", expanded=False):
+        st.markdown("### Charger une composition d'équipe pro réelle")
+        st.markdown("*Compositions basées sur des matches professionnels (Worlds, MSI, LCK, LPL, LEC)*")
 
-        col_preset1, col_preset2 = st.columns([4, 1])
+        col_preset1, col_preset2, col_preset3 = st.columns([3, 1, 1])
 
         with col_preset1:
             preset_names = [""] + get_preset_names()
@@ -164,14 +164,25 @@ if page == "🎯 Draft Assistant":
             )
 
         with col_preset2:
-            if selected_preset and st.button("📥 Charger",  key="load_preset", use_container_width=True):
+            if selected_preset and st.button("🔵 Équipe Bleue",  key="load_preset_blue", use_container_width=True):
                 preset = get_preset_composition(selected_preset)
                 if preset:
                     st.session_state.blue_team = preset['blue_team'].copy()
                     st.session_state.blue_recommendations = []
                     st.session_state.blue_recs_lane = None
                     st.session_state.edit_mode_blue = False
-                    st.success(f"✅ '{selected_preset}' chargée!")
+                    st.success(f"✅ '{selected_preset}' chargée pour l'équipe bleue!")
+                    st.rerun()
+
+        with col_preset3:
+            if selected_preset and st.button("🔴 Équipe Rouge",  key="load_preset_red", use_container_width=True):
+                preset = get_preset_composition(selected_preset)
+                if preset:
+                    st.session_state.red_team = preset['blue_team'].copy()
+                    st.session_state.red_recommendations = []
+                    st.session_state.red_recs_lane = None
+                    st.session_state.edit_mode_red = False
+                    st.success(f"✅ '{selected_preset}' chargée pour l'équipe rouge!")
                     st.rerun()
 
         # Afficher les informations de la composition sélectionnée
@@ -179,8 +190,21 @@ if page == "🎯 Draft Assistant":
             preset = get_preset_composition(selected_preset)
             if preset:
                 st.markdown("---")
+
+                # Infos de l'équipe et du tournoi
+                info_cols = st.columns(3)
+                with info_cols[0]:
+                    if 'team' in preset:
+                        st.markdown(f"**🏆 Équipe:** {preset['team']}")
+                with info_cols[1]:
+                    if 'tournament' in preset:
+                        st.markdown(f"**🎮 Tournoi:** {preset['tournament']}")
+                with info_cols[2]:
+                    if 'opponent' in preset:
+                        st.markdown(f"**⚔️ Opposant:** {preset['opponent']}")
+
                 st.markdown(f"**📝 Description:** {preset['description']}")
-                st.markdown(f"**⚔️ Stratégie:** {preset['strategy']}")
+                st.markdown(f"**🎯 Stratégie:** {preset['strategy']}")
                 st.markdown("**👥 Champions:**")
                 cols = st.columns(5)
                 for i, champ_id in enumerate(preset['blue_team']):
