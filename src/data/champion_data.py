@@ -171,3 +171,87 @@ def get_champions_for_lane(lane: str, champion_manager: ChampionDataManager) -> 
             unique_champions.append(champ)
 
     return unique_champions
+
+
+def calculate_champion_stats_at_level(champion: Dict, level: int = 1) -> Dict:
+    """Calcule les statistiques d'un champion à un niveau donné."""
+    if not champion or level < 1 or level > 18:
+        return champion
+
+    # Créer une copie du champion pour ne pas modifier l'original
+    champion_copy = champion.copy()
+    base_stats = champion.get('stats', {})
+
+    if not base_stats:
+        return champion_copy
+
+    # Calculer les nouvelles stats selon le niveau
+    level_stats = {}
+
+    # Mapping des stats avec leurs croissances par niveau
+    stat_growths = {
+        'hp': base_stats.get('hpperlevel', 0),
+        'mp': base_stats.get('mpperlevel', 0),
+        'armor': base_stats.get('armorperlevel', 0),
+        'spellblock': base_stats.get('spellblockperlevel', 0),
+        'attackdamage': base_stats.get('attackdamageperlevel', 0),
+        'attackspeed': base_stats.get('attackspeedperlevel', 0),
+        'hpregen': base_stats.get('hpregenperlevel', 0),
+        'mpregen': base_stats.get('mpregenperlevel', 0),
+        'crit': base_stats.get('critperlevel', 0),
+        'critdamage': base_stats.get('critdamageperlevel', 0)
+    }
+
+    # Calculer chaque statistique au niveau donné
+    for stat, base_value in base_stats.items():
+        if stat.endswith('perlevel'):
+            continue  # Ignorer les stats de croissance
+
+        # Trouver la croissance correspondante
+        growth_stat = stat + 'perlevel'
+        growth_value = base_stats.get(growth_stat, 0)
+
+        # Formule League of Legends : Stat(n) = Base + Growth × (n-1) × (0.7025 + 0.0175 × (n-1))
+        # Simplifiée pour une croissance linéaire : Stat(n) = Base + Growth × (n-1)
+        level_modifier = level - 1
+        level_stats[stat] = base_value + (growth_value * level_modifier)
+
+    # Cas spéciaux pour certaines stats
+    if 'attackspeed' in level_stats:
+        # L'attackspeed a une formule particulière
+        base_as = base_stats.get('attackspeed', 0.625)
+        as_growth = base_stats.get('attackspeedperlevel', 0)
+        level_stats['attackspeed'] = base_as * (1 + (as_growth / 100) * (level - 1))
+
+    # Mettre à jour la copie du champion
+    champion_copy['stats'] = level_stats
+    champion_copy['level'] = level
+
+    return champion_copy
+
+
+def get_champion_power_curve(champion: Dict, max_level: int = 18) -> Dict:
+    """Génère la courbe de puissance d'un champion sur tous les niveaux."""
+    if not champion:
+        return {}
+
+    power_curve = {
+        'levels': list(range(1, max_level + 1)),
+        'hp': [],
+        'damage': [],
+        'armor': [],
+        'magic_resist': [],
+        'attack_speed': []
+    }
+
+    for level in range(1, max_level + 1):
+        champ_at_level = calculate_champion_stats_at_level(champion, level)
+        stats = champ_at_level.get('stats', {})
+
+        power_curve['hp'].append(stats.get('hp', 0))
+        power_curve['damage'].append(stats.get('attackdamage', 0))
+        power_curve['armor'].append(stats.get('armor', 0))
+        power_curve['magic_resist'].append(stats.get('spellblock', 0))
+        power_curve['attack_speed'].append(stats.get('attackspeed', 0))
+
+    return power_curve

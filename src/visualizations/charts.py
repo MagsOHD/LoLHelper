@@ -441,3 +441,105 @@ class ChartGenerator:
         )
 
         return fig
+
+    def create_pro_stats_bar_chart(self, df: pd.DataFrame, sort_by: str) -> go.Figure:
+        """Crée un graphique en barres des statistiques pro."""
+        # Trier par la métrique choisie
+        df_sorted = df.sort_values(sort_by, ascending=True).tail(15)
+
+        # Définir les couleurs selon la métrique
+        color_scale = 'Viridis' if sort_by in ['Winrate', 'Pickrate'] else 'Reds'
+
+        fig = go.Figure(data=[
+            go.Bar(
+                y=df_sorted['Champion'],
+                x=df_sorted[sort_by],
+                orientation='h',
+                text=df_sorted[sort_by].round(1),
+                textposition='auto',
+                marker=dict(
+                    color=df_sorted[sort_by],
+                    colorscale=color_scale,
+                    colorbar=dict(title=sort_by)
+                )
+            )
+        ])
+
+        fig.update_layout(
+            title=f'Top 15 Champions - {sort_by}',
+            title_font=dict(size=20, color=self.COLORS['accent']),
+            xaxis=dict(
+                title=sort_by,
+                gridcolor=self.COLORS['secondary'],
+                color=self.COLORS['text']
+            ),
+            yaxis=dict(
+                title='Champions',
+                gridcolor=self.COLORS['secondary'],
+                color=self.COLORS['text']
+            ),
+            paper_bgcolor=self.COLORS['primary'],
+            plot_bgcolor=self.COLORS['primary'],
+            font={'color': self.COLORS['text']},
+            height=600
+        )
+
+        return fig
+
+    def create_pro_stats_scatter(self, df: pd.DataFrame) -> go.Figure:
+        """Crée un scatter plot Pickrate vs Winrate."""
+        # Définir la taille des points selon le nombre de picks
+        sizes = [max(5, min(30, picks * 3)) for picks in df['Picks']]
+
+        fig = go.Figure(data=[
+            go.Scatter(
+                x=df['Pickrate'],
+                y=df['Winrate'],
+                mode='markers+text',
+                text=df['Champion'],
+                textposition='top center',
+                marker=dict(
+                    size=sizes,
+                    color=df['Banrate'],
+                    colorscale='RdYlBu_r',
+                    colorbar=dict(title='Banrate %'),
+                    line=dict(width=1, color=self.COLORS['accent'])
+                ),
+                hovertemplate=(
+                    '<b>%{text}</b><br>' +
+                    'Pickrate: %{x:.1f}%<br>' +
+                    'Winrate: %{y:.1f}%<br>' +
+                    'Picks: %{marker.size}<br>' +
+                    '<extra></extra>'
+                )
+            )
+        ])
+
+        # Ajouter des lignes de référence
+        fig.add_hline(y=50, line_dash="dash", line_color=self.COLORS['accent'],
+                     annotation_text="Winrate équilibré (50%)")
+        fig.add_vline(x=df['Pickrate'].mean(), line_dash="dash", line_color=self.COLORS['secondary'],
+                     annotation_text="Pickrate moyen")
+
+        fig.update_layout(
+            title='Analyse Pickrate vs Winrate (taille = picks, couleur = banrate)',
+            title_font=dict(size=18, color=self.COLORS['accent']),
+            xaxis=dict(
+                title='Pickrate (%)',
+                gridcolor=self.COLORS['secondary'],
+                color=self.COLORS['text'],
+                range=[-2, df['Pickrate'].max() + 5]
+            ),
+            yaxis=dict(
+                title='Winrate (%)',
+                gridcolor=self.COLORS['secondary'],
+                color=self.COLORS['text'],
+                range=[df['Winrate'].min() - 5, df['Winrate'].max() + 5]
+            ),
+            paper_bgcolor=self.COLORS['primary'],
+            plot_bgcolor=self.COLORS['primary'],
+            font={'color': self.COLORS['text']},
+            height=600
+        )
+
+        return fig

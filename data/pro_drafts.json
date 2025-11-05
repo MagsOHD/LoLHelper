@@ -1,0 +1,242 @@
+[
+  {
+    "blue_team": {
+      "picks": ["Aatrox", "LeeSin", "Ahri", "Jinx", "Thresh"],
+      "bans": ["Zed", "Yasuo", "Darius", "Blitzcrank", "MasterYi"]
+    },
+    "red_team": {
+      "picks": ["Garen", "Jarvan IV", "Syndra", "Caitlyn", "Lulu"],
+      "bans": ["Katarina", "Fizz", "Vayne", "Pyke", "Hecarim"]
+    },
+    "winner": "blue",
+    "match_duration": 1800
+  },
+  {
+    "blue_team": {
+      "picks": ["Ornn", "Graves", "Viktor", "Aphelios", "Nautilus"],
+      "bans": ["Akali", "Sylas", "Kalista", "Renata Glasc", "Nidalee"]
+    },
+    "red_team": {
+      "picks": ["Renekton", "Viego", "Orianna", "Ezreal", "Rakan"],
+      "bans": ["Zeri", "Yuumi", "Kaisa", "LeBlanc", "KSante"]
+    },
+    "winner": "red",
+    "match_duration": 2100
+  },
+  {
+    "blue_team": {
+      "picks": ["KSante", "Kindred", "Azir", "Jinx", "Renata Glasc"],
+      "bans": ["Aatrox", "Viego", "Yasuo", "Kaisa", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["Jax", "Graves", "Orianna", "Aphelios", "Nautilus"],
+      "bans": ["Sylas", "LeeSin", "Ahri", "Ezreal", "Lulu"]
+    },
+    "winner": "blue",
+    "match_duration": 1950
+  },
+  {
+    "blue_team": {
+      "picks": ["Gnar", "Viego", "LeBlanc", "Kaisa", "Alistar"],
+      "bans": ["Aatrox", "Graves", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["Ornn", "Sejuani", "Viktor", "Caitlyn", "Lux"],
+      "bans": ["KSante", "LeeSin", "Yasuo", "Aphelios", "Nautilus"]
+    },
+    "winner": "red",
+    "match_duration": 2250
+  },
+  {
+    "blue_team": {
+      "picks": ["Aatrox", "Graves", "Orianna", "Jinx", "Thresh"],
+      "bans": ["KSante", "Viego", "Azir", "Kaisa", "Nautilus"]
+    },
+    "red_team": {
+      "picks": ["Jax", "Kindred", "Viktor", "Aphelios", "Renata Glasc"],
+      "bans": ["Ornn", "LeeSin", "LeBlanc", "Ezreal", "Alistar"]
+    },
+    "winner": "blue",
+    "match_duration": 1875
+  },
+  {
+    "blue_team": {
+      "picks": ["Renekton", "LeeSin", "Sylas", "Caitlyn", "Lulu"],
+      "bans": ["Aatrox", "Graves", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Viego", "Orianna", "Kaisa", "Nautilus"],
+      "bans": ["Jax", "Kindred", "Viktor", "Aphelios", "Renata Glasc"]
+    },
+    "winner": "red",
+    "match_duration": 2150
+  },
+  {
+    "blue_team": {
+      "picks": ["Ornn", "Sejuani", "Ahri", "Ezreal", "Braum"],
+      "bans": ["Aatrox", "Graves", "LeBlanc", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["Gnar", "Viego", "Viktor", "Kaisa", "Nautilus"],
+      "bans": ["KSante", "LeeSin", "Azir", "Aphelios", "Renata Glasc"]
+    },
+    "winner": "blue",
+    "match_duration": 1950
+  },
+  {
+    "blue_team": {
+      "picks": ["Jax", "Graves", "Orianna", "Caitlyn", "Thresh"],
+      "bans": ["Aatrox", "Viego", "Azir", "Kaisa", "Nautilus"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Kindred", "LeBlanc", "Jinx", "Lulu"],
+      "bans": ["Ornn", "LeeSin", "Sylas", "Aphelios", "Renata Glasc"]
+    },
+    "winner": "red",
+    "match_duration": 2080
+  },
+  {
+    "blue_team": {
+      "picks": ["Aatrox", "Viego", "Viktor", "Jinx", "Nautilus"],
+      "bans": ["KSante", "Graves", "Azir", "Kaisa", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["Gnar", "LeeSin", "Orianna", "Ezreal", "Alistar"],
+      "bans": ["Jax", "Sejuani", "LeBlanc", "Aphelios", "Renata Glasc"]
+    },
+    "winner": "blue",
+    "match_duration": 1825
+  },
+  {
+    "blue_team": {
+      "picks": ["Renekton", "Kindred", "Ahri", "Caitlyn", "Lux"],
+      "bans": ["Aatrox", "Viego", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Graves", "Orianna", "Kaisa", "Nautilus"],
+      "bans": ["Jax", "LeeSin", "LeBlanc", "Aphelios", "Braum"]
+    },
+    "winner": "red",
+    "match_duration": 2200
+  },
+  {
+    "blue_team": {
+      "picks": ["Ornn", "Graves", "Sylas", "Ezreal", "Renata Glasc"],
+      "bans": ["Aatrox", "Viego", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["Gnar", "Sejuani", "Viktor", "Kaisa", "Lulu"],
+      "bans": ["KSante", "LeeSin", "LeBlanc", "Caitlyn", "Nautilus"]
+    },
+    "winner": "blue",
+    "match_duration": 1900
+  },
+  {
+    "blue_team": {
+      "picks": ["Jax", "Viego", "Orianna", "Jinx", "Alistar"],
+      "bans": ["Aatrox", "Graves", "Azir", "Kaisa", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Kindred", "Ahri", "Aphelios", "Nautilus"],
+      "bans": ["Ornn", "LeeSin", "LeBlanc", "Caitlyn", "Renata Glasc"]
+    },
+    "winner": "red",
+    "match_duration": 2050
+  },
+  {
+    "blue_team": {
+      "picks": ["Aatrox", "LeeSin", "Viktor", "Caitlyn", "Thresh"],
+      "bans": ["KSante", "Viego", "Azir", "Jinx", "Nautilus"]
+    },
+    "red_team": {
+      "picks": ["Gnar", "Graves", "Orianna", "Kaisa", "Lulu"],
+      "bans": ["Jax", "Sejuani", "LeBlanc", "Ezreal", "Renata Glasc"]
+    },
+    "winner": "blue",
+    "match_duration": 1775
+  },
+  {
+    "blue_team": {
+      "picks": ["Renekton", "Kindred", "Sylas", "Jinx", "Braum"],
+      "bans": ["Aatrox", "Graves", "Azir", "Kaisa", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Viego", "Ahri", "Aphelios", "Nautilus"],
+      "bans": ["Ornn", "LeeSin", "Viktor", "Caitlyn", "Lux"]
+    },
+    "winner": "red",
+    "match_duration": 2175
+  },
+  {
+    "blue_team": {
+      "picks": ["Ornn", "Sejuani", "LeBlanc", "Ezreal", "Renata Glasc"],
+      "bans": ["Aatrox", "Viego", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["Jax", "Graves", "Orianna", "Kaisa", "Alistar"],
+      "bans": ["KSante", "LeeSin", "Viktor", "Caitlyn", "Nautilus"]
+    },
+    "winner": "blue",
+    "match_duration": 1950
+  },
+  {
+    "blue_team": {
+      "picks": ["Gnar", "Viego", "Viktor", "Caitlyn", "Lulu"],
+      "bans": ["Aatrox", "Graves", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Kindred", "Orianna", "Kaisa", "Nautilus"],
+      "bans": ["Jax", "LeeSin", "LeBlanc", "Aphelios", "Renata Glasc"]
+    },
+    "winner": "red",
+    "match_duration": 2125
+  },
+  {
+    "blue_team": {
+      "picks": ["Aatrox", "Graves", "Ahri", "Jinx", "Thresh"],
+      "bans": ["KSante", "Viego", "Azir", "Kaisa", "Nautilus"]
+    },
+    "red_team": {
+      "picks": ["Renekton", "LeeSin", "Sylas", "Ezreal", "Braum"],
+      "bans": ["Ornn", "Sejuani", "Viktor", "Aphelios", "Renata Glasc"]
+    },
+    "winner": "blue",
+    "match_duration": 1850
+  },
+  {
+    "blue_team": {
+      "picks": ["Jax", "Kindred", "Orianna", "Caitlyn", "Nautilus"],
+      "bans": ["Aatrox", "Viego", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Graves", "LeBlanc", "Kaisa", "Lulu"],
+      "bans": ["Gnar", "LeeSin", "Viktor", "Aphelios", "Alistar"]
+    },
+    "winner": "red",
+    "match_duration": 2075
+  },
+  {
+    "blue_team": {
+      "picks": ["Ornn", "Viego", "Viktor", "Ezreal", "Renata Glasc"],
+      "bans": ["Aatrox", "Graves", "Azir", "Jinx", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["Gnar", "Sejuani", "Ahri", "Kaisa", "Nautilus"],
+      "bans": ["KSante", "LeeSin", "LeBlanc", "Caitlyn", "Braum"]
+    },
+    "winner": "blue",
+    "match_duration": 1925
+  },
+  {
+    "blue_team": {
+      "picks": ["Renekton", "Graves", "Sylas", "Jinx", "Alistar"],
+      "bans": ["Aatrox", "Viego", "Azir", "Kaisa", "Thresh"]
+    },
+    "red_team": {
+      "picks": ["KSante", "Kindred", "Orianna", "Aphelios", "Lulu"],
+      "bans": ["Jax", "LeeSin", "Viktor", "Caitlyn", "Nautilus"]
+    },
+    "winner": "red",
+    "match_duration": 2150
+  }
+]
