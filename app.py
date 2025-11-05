@@ -1645,7 +1645,12 @@ elif page == "🛡️ Stats Champions & Items":
             if item_search:
                 available_items = item_manager.search_items(item_search)
             else:
-                available_items = list(item_manager.items.values())[:50]  # Limiter pour les performances
+                # Afficher tous les items triés par coût
+                available_items = sorted(
+                    item_manager.items.values(),
+                    key=lambda x: x['gold'].get('total', 0),
+                    reverse=True
+                )
 
             item_names = [f"{item['name']} ({item['gold'].get('total', 0)} gold)" for item in available_items]
             selected_items = st.multiselect("Sélectionner jusqu'à 6 items:", item_names, max_selections=6)
@@ -1778,7 +1783,12 @@ elif page == "🛡️ Stats Champions & Items":
                     if item_search:
                         available_items = item_manager.search_items(item_search)
                     else:
-                        available_items = list(item_manager.items.values())[:30]  # Top 30 items
+                        # Afficher tous les items triés par coût
+                        available_items = sorted(
+                            item_manager.items.values(),
+                            key=lambda x: x['gold'].get('total', 0),
+                            reverse=True
+                        )
 
                     item_options = [f"{item['name']} ({item['gold'].get('total', 0)}g)" for item in available_items]
 
