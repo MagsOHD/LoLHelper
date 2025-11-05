@@ -173,15 +173,19 @@ if page == "🎯 Draft Assistant":
             if selected_preset:
                 preset = get_preset_composition(selected_preset)
                 if preset:
-                    with st.popover("ℹ️ Info"):
-                        st.markdown(f"**Description:**")
-                        st.write(preset['description'])
-                        st.markdown(f"**Stratégie:**")
-                        st.write(preset['strategy'])
-                        st.markdown(f"**Champions:**")
-                        for i, champ_id in enumerate(preset['blue_team']):
-                            lane = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'][i]
-                            st.write(f"• **{lane}**: {champ_id}")
+                    if st.button("ℹ️ Info", key="preset_info", use_container_width=True):
+                        pass  # Le contenu s'affiche en dessous
+
+        # Afficher les informations de la composition sélectionnée
+        if selected_preset:
+            preset = get_preset_composition(selected_preset)
+            if preset:
+                st.markdown(f"**📝 Description:** {preset['description']}")
+                st.markdown(f"**⚔️ Stratégie:** {preset['strategy']}")
+                with st.expander("👥 Champions de cette composition"):
+                    for i, champ_id in enumerate(preset['blue_team']):
+                        lane = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'][i]
+                        st.write(f"• **{lane}**: {champ_id}")
 
     st.markdown("---")
 
