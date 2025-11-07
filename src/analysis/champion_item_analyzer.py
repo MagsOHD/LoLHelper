@@ -431,24 +431,24 @@ class ChampionItemAnalyzer:
             else:
                 ap_champs += 1
 
-        damage_balance = 100 - abs(ad_champs - ap_champs) / len(champions) * 50
+        damage_balance = 100 - (abs(ad_champs - ap_champs) / len(champions) * 50)
         analysis['Équilibre des Dégâts'] = damage_balance
 
-        # Présence de Tank
+        # Présence de Tank (pourcentage basé sur le nombre de champions)
         tanks = sum(1 for champ in champions if 'Tank' in champ.get('tags', []))
-        tank_presence = min(tanks / 2 * 100, 100)
+        tank_presence = min((tanks / len(champions)) * 100, 100)
         analysis['Présence Tank'] = tank_presence
 
-        # Présence de Support
+        # Présence de Support (pourcentage basé sur le nombre de champions)
         supports = sum(1 for champ in champions if 'Support' in champ.get('tags', []))
-        support_presence = min(supports * 100, 100)
+        support_presence = min((supports / len(champions)) * 100, 100)
         analysis['Présence Support'] = support_presence
 
         # Couverture des phases de jeu
         early_game = sum(1 for champ in champions if champ.get('info', {}).get('difficulty', 0) <= 5)
         late_game = sum(1 for champ in champions if champ.get('info', {}).get('difficulty', 0) > 5)
 
-        phase_coverage = 100 - abs(early_game - late_game) / len(champions) * 30
+        phase_coverage = 100 - (abs(early_game - late_game) / len(champions) * 30)
         analysis['Couverture des Phases'] = phase_coverage
 
         # Synergie globale

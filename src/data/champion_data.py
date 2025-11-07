@@ -188,20 +188,6 @@ def calculate_champion_stats_at_level(champion: Dict, level: int = 1) -> Dict:
     # Calculer les nouvelles stats selon le niveau
     level_stats = {}
 
-    # Mapping des stats avec leurs croissances par niveau
-    stat_growths = {
-        'hp': base_stats.get('hpperlevel', 0),
-        'mp': base_stats.get('mpperlevel', 0),
-        'armor': base_stats.get('armorperlevel', 0),
-        'spellblock': base_stats.get('spellblockperlevel', 0),
-        'attackdamage': base_stats.get('attackdamageperlevel', 0),
-        'attackspeed': base_stats.get('attackspeedperlevel', 0),
-        'hpregen': base_stats.get('hpregenperlevel', 0),
-        'mpregen': base_stats.get('mpregenperlevel', 0),
-        'crit': base_stats.get('critperlevel', 0),
-        'critdamage': base_stats.get('critdamageperlevel', 0)
-    }
-
     # Calculer chaque statistique au niveau donné
     for stat, base_value in base_stats.items():
         if stat.endswith('perlevel'):

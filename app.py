@@ -178,7 +178,8 @@ if page == "🎯 Draft Assistant":
             if selected_preset and st.button("🔴 Équipe Rouge",  key="load_preset_red", use_container_width=True):
                 preset = get_preset_composition(selected_preset)
                 if preset:
-                    st.session_state.red_team = preset['blue_team'].copy()
+                    # Charger red_team si disponible, sinon utiliser blue_team (composition générique)
+                    st.session_state.red_team = preset.get('red_team', preset['blue_team']).copy()
                     st.session_state.red_recommendations = []
                     st.session_state.red_recs_lane = None
                     st.session_state.edit_mode_red = False
@@ -640,15 +641,15 @@ if page == "🎯 Draft Assistant":
 
         if team_to_check == "Équipe Bleue" and len(st.session_state.blue_team) >= 3:
             team_composition = [
-                champion_manager.get_champion_by_id(c)['name']
+                champ['name']
                 for c in st.session_state.blue_team
-                if champion_manager.get_champion_by_id(c)
+                if (champ := champion_manager.get_champion_by_id(c))
             ]
         elif team_to_check == "Équipe Rouge" and len(st.session_state.red_team) >= 3:
             team_composition = [
-                champion_manager.get_champion_by_id(c)['name']
+                champ['name']
                 for c in st.session_state.red_team
-                if champion_manager.get_champion_by_id(c)
+                if (champ := champion_manager.get_champion_by_id(c))
             ]
         else:
             team_composition = []
@@ -722,15 +723,15 @@ if page == "🎯 Draft Assistant":
 
         if team_to_explain == "Équipe Bleue" and len(st.session_state.blue_team) >= 3:
             team_composition = [
-                champion_manager.get_champion_by_id(c)['name']
+                champ['name']
                 for c in st.session_state.blue_team
-                if champion_manager.get_champion_by_id(c)
+                if (champ := champion_manager.get_champion_by_id(c))
             ]
         elif team_to_explain == "Équipe Rouge" and len(st.session_state.red_team) >= 3:
             team_composition = [
-                champion_manager.get_champion_by_id(c)['name']
+                champ['name']
                 for c in st.session_state.red_team
-                if champion_manager.get_champion_by_id(c)
+                if (champ := champion_manager.get_champion_by_id(c))
             ]
         else:
             team_composition = []
@@ -818,9 +819,9 @@ if page == "🎯 Draft Assistant":
                 if len(st.session_state.blue_team) >= 3:
                     st.markdown("#### 🔵 Équipe Bleue")
                     blue_composition = [
-                        champion_manager.get_champion_by_id(c)['name']
+                        champ['name']
                         for c in st.session_state.blue_team
-                        if champion_manager.get_champion_by_id(c)
+                        if (champ := champion_manager.get_champion_by_id(c))
                     ]
 
                     if st.button("Analyser Équipe Bleue", key="analyze_blue"):
@@ -842,9 +843,9 @@ if page == "🎯 Draft Assistant":
                 if len(st.session_state.red_team) >= 3:
                     st.markdown("#### 🔴 Équipe Rouge")
                     red_composition = [
-                        champion_manager.get_champion_by_id(c)['name']
+                        champ['name']
                         for c in st.session_state.red_team
-                        if champion_manager.get_champion_by_id(c)
+                        if (champ := champion_manager.get_champion_by_id(c))
                     ]
 
                     if st.button("Analyser Équipe Rouge", key="analyze_red"):
@@ -868,14 +869,14 @@ if page == "🎯 Draft Assistant":
 
                 if st.button("🎯 Prédire le résultat", key="predict_match"):
                     blue_composition = [
-                        champion_manager.get_champion_by_id(c)['name']
+                        champ['name']
                         for c in st.session_state.blue_team
-                        if champion_manager.get_champion_by_id(c)
+                        if (champ := champion_manager.get_champion_by_id(c))
                     ]
                     red_composition = [
-                        champion_manager.get_champion_by_id(c)['name']
+                        champ['name']
                         for c in st.session_state.red_team
-                        if champion_manager.get_champion_by_id(c)
+                        if (champ := champion_manager.get_champion_by_id(c))
                     ]
 
                     blue_winrate = pro_draft_analyzer.get_composition_winrate(blue_composition)
@@ -1300,7 +1301,7 @@ elif page == "🛡️ Stats Champions & Items":
                     if 'image' in selected_champion:
                         try:
                             st.image(selected_champion['image'], width=200)
-                        except:
+                        except Exception:
                             st.write("Image non disponible")
 
                     # Sorts et passif
@@ -1405,7 +1406,7 @@ elif page == "🛡️ Stats Champions & Items":
                             if 'image' in champion:
                                 try:
                                     st.image(champion['image'], width=100)
-                                except:
+                                except Exception:
                                     pass
 
                     # Graphiques de comparaison
@@ -1594,7 +1595,7 @@ elif page == "🛡️ Stats Champions & Items":
                     if 'image' in selected_item:
                         try:
                             st.image(selected_item['image'], width=100)
-                        except:
+                        except Exception:
                             st.write("Image non disponible")
 
                 # Graphique des statistiques

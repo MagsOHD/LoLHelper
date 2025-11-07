@@ -90,7 +90,7 @@ class ItemDataManager:
         """Détermine si un item est achetable dans le jeu."""
         # Exclure les items sans coût ou marqués comme non achetables
         gold = item_info.get('gold', {})
-        if not gold or gold.get('purchasable', True) == False:
+        if not gold or not gold.get('purchasable', True):
             return False
 
         # Exclure uniquement les items vraiment inutilisables
