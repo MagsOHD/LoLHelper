@@ -3,3 +3,4 @@ frontend/dist/
 backend/data/
 backend/.env
 *.db
+!frontend/src/lib/
