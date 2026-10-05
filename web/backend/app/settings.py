@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -52,7 +53,21 @@ class Settings(BaseSettings):
     cache_dir: Path = BACKEND_DIR / "data" / "cache"
     ddragon_locale: str = "fr_FR"
     frontend_dist: Path = BACKEND_DIR.parent / "frontend" / "dist"
-    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # Shared access password; empty = no protection (local use).
+    app_password: str = ""
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [o.strip().rstrip("/") for o in value.split(",") if o.strip()]
+        return value
+
+    @field_validator("app_password", mode="before")
+    @classmethod
+    def _strip_password(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("riot_api_key", mode="before")
     @classmethod

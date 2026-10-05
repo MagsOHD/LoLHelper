@@ -65,6 +65,11 @@ cd ../backend && uvicorn app.main:app --host 0.0.0.0 --port 8000   # http://loca
 
 Pour tester l'interface sans backend : `VITE_MOCK=1 npm run dev`.
 
+## Mise en ligne
+
+Voir [`DEPLOIEMENT.md`](DEPLOIEMENT.md) : interface sur un hébergement web (OVH),
+serveur sur Railway, accès protégé par un mot de passe partagé (`APP_PASSWORD`).
+
 ## Tests
 
 ```bash

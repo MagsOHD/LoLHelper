@@ -187,6 +187,7 @@ export interface Meta {
   platform: string;
   region: string;
   platforms: string[];
+  password_required?: boolean;
 }
 
 export interface Rank {

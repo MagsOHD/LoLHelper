@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -20,6 +21,8 @@ from .services.state import AppContext
 from .settings import Settings
 
 logger = logging.getLogger("app")
+
+_PUBLIC_API_PATHS = {"/api/health", "/api/meta"}
 
 _DEFAULT_HTTP_MESSAGES = {
     404: "Ressource introuvable.",
@@ -117,6 +120,22 @@ def create_app(
             db.close()
 
     app = FastAPI(title="LoL Team Builder", version="1.0.0", lifespan=lifespan)
+
+    # Registered before CORS so that CORS (outermost) also decorates 401 responses.
+    @app.middleware("http")
+    async def require_password(request: Request, call_next):
+        path = request.url.path
+        if (
+            settings.app_password
+            and path.startswith("/api/")
+            and path not in _PUBLIC_API_PATHS
+            and request.method != "OPTIONS"
+        ):
+            given = request.headers.get("x-app-password", "")
+            if not hmac.compare_digest(given.encode(), settings.app_password.encode()):
+                return JSONResponse({"detail": "Mot de passe requis ou incorrect."}, status_code=401)
+        return await call_next(request)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

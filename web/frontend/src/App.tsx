@@ -7,6 +7,7 @@ import { CompositionsPage } from './pages/CompositionsPage';
 import { MatchupPage } from './pages/MatchupPage';
 import { SavedPage } from './pages/SavedPage';
 import { EmptyState } from './components/ui';
+import { PasswordGate } from './components/PasswordGate';
 
 const NAV: { to: string; label: string; short?: string; end?: boolean }[] = [
   { to: '/', label: 'Équipe', end: true },
@@ -63,6 +64,7 @@ export function App() {
       )}
 
       <main id="main" className="main">
+        <PasswordGate required={Boolean(meta.data?.password_required)}>
         <Routes>
           <Route path="/" element={<TeamPage />} />
           <Route path="/players/:id" element={<PlayerPage />} />
@@ -74,6 +76,7 @@ export function App() {
             element={<EmptyState title="Page introuvable" action={<Link className="btn btn--primary" to="/">Retour à l’équipe</Link>} />}
           />
         </Routes>
+        </PasswordGate>
       </main>
       <footer className="footer">
         {meta.data && <span>Patch {meta.data.ddragon_version} · {meta.data.platform.toUpperCase()}</span>}

@@ -18,6 +18,7 @@ import type {
   TeamBody,
   ThemeInfo,
 } from './types';
+import { loadLocal, saveLocal } from '../lib/storage';
 
 export class ApiError extends Error {
   status: number;
@@ -29,6 +30,26 @@ export class ApiError extends Error {
 }
 
 export const MOCK_MODE = import.meta.env.VITE_MOCK === '1';
+
+declare global {
+  interface Window {
+    APP_CONFIG?: { apiBase?: string };
+  }
+}
+
+// Set in public/config.js (editable after build) so the static site can target a remote backend.
+const API_BASE = (window.APP_CONFIG?.apiBase || '').trim().replace(/\/+$/, '');
+
+const PASSWORD_KEY = 'password';
+export const AUTH_REQUIRED_EVENT = 'lolhelper:auth-required';
+
+export function getPassword(): string {
+  return loadLocal<string>(PASSWORD_KEY, '');
+}
+
+export function setPassword(value: string): void {
+  saveLocal(PASSWORD_KEY, value || null);
+}
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
@@ -53,9 +74,13 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
   }
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    const headers: Record<string, string> = {};
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const password = getPassword();
+    if (password) headers['X-App-Password'] = password;
+    res = await fetch(`${API_BASE}/api${path}`, {
       method,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -71,6 +96,7 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
       data = null;
     }
   }
+  if (res.status === 401) window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
   if (!res.ok) {
     throw new ApiError(extractDetail(data) ?? `Erreur ${res.status} du serveur.`, res.status);
   }

@@ -1,0 +1,14 @@
+# Hébergement Apache (OVH) : renvoie toutes les pages de l'appli vers index.html.
+Options -MultiViews
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^ index.html [L]
+
+# Toujours relire index.html et config.js (les autres fichiers ont un nom versionné).
+<IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|config\.js)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

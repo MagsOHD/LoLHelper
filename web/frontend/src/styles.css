@@ -592,3 +592,6 @@ a.member:hover { border-color: var(--gold); }
   .player-head__actions { width: 100%; }
   .player-head__actions .btn { flex: 1; }
 }
+
+.password-gate { max-width: 420px; width: 100%; margin: 24px auto; display: flex; flex-direction: column; gap: 14px; }
+.password-gate h1 { font-family: var(--font-title); color: var(--gold); font-size: 1.4rem; }

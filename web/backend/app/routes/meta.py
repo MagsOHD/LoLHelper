@@ -26,6 +26,7 @@ def _meta(ctx: AppContext) -> Meta:
         platform=ctx.settings.riot_platform,
         region=ctx.settings.effective_region,
         platforms=PLATFORMS,
+        password_required=bool(ctx.settings.app_password),
     )
 
 

@@ -119,3 +119,4 @@ class Meta(BaseModel):
     platform: str
     region: str
     platforms: list[str]
+    password_required: bool = False
