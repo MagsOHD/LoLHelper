@@ -1,0 +1,33 @@
+# API PHP : seul index.php est accessible depuis le web.
+# lib/, config.php, config.example.php, data/ (stockage de secours) et tout le reste sont refusés.
+
+Options -Indexes
+
+<IfModule mod_dir.c>
+  DirectoryIndex index.php
+</IfModule>
+
+# Apache 2.4+
+<IfModule mod_authz_core.c>
+  Require all denied
+  <Files "index.php">
+    Require all granted
+  </Files>
+</IfModule>
+
+# Apache 2.2 (ou 2.4 sans mod_authz_core)
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+  <Files "index.php">
+    Order allow,deny
+    Allow from all
+  </Files>
+</IfModule>
+
+# Le sous-dossier data/ (stockage de secours) ne contient jamais de index.php ;
+# il reçoit en plus son propre .htaccess « tout refuser » à sa création.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(data|lib)(/|$) - [F,L]
+</IfModule>

@@ -1,0 +1,39 @@
+[
+  {
+    "puuid": "kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k",
+    "championId": 103,
+    "championLevel": 12,
+    "championPoints": 154321,
+    "lastPlayTime": 1759600000000,
+    "championPointsSinceLastLevel": 20000,
+    "championPointsUntilNextLevel": 11000,
+    "markRequiredForNextLevel": 2,
+    "tokensEarned": 0,
+    "championSeasonMilestone": 1,
+    "milestoneGrades": [
+      "A",
+      "S-"
+    ]
+  },
+  {
+    "puuid": "kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k",
+    "championId": 99999,
+    "championLevel": 3,
+    "championPoints": 9000,
+    "lastPlayTime": 1759000000000
+  },
+  {
+    "puuid": "kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k",
+    "championId": 62,
+    "championLevel": 7,
+    "championPoints": 60250,
+    "lastPlayTime": 1759500000000
+  },
+  {
+    "puuid": "kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k",
+    "championId": 412,
+    "championLevel": 9,
+    "championPoints": 88000,
+    "lastPlayTime": 1759550000000
+  }
+]

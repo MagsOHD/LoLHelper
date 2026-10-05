@@ -4,3 +4,4 @@ backend/data/
 backend/.env
 *.db
 !frontend/src/lib/
+!frontend/public/api/lib/
