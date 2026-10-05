@@ -1,5 +1,8 @@
 # LoL Team Composition Helper
 
+> **Nouvelle version web** (compos entre amis avec l'API Riot) : voir [`web/README.md`](web/README.md).
+> La suite de ce document décrit l'ancienne application Streamlit.
+
 Un outil d'aide à la création de compositions d'équipe pour League of Legends, basé sur les statistiques, les drafts professionnels et l'analyse prédictive.
 
 ## Fonctionnalités

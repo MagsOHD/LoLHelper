@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  useArchetypes, useChampionMap, usePlayer, useSyncPlayer, useUpdatePool, useUpdatePreferences,
+  useArchetypes, useChampionMap, useMeta, usePlayer, useSyncPlayer, useUpdatePool, useUpdatePreferences,
 } from '../api/hooks';
 import type { ManualPoolEntry, Player, PlayerPreferences } from '../api/types';
 import { ROLES } from '../api/types';
@@ -325,6 +325,7 @@ export function PlayerPage() {
   const { id = '' } = useParams();
   const player = usePlayer(id);
   const sync = useSyncPlayer();
+  const meta = useMeta();
   const [tab, setTab] = useState<Tab>('prefs');
 
   if (player.isPending) {
@@ -344,6 +345,7 @@ export function PlayerPage() {
     );
   }
   const p = player.data;
+  const canSync = Boolean(p.puuid || meta.data?.riot_configured);
   return (
     <div className="page">
       <Link to="/" className="back">← Équipe</Link>
@@ -361,7 +363,7 @@ export function PlayerPage() {
           <p className="muted small">Dernière synchro : {formatDate(p.last_synced_at)}</p>
         </div>
         <div className="player-head__actions">
-          <button type="button" className="btn btn--primary" onClick={() => sync.mutate(p.id)} disabled={sync.isPending || !p.puuid} title={!p.puuid ? 'Indisponible pour un joueur manuel' : undefined}>
+          <button type="button" className="btn btn--primary" onClick={() => sync.mutate(p.id)} disabled={sync.isPending || !canSync} title={!canSync ? 'Clé API Riot non configurée' : undefined}>
             {sync.isPending ? 'Synchronisation…' : 'Synchroniser'}
           </button>
         </div>

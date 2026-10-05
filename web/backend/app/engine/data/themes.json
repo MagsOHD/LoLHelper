@@ -1,0 +1,750 @@
+{
+  "themes": [
+    {
+      "key": "engage",
+      "label": "Engage & teamfight",
+      "kind": "playstyle",
+      "description": "Des tanks et des contrôles de zone pour lancer des 5v5 et les gagner grâce aux sorts de zone.",
+      "weights": {
+        "engage": 1.0,
+        "teamfight": 1.0,
+        "cc": 0.6,
+        "frontline": 0.5
+      },
+      "requires": [
+        {
+          "trait": "engage",
+          "min": 3,
+          "count": 1
+        },
+        {
+          "trait": "teamfight",
+          "min": 3,
+          "count": 2
+        }
+      ]
+    },
+    {
+      "key": "pick",
+      "label": "Pick / catch",
+      "kind": "playstyle",
+      "description": "Attraper une cible isolée grâce à la vision et aux contrôles, puis jouer l'objectif en 5v4.",
+      "weights": {
+        "pick": 1.0,
+        "cc": 0.6,
+        "mobility": 0.4,
+        "early": 0.3
+      },
+      "requires": [
+        {
+          "trait": "pick",
+          "min": 3,
+          "count": 2
+        }
+      ]
+    },
+    {
+      "key": "poke_siege",
+      "label": "Poke & siège",
+      "kind": "playstyle",
+      "description": "User l'adversaire à distance, assiéger les tours et refuser les combats tant qu'il n'est pas affaibli.",
+      "weights": {
+        "poke": 1.0,
+        "waveclear": 0.7,
+        "peel": 0.3
+      },
+      "target": 1.4,
+      "requires": [
+        {
+          "trait": "poke",
+          "min": 2,
+          "count": 3
+        }
+      ]
+    },
+    {
+      "key": "protect_carry",
+      "label": "Protect the carry",
+      "kind": "playstyle",
+      "description": "Toute l'équipe protège un hypercarry qui fait les dégâts pendant que les autres le gardent en vie.",
+      "weights": {
+        "peel": 1.0,
+        "late": 0.6,
+        "frontline": 0.4,
+        "cc": 0.3
+      },
+      "requires": [
+        {
+          "archetypes": [
+            "marksman",
+            "skirmisher",
+            "battlemage"
+          ],
+          "trait": "late",
+          "min": 3,
+          "count": 1
+        },
+        {
+          "trait": "peel",
+          "min": 2,
+          "count": 2
+        }
+      ]
+    },
+    {
+      "key": "split_push",
+      "label": "Split push 1-3-1",
+      "kind": "playstyle",
+      "description": "Un ou deux duellistes poussent les lanes latérales pendant que le reste de l'équipe tient le milieu.",
+      "weights": {
+        "splitpush": 1.0,
+        "waveclear": 0.7,
+        "mobility": 0.4,
+        "peel": 0.2
+      },
+      "target": 1.2,
+      "requires": [
+        {
+          "trait": "splitpush",
+          "min": 3,
+          "count": 1
+        },
+        {
+          "trait": "waveclear",
+          "min": 2,
+          "count": 3
+        }
+      ]
+    },
+    {
+      "key": "dive",
+      "label": "Dive",
+      "kind": "playstyle",
+      "description": "Plonger ensemble sur la backline adverse pour tuer les carries avant qu'ils ne fassent des dégâts.",
+      "weights": {
+        "mobility": 1.0,
+        "engage": 0.7,
+        "early": 0.4,
+        "cc": 0.4,
+        "frontline": 0.3
+      },
+      "requires": [
+        {
+          "archetypes": [
+            "diver",
+            "assassin",
+            "skirmisher",
+            "vanguard"
+          ],
+          "trait": "mobility",
+          "min": 2,
+          "count": 3
+        }
+      ]
+    },
+    {
+      "key": "early_snowball",
+      "label": "Early game / snowball",
+      "kind": "playstyle",
+      "description": "Gagner les lanes, enchaîner les ganks et les objectifs pour finir avant que l'adversaire ne scale.",
+      "weights": {
+        "early": 1.0,
+        "objective": 0.5,
+        "pick": 0.3,
+        "mobility": 0.3
+      },
+      "penalties": {
+        "late": 0.15
+      },
+      "requires": [
+        {
+          "trait": "early",
+          "min": 2,
+          "count": 4
+        }
+      ]
+    },
+    {
+      "key": "scaling",
+      "label": "Scaling late game",
+      "kind": "playstyle",
+      "description": "Survivre au début de partie puis écraser l'adversaire une fois les objets complétés.",
+      "weights": {
+        "late": 1.0,
+        "teamfight": 0.5,
+        "peel": 0.3,
+        "waveclear": 0.4
+      },
+      "penalties": {
+        "early": 0.1
+      },
+      "requires": [
+        {
+          "trait": "late",
+          "min": 3,
+          "count": 2
+        },
+        {
+          "trait": "waveclear",
+          "min": 2,
+          "count": 2
+        }
+      ]
+    },
+    {
+      "key": "skirmish",
+      "label": "Escarmouches",
+      "kind": "playstyle",
+      "description": "Des champions forts en petits combats (2v2, 3v3) autour de la jungle et des objectifs neutres.",
+      "weights": {
+        "mobility": 0.6,
+        "sustain": 0.6,
+        "early": 0.6,
+        "pick": 0.3,
+        "objective": 0.3
+      },
+      "requires": [
+        {
+          "archetypes": [
+            "skirmisher",
+            "diver",
+            "juggernaut",
+            "assassin"
+          ],
+          "count": 2
+        }
+      ]
+    },
+    {
+      "key": "yordles",
+      "label": "Yordles",
+      "kind": "thematic",
+      "description": "Petits mais terribles : un maximum de yordles de Bandle.",
+      "members": {
+        "groups": [
+          "yordle"
+        ],
+        "regions": [
+          "bandle_city"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "void",
+      "label": "Le Néant",
+      "kind": "thematic",
+      "description": "Les créatures du Néant viennent tout dévorer.",
+      "members": {
+        "groups": [
+          "void_born"
+        ],
+        "regions": [
+          "void"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "shadow_isles",
+      "label": "Îles obscures",
+      "kind": "thematic",
+      "description": "Morts-vivants et spectres de la Brume noire.",
+      "members": {
+        "groups": [
+          "undead"
+        ],
+        "regions": [
+          "shadow_isles"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "noxus",
+      "label": "Noxus",
+      "kind": "thematic",
+      "description": "La force avant tout : l'empire noxien part en conquête.",
+      "members": {
+        "regions": [
+          "noxus"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "demacia",
+      "label": "Demacia",
+      "kind": "thematic",
+      "description": "Pour Demacia ! Honneur, justice et grosses épées.",
+      "members": {
+        "regions": [
+          "demacia"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "freljord",
+      "label": "Freljord",
+      "kind": "thematic",
+      "description": "Les guerriers des terres gelées.",
+      "members": {
+        "regions": [
+          "freljord"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "ionia",
+      "label": "Ionia",
+      "kind": "thematic",
+      "description": "Ninjas, esprits et lames : l'équilibre ionien.",
+      "members": {
+        "regions": [
+          "ionia"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "piltover_zaun",
+      "label": "Piltover & Zaun",
+      "kind": "thematic",
+      "description": "La ville du progrès et ses bas-fonds réunis, façon Arcane.",
+      "members": {
+        "regions": [
+          "piltover",
+          "zaun"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "shurima",
+      "label": "Shurima",
+      "kind": "thematic",
+      "description": "L'empire des sables et ses Transfigurés.",
+      "members": {
+        "regions": [
+          "shurima"
+        ],
+        "groups": [
+          "ascended"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "bilgewater",
+      "label": "Bilgewater",
+      "kind": "thematic",
+      "description": "Pirates, chasseurs de primes et monstres marins.",
+      "members": {
+        "regions": [
+          "bilgewater"
+        ],
+        "groups": [
+          "pirate"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "targon",
+      "label": "Targon & célestes",
+      "kind": "thematic",
+      "description": "Les Aspects du mont Targon et les êtres célestes.",
+      "members": {
+        "regions": [
+          "targon"
+        ],
+        "groups": [
+          "celestial"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "ixtal",
+      "label": "Ixtal",
+      "kind": "thematic",
+      "description": "Les mages élémentaires et les créatures de la jungle d'Ixtal.",
+      "members": {
+        "regions": [
+          "ixtal"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "menagerie",
+      "label": "Ménagerie",
+      "kind": "thematic",
+      "description": "Vastayas, bêtes et dragons : une équipe à poils et à écailles.",
+      "members": {
+        "groups": [
+          "vastaya",
+          "beast",
+          "dragon"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "darkin_spirits",
+      "label": "Darkins & esprits",
+      "kind": "thematic",
+      "description": "Armes maudites, demi-dieux et esprits anciens.",
+      "members": {
+        "groups": [
+          "darkin",
+          "spirit"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "full_ap",
+      "label": "Full AP",
+      "kind": "thematic",
+      "description": "Que des dégâts magiques : la résistance magique adverse va souffrir.",
+      "members": {
+        "damage": [
+          "AP",
+          "MIXED"
+        ]
+      },
+      "min_members": 5,
+      "ignore_damage_mix": true
+    },
+    {
+      "key": "full_ad",
+      "label": "Full AD",
+      "kind": "thematic",
+      "description": "Que des dégâts physiques : on mise tout sur l'armure... de l'autre équipe.",
+      "members": {
+        "damage": [
+          "AD",
+          "MIXED"
+        ]
+      },
+      "min_members": 5,
+      "ignore_damage_mix": true
+    },
+    {
+      "key": "assassins",
+      "label": "Full assassins",
+      "kind": "thematic",
+      "description": "Des tueurs partout : un faux pas adverse et c'est fini.",
+      "members": {
+        "archetypes": [
+          "assassin",
+          "skirmisher",
+          "catcher"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "tank_wall",
+      "label": "Mur de tanks",
+      "kind": "thematic",
+      "description": "Trois tanks ou plus : impossible à tuer, impossible à fuir.",
+      "members": {
+        "archetypes": [
+          "vanguard",
+          "warden",
+          "juggernaut"
+        ]
+      },
+      "min_members": 3
+    },
+    {
+      "key": "lore",
+      "label": "Liens de lore",
+      "kind": "thematic",
+      "description": "Frères, sœurs, amoureux et rivaux jurés dans la même équipe.",
+      "pairs_theme": true,
+      "min_members": 4
+    }
+  ],
+  "lore_pairs": [
+    [
+      "Garen",
+      "Lux",
+      "frère et sœur Crownguard"
+    ],
+    [
+      "Garen",
+      "Katarina",
+      "amour impossible entre Demacia et Noxus"
+    ],
+    [
+      "Darius",
+      "Draven",
+      "frères noxiens"
+    ],
+    [
+      "Vi",
+      "Jinx",
+      "sœurs de Zaun"
+    ],
+    [
+      "Vi",
+      "Caitlyn",
+      "duo de choc de Piltover"
+    ],
+    [
+      "Caitlyn",
+      "Jinx",
+      "la shérif et sa pire ennemie"
+    ],
+    [
+      "Jayce",
+      "Viktor",
+      "anciens partenaires devenus rivaux"
+    ],
+    [
+      "Ekko",
+      "Jinx",
+      "amis d'enfance devenus ennemis"
+    ],
+    [
+      "Xayah",
+      "Rakan",
+      "le couple vastaya"
+    ],
+    [
+      "Lucian",
+      "Senna",
+      "les époux sentinelles"
+    ],
+    [
+      "Lucian",
+      "Thresh",
+      "chasse au geôlier"
+    ],
+    [
+      "Senna",
+      "Thresh",
+      "l'âme volée"
+    ],
+    [
+      "Yasuo",
+      "Yone",
+      "frères ioniens"
+    ],
+    [
+      "Yasuo",
+      "Riven",
+      "l'exilé et la repentie"
+    ],
+    [
+      "Yasuo",
+      "Taliyah",
+      "le maître et son élève"
+    ],
+    [
+      "Kayle",
+      "Morgana",
+      "sœurs jumelles ennemies"
+    ],
+    [
+      "Nasus",
+      "Renekton",
+      "frères de Shurima"
+    ],
+    [
+      "Azir",
+      "Xerath",
+      "l'empereur et le traître"
+    ],
+    [
+      "Ashe",
+      "Tryndamere",
+      "le couple royal d'Avarosa"
+    ],
+    [
+      "Ashe",
+      "Sejuani",
+      "rivales pour le Freljord"
+    ],
+    [
+      "Ashe",
+      "Lissandra",
+      "la reine et la sorcière de glace"
+    ],
+    [
+      "Shen",
+      "Zed",
+      "frères d'armes devenus ennemis"
+    ],
+    [
+      "Shen",
+      "Akali",
+      "le maître et l'élève du Kinkou"
+    ],
+    [
+      "Shen",
+      "Kennen",
+      "les gardiens du Kinkou"
+    ],
+    [
+      "Zed",
+      "Akali",
+      "l'ombre et la rebelle"
+    ],
+    [
+      "Leona",
+      "Diana",
+      "le Soleil et la Lune"
+    ],
+    [
+      "JarvanIV",
+      "Shyvana",
+      "le prince et sa dragonne"
+    ],
+    [
+      "JarvanIV",
+      "XinZhao",
+      "le prince et son sénéchal"
+    ],
+    [
+      "JarvanIV",
+      "Garen",
+      "la couronne et son épée"
+    ],
+    [
+      "Katarina",
+      "Cassiopeia",
+      "sœurs Du Couteau"
+    ],
+    [
+      "Katarina",
+      "Talon",
+      "frère et sœur adoptifs"
+    ],
+    [
+      "Swain",
+      "LeBlanc",
+      "les maîtres de Noxus"
+    ],
+    [
+      "Swain",
+      "Darius",
+      "le grand général et sa main"
+    ],
+    [
+      "Gangplank",
+      "MissFortune",
+      "vengeance à Bilgewater"
+    ],
+    [
+      "Graves",
+      "TwistedFate",
+      "anciens partenaires d'arnaque"
+    ],
+    [
+      "Illaoi",
+      "Gangplank",
+      "l'ancienne romance de Bilgewater"
+    ],
+    [
+      "Rengar",
+      "Khazix",
+      "le chasseur et sa proie"
+    ],
+    [
+      "Teemo",
+      "Tristana",
+      "les scouts de Bandle"
+    ],
+    [
+      "Lulu",
+      "Veigar",
+      "duo yordle imprévisible"
+    ],
+    [
+      "Sylas",
+      "Lux",
+      "le mage rebelle et la lumière"
+    ],
+    [
+      "Aatrox",
+      "Varus",
+      "darkins réunis"
+    ],
+    [
+      "Aatrox",
+      "Kayn",
+      "Rhaast et les siens"
+    ],
+    [
+      "Viego",
+      "Gwen",
+      "la Ruine et la poupée d'Isolde"
+    ],
+    [
+      "Viego",
+      "Kalista",
+      "le roi déchu et la vengeresse"
+    ],
+    [
+      "Hecarim",
+      "Kalista",
+      "trahison à Camavor"
+    ],
+    [
+      "Ornn",
+      "Volibear",
+      "frères demi-dieux"
+    ],
+    [
+      "Ornn",
+      "Anivia",
+      "demi-dieux du Freljord"
+    ],
+    [
+      "Volibear",
+      "Anivia",
+      "demi-dieux du Freljord"
+    ],
+    [
+      "Ezreal",
+      "Lux",
+      "romance des fans"
+    ],
+    [
+      "Zoe",
+      "AurelionSol",
+      "célestes facétieux"
+    ],
+    [
+      "Pantheon",
+      "Leona",
+      "Aspects de Targon"
+    ],
+    [
+      "Aphelios",
+      "Diana",
+      "les Lunari"
+    ],
+    [
+      "Ambessa",
+      "Mel",
+      "mère et fille Medarda"
+    ],
+    [
+      "Seraphine",
+      "Sona",
+      "musiciennes"
+    ],
+    [
+      "Irelia",
+      "Syndra",
+      "les ennemies d'Ionia"
+    ]
+  ]
+}

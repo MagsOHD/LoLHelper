@@ -99,6 +99,11 @@ class PoolEntry(BaseModel):
     comfort: float = Field(ge=0, le=1)  # how well the player knows it
     desire: float = Field(ge=0, le=1)  # how much the player wants to play it
     sources: list[Literal["mastery", "recent", "manual", "wanted"]] = []
+    # Optional raw stats kept so the engine can explain its choices ("124k points").
+    mastery_points: int = 0
+    mastery_level: int = 0
+    recent_games: int = 0
+    recent_wins: int = 0
 
 
 class PlayerInput(BaseModel):

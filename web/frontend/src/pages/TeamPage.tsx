@@ -75,6 +75,8 @@ function PlayerCard({ player }: { player: Player }) {
   const champs = useChampionMap();
   const sync = useSyncPlayer();
   const del = useDeletePlayer();
+  const meta = useMeta();
+  const canSync = Boolean(player.puuid || meta.data?.riot_configured);
   const top = player.pool.slice(0, 3);
   const onDelete = () => {
     if (window.confirm(`Supprimer ${riotId(player)} ? Il sera aussi retiré des équipes.`)) del.mutate(player.id);
@@ -109,7 +111,7 @@ function PlayerCard({ player }: { player: Player }) {
       {(sync.isError || del.isError) && <ErrorMessage error={sync.error ?? del.error} />}
       <div className="player-card__actions">
         <Link to={`/players/${player.id}`} className="btn btn--ghost btn--sm">Profil</Link>
-        {player.puuid && (
+        {canSync && (
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => sync.mutate(player.id)} disabled={sync.isPending}>
             {sync.isPending ? 'Synchro…' : 'Synchroniser'}
           </button>
