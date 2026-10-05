@@ -1,0 +1,6138 @@
+{
+  "Aatrox": {
+    "name": "Aatrox",
+    "key": 266,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "runeterra",
+    "groups": [
+      "darkin"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 3,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet (Eclipse)",
+      "Deux objets"
+    ],
+    "playstyle": "Combat prolongé en première ligne en touchant les pointes de ses Q pour se soigner massivement pendant l'ultime.",
+    "counter_tips": "Esquive les pointes de ses Q en te rapprochant de lui et achète des anti-soins avant les combats."
+  },
+  "Ahri": {
+    "name": "Ahri",
+    "key": 103,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Niveau 11"
+    ],
+    "playstyle": "Charme une cible isolée avec E puis l'achève grâce à la mobilité de son ultime; excellente pour les picks.",
+    "counter_tips": "Reste derrière tes sbires pour bloquer son charme et engage quand ses charges d'ultime sont utilisées."
+  },
+  "Akali": {
+    "name": "Akali",
+    "key": 84,
+    "roles": [
+      "MID",
+      "TOP"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 2,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 1,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet (Ceinture-roquette)",
+      "Deux objets"
+    ],
+    "playstyle": "Entre sur une cible fragile avec R et E, se rend intouchable dans son linceul puis ressort.",
+    "counter_tips": "Achète un Œil de contrôle ou une lentille pour la révéler dans son linceul et reste groupé."
+  },
+  "Akshan": {
+    "name": "Akshan",
+    "key": 166,
+    "roles": [
+      "MID",
+      "TOP"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "shurima",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 2,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Roam avec son grappin, élimine les cibles isolées et ressuscite ses alliés en tuant leur meurtrier.",
+    "counter_tips": "Ne te sépare pas de ton équipe et punis-le au corps à corps quand son E est utilisé."
+  },
+  "Alistar": {
+    "name": "Alistar",
+    "key": 12,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2 (W+Q)",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Saute au milieu de l'équipe adverse avec W+Q pour engager, puis encaisse avec son ultime.",
+    "counter_tips": "Reste hors de portée de son combo W-Q et garde un dash pour sortir de la zone."
+  },
+  "Ambessa": {
+    "name": "Ambessa",
+    "key": 799,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Enchaîne les dashes entre ses sorts pour coller une cible puis la suppresser avec l'ultime.",
+    "counter_tips": "Garde tes contrôles pour couper ses enchaînements et ne combats pas pendant qu'elle a ses dashes disponibles."
+  },
+  "Amumu": {
+    "name": "Amumu",
+    "key": 32,
+    "roles": [
+      "JUNGLE",
+      "SUPPORT"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "shurima",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 1,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3 (Q)",
+      "Niveau 6 (R)",
+      "Premier objet tank"
+    ],
+    "playstyle": "Bandage sur la cible prioritaire puis ultime au milieu d'un groupe pour étourdir toute l'équipe.",
+    "counter_tips": "Ne te groupe pas en combat et esquive ses bandelettes en restant derrière les sbires."
+  },
+  "Anivia": {
+    "name": "Anivia",
+    "key": 34,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "freljord",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 2,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet (Cœur-de-glace / Larme)",
+      "Niveau 11"
+    ],
+    "playstyle": "Coupe les combats avec son mur et zone les couloirs avec sa tempête glaciale en milieu de partie.",
+    "counter_tips": "Joue autour de son œuf en passif et engage depuis un angle où son mur ne peut pas te couper."
+  },
+  "Annie": {
+    "name": "Annie",
+    "key": 1,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R + Tibbers)",
+      "Étourdissement chargé",
+      "Premier objet"
+    ],
+    "playstyle": "Charge son passif puis Flash + ultime pour étourdir plusieurs ennemis et lancer le combat.",
+    "counter_tips": "Surveille son compteur de passif et reste écarté quand l'étourdissement est prêt."
+  },
+  "Aphelios": {
+    "name": "Aphelios",
+    "key": 523,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "targon",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Bonne rotation d'armes"
+    ],
+    "playstyle": "Joue derrière sa frontline et déclenche son ultime dans un groupe avec la bonne arme pour raser l'équipe.",
+    "counter_tips": "Engage sur lui directement, il n'a aucun sort de mobilité pour s'échapper."
+  },
+  "Ashe": {
+    "name": "Ashe",
+    "key": 22,
+    "roles": [
+      "BOTTOM",
+      "SUPPORT"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "freljord",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 2,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 1,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Ralentit en continu et lance sa flèche de cristal à longue distance pour démarrer un pick ou un combat.",
+    "counter_tips": "Esquive la flèche en te décalant latéralement et plonge-la, elle n'a aucune mobilité."
+  },
+  "AurelionSol": {
+    "name": "Aurelion Sol",
+    "key": 136,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "targon",
+    "groups": [
+      "celestial",
+      "dragon"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Stacks de Q",
+      "Deux objets"
+    ],
+    "playstyle": "Accumule des cumuls tout au long de la partie pour devenir un monstre de zone en combat d'équipe.",
+    "counter_tips": "Punis-le tôt en lane et engage sur lui, il manque de sorts défensifs."
+  },
+  "Aurora": {
+    "name": "Aurora",
+    "key": 893,
+    "roles": [
+      "MID",
+      "TOP"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "freljord",
+    "groups": [
+      "vastaya",
+      "spirit"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Joue l'escarmouche avec ses sauts et emprisonne l'équipe adverse dans la zone de son ultime.",
+    "counter_tips": "Ne te bats pas à l'intérieur de son ultime et garde un contrôle pour son E en retrait."
+  },
+  "Azir": {
+    "name": "Azir",
+    "key": 268,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "shurima",
+    "groups": [
+      "ascended"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 2,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Deux objets",
+      "Niveau 11",
+      "Fin de partie"
+    ],
+    "playstyle": "Inflige des dégâts constants avec ses soldats et utilise son mur (R) pour repousser l'engage ou faire un shuffle.",
+    "counter_tips": "Engage avec du dive rapide avant qu'il ne place ses soldats et ne te bats pas près de ses tourelles."
+  },
+  "Bard": {
+    "name": "Bard",
+    "key": 432,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "catcher",
+    "damage_type": "AP",
+    "region": "runeterra",
+    "groups": [
+      "celestial"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 2,
+      "poke": 1,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Carillons accumulés",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Roam beaucoup, crée des picks avec son étourdissement contre les murs et des engagements avec son ultime.",
+    "counter_tips": "Ne reste pas aligné avec un mur ou un allié face à son Q et contrôle les zones où il peut roam."
+  },
+  "Belveth": {
+    "name": "Bel'Veth",
+    "key": 200,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "void",
+    "groups": [
+      "void_born"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 1,
+      "early": 1,
+      "late": 3,
+      "mobility": 3,
+      "frontline": 1,
+      "cc": 0,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Nashor/Héraut volé",
+      "Deux objets"
+    ],
+    "playstyle": "Farm vite, prend les objectifs pour obtenir sa vraie forme et domine les combats prolongés.",
+    "counter_tips": "Contrôle-la tôt quand elle est faible et garde un contrôle pour ses dashes en combat."
+  },
+  "Blitzcrank": {
+    "name": "Blitzcrank",
+    "key": 53,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "catcher",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [
+      "machine"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 1,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Crée des picks avec son grappin depuis le brouillard de guerre puis enchaîne avec le knock-up.",
+    "counter_tips": "Reste derrière tes sbires et garde ton Flash pour annuler l'enchaînement après un grappin."
+  },
+  "Brand": {
+    "name": "Brand",
+    "key": 63,
+    "roles": [
+      "SUPPORT",
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet (Liandry)",
+      "Deux objets"
+    ],
+    "playstyle": "Pose son passif en zone et détruit les groupes serrés avec son ultime rebondissant.",
+    "counter_tips": "Écarte-toi en combat pour limiter les rebonds et engage-le, il est très fragile."
+  },
+  "Braum": {
+    "name": "Braum",
+    "key": 201,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "warden",
+    "damage_type": "AD",
+    "region": "freljord",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Protège son tireur avec son bouclier qui bloque les projectiles et contre-engage avec l'ultime.",
+    "counter_tips": "Ne lance pas tes compétences dans son bouclier et évite de te faire accumuler son passif."
+  },
+  "Briar": {
+    "name": "Briar",
+    "key": 233,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 3,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Fonce sur une cible avec son W pour la marquer, se soigne en frénésie et engage de loin avec l'ultime.",
+    "counter_tips": "Recule pour la faire courir dans ta tourelle ou ton équipe pendant sa frénésie, elle ne peut pas s'arrêter."
+  },
+  "Caitlyn": {
+    "name": "Caitlyn",
+    "key": 51,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "piltover",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Domine la lane avec sa portée et ses pièges, puis siège les tourelles grâce au poke.",
+    "counter_tips": "Engage sur elle avec un tank ou un plongeur et évite de marcher dans ses pièges."
+  },
+  "Camille": {
+    "name": "Camille",
+    "key": 164,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "piltover",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 3,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Premier objet (Trinity Force)",
+      "Niveau 6 (R)",
+      "Deux objets"
+    ],
+    "playstyle": "Split-push et utilise son grappin pour plonger une cible clé puis l'isoler avec son ultime.",
+    "counter_tips": "Garde tes contrôles pour son E et ne la laisse pas split sans répondre avec un duelliste."
+  },
+  "Cassiopeia": {
+    "name": "Cassiopeia",
+    "key": 69,
+    "roles": [
+      "MID",
+      "TOP"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Fin de partie"
+    ],
+    "playstyle": "Inflige des dégâts continus avec son E sur les cibles empoisonnées et pétrifie les ennemis face à elle avec l'ultime.",
+    "counter_tips": "Tourne-lui le dos quand elle lance son ultime et force les combats avant qu'elle ait ses objets."
+  },
+  "Chogath": {
+    "name": "Cho'Gath",
+    "key": 31,
+    "roles": [
+      "TOP",
+      "MID"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "void",
+    "groups": [
+      "void_born"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Cumuls de festin",
+      "Premier objet tank"
+    ],
+    "playstyle": "Grossit grâce à ses cumuls, sécurise les objectifs avec l'exécution et contrôle avec Q et W.",
+    "counter_tips": "Esquive sa rupture (Q) en bougeant latéralement et vole-lui les objectifs quand son R est indisponible."
+  },
+  "Corki": {
+    "name": "Corki",
+    "key": 42,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "marksman",
+    "damage_type": "MIXED",
+    "region": "bandle_city",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Le Colis",
+      "Deux objets"
+    ],
+    "playstyle": "Poke de loin avec ses missiles puis utilise le Colis pour engager ou plonger.",
+    "counter_tips": "Engage sur lui quand son W est utilisé, il n'a plus de moyen de fuir."
+  },
+  "Darius": {
+    "name": "Darius",
+    "key": 122,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 0,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 1-3 (lane)",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Domine la lane en accumulant ses saignements puis enchaîne les exécutions en combat avec son ultime.",
+    "counter_tips": "Ne reste pas au contact prolongé, kite-le et punis-le quand son E est utilisé."
+  },
+  "Diana": {
+    "name": "Diana",
+    "key": 131,
+    "roles": [
+      "JUNGLE",
+      "MID"
+    ],
+    "archetype": "diver",
+    "damage_type": "AP",
+    "region": "targon",
+    "groups": [
+      "celestial"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 3,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Plonge dans l'équipe adverse avec Q+E et attire plusieurs ennemis avec son ultime.",
+    "counter_tips": "Écarte-toi en combat et garde un contrôle pour la stopper dès qu'elle saute."
+  },
+  "Draven": {
+    "name": "Draven",
+    "key": 119,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Premier kill",
+      "Premier objet"
+    ],
+    "playstyle": "Joue très agressif en lane pour cumuler son passif et snowballer avant les autres.",
+    "counter_tips": "Joue la sécurité, fais-lui perdre ses haches et tue-le une fois pour encaisser son passif."
+  },
+  "DrMundo": {
+    "name": "Dr. Mundo",
+    "key": 36,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 3,
+      "cc": 1,
+      "sustain": 3,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet tank",
+      "Deux objets"
+    ],
+    "playstyle": "Encaisse en première ligne et régénère massivement, devient quasi impossible à tuer en fin de partie.",
+    "counter_tips": "Achète des anti-soins et des dégâts en pourcentage, et ignore-le pour viser ses carries."
+  },
+  "Ekko": {
+    "name": "Ekko",
+    "key": 245,
+    "roles": [
+      "JUNGLE",
+      "MID"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Entre en combat pour exploser une cible puis revient en arrière avec son ultime pour se soigner.",
+    "counter_tips": "Garde un contrôle pour après son ultime et place une balise sur son ombre."
+  },
+  "Elise": {
+    "name": "Elise",
+    "key": 60,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6",
+      "Premier objet"
+    ],
+    "playstyle": "Gank tôt avec son cocon et fait plonger sous tourelle grâce à sa descente en rappel.",
+    "counter_tips": "Esquive son cocon et retarde ses ganks, elle perd de l'impact en fin de partie."
+  },
+  "Evelynn": {
+    "name": "Evelynn",
+    "key": 28,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AP",
+    "region": "shadow_isles",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 1,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Rôde invisible et élimine les cibles isolées, puis s'échappe avec son ultime.",
+    "counter_tips": "Place des Yeux de contrôle et reste groupé, achète un Gardien du dessein si tu es fragile."
+  },
+  "Ezreal": {
+    "name": "Ezreal",
+    "key": 81,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "MIXED",
+    "region": "piltover",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet (Larme + Manamune)",
+      "Deux objets",
+      "Trinity Force"
+    ],
+    "playstyle": "Poke en continu avec ses Q et se repositionne en sécurité grâce à son clignement.",
+    "counter_tips": "Engage sur lui quand son E est utilisé, il manque de dégâts face aux tanks."
+  },
+  "Fiddlesticks": {
+    "name": "Fiddlesticks",
+    "key": 9,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet (Zhonya)",
+      "Deux objets"
+    ],
+    "playstyle": "Se cache dans le brouillard puis saute au milieu de l'équipe adverse avec son ultime pour un combat dévastateur.",
+    "counter_tips": "Contrôle les buissons et la vision près des combats, et contrôle-le pendant sa canalisation."
+  },
+  "Fiora": {
+    "name": "Fiora",
+    "key": 114,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 1,
+      "early": 2,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 3,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Split-push en duel en tapant les points vitaux et force les combats en 1v1 où elle est imbattable.",
+    "counter_tips": "Ne la laisse pas split seule : réponds avec un tank solide ou plusieurs joueurs."
+  },
+  "Fizz": {
+    "name": "Fizz",
+    "key": 105,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AP",
+    "region": "bilgewater",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Lance son requin sur une cible puis plonge dessus et esquive les contrôles avec son E.",
+    "counter_tips": "Garde ton contrôle pour après son E et reste à distance quand son ultime est prêt."
+  },
+  "Galio": {
+    "name": "Galio",
+    "key": 3,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "warden",
+    "damage_type": "AP",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Rejoint les combats depuis l'autre bout de la carte avec son ultime et provoque toute l'équipe adverse.",
+    "counter_tips": "Engage avant qu'il n'utilise son ultime et privilégie les dégâts physiques contre lui."
+  },
+  "Gangplank": {
+    "name": "Gangplank",
+    "key": 41,
+    "roles": [
+      "TOP",
+      "MID"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AD",
+    "region": "bilgewater",
+    "groups": [
+      "pirate"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Trois objets"
+    ],
+    "playstyle": "Scale avec l'or de ses barils et exécute plusieurs ennemis avec des combos de tonneaux et son ultime global.",
+    "counter_tips": "Punis-le tôt avant ses objets et détruis ses barils avant qu'il ne les fasse exploser."
+  },
+  "Garen": {
+    "name": "Garen",
+    "key": 86,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 2,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Encaisse en première ligne et exécute la cible la plus dangereuse avec son ultime.",
+    "counter_tips": "Kite-le à distance et touche-le régulièrement pour couper sa régénération."
+  },
+  "Gnar": {
+    "name": "Gnar",
+    "key": 150,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AD",
+    "region": "freljord",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 2,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Méga Gnar",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Poke en mini Gnar puis transforme-toi au bon moment pour envoyer l'équipe adverse dans un mur.",
+    "counter_tips": "Ne te bats pas près des murs quand il est presque en rage."
+  },
+  "Gragas": {
+    "name": "Gragas",
+    "key": 79,
+    "roles": [
+      "JUNGLE",
+      "TOP",
+      "SUPPORT"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "freljord",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Engage avec son coup de bidon et repousse une cible vers son équipe avec son ultime.",
+    "counter_tips": "Reste à distance quand son E est prêt et ne reste pas groupé dans sa zone de baril."
+  },
+  "Graves": {
+    "name": "Graves",
+    "key": 104,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AD",
+    "region": "bilgewater",
+    "groups": [
+      "pirate"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Niveau 6 (R)",
+      "Deux objets"
+    ],
+    "playstyle": "Farm vite, vole la jungle adverse et gagne les escarmouches en combat rapproché.",
+    "counter_tips": "Envahis-le tôt avec ton équipe et reste à distance moyenne pour éviter ses tirs pleins."
+  },
+  "Gwen": {
+    "name": "Gwen",
+    "key": 887,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AP",
+    "region": "shadow_isles",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 3,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Split-push et se protège des attaques à distance dans son brouillard sacré.",
+    "counter_tips": "Entre dans son brouillard pour la toucher et punis-la avant qu'elle ait ses objets."
+  },
+  "Hecarim": {
+    "name": "Hecarim",
+    "key": 120,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "shadow_isles",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Accumule de la vitesse puis charge dans l'équipe adverse pour l'effrayer avec son ultime.",
+    "counter_tips": "Ralentis-le et place des pièges sur son chemin, il dépend beaucoup de sa vitesse."
+  },
+  "Heimerdinger": {
+    "name": "Heimerdinger",
+    "key": 74,
+    "roles": [
+      "MID",
+      "TOP",
+      "SUPPORT"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "piltover",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 2,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 2,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Contrôle une zone avec ses tourelles et l'étourdissement de sa grenade pour défendre ou sieger.",
+    "counter_tips": "Évite de combattre près de ses tourelles et engage-le directement."
+  },
+  "Hwei": {
+    "name": "Hwei",
+    "key": 910,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "artillery",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 3,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à très longue portée et lance des contrôles de zone pour piéger l'équipe adverse.",
+    "counter_tips": "Engage-le rapidement, il a peu de mobilité et ses sorts sont lents."
+  },
+  "Illaoi": {
+    "name": "Illaoi",
+    "key": 420,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "bilgewater",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 3,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 2,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Fait apparaître ses tentacules et tape les esprits arrachés par son E pour dominer en 1v1.",
+    "counter_tips": "Esquive son E ou tue l'esprit, et ne te bats jamais dans son ultime."
+  },
+  "Irelia": {
+    "name": "Irelia",
+    "key": 39,
+    "roles": [
+      "TOP",
+      "MID"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 1,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Rebondit sur les sbires et les ennemis avec son Q pour coller les cibles et les étourdir.",
+    "counter_tips": "Ne la laisse pas accumuler son passif et garde un contrôle pour la stopper."
+  },
+  "Ivern": {
+    "name": "Ivern",
+    "key": 427,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (Daisy)",
+      "Premier objet"
+    ],
+    "playstyle": "Protège ses alliés avec ses boucliers, immobilise les ennemis et domine la jungle en partageant les camps.",
+    "counter_tips": "Engage sur lui directement, il n'a pas beaucoup de dégâts et compte sur ses alliés."
+  },
+  "Janna": {
+    "name": "Janna",
+    "key": 40,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Désengage avec sa tornade et son ultime qui repousse et soigne, protège son tireur.",
+    "counter_tips": "Engage depuis des angles et coupe-la avant qu'elle lance son ultime."
+  },
+  "JarvanIV": {
+    "name": "Jarvan IV",
+    "key": 59,
+    "roles": [
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3 (E+Q)",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Engage avec son combo drapeau-lance et enferme les cibles dans son arène.",
+    "counter_tips": "Garde ton dash pour sortir de son arène et ne te groupe pas devant lui."
+  },
+  "Jax": {
+    "name": "Jax",
+    "key": 24,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet (Trinity Force)",
+      "Deux objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Split-push et gagne les duels prolongés en esquivant les attaques avec son contre-coup.",
+    "counter_tips": "Ne combats pas pendant son contre-coup et kite-le à distance."
+  },
+  "Jayce": {
+    "name": "Jayce",
+    "key": 126,
+    "roles": [
+      "TOP",
+      "MID"
+    ],
+    "archetype": "artillery",
+    "damage_type": "AD",
+    "region": "piltover",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2-3",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Domine la lane avec son poke en forme canon et siège les tourelles avant les combats.",
+    "counter_tips": "Survis à la lane et engage directement, il décline en fin de partie."
+  },
+  "Jhin": {
+    "name": "Jhin",
+    "key": 202,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 2,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Niveau 6 (R)"
+    ],
+    "playstyle": "Utilise ses longues portées et son ultime pour isoler les cibles et les achever.",
+    "counter_tips": "Engage sur lui quand il recharge son arme et reste derrière les sbires."
+  },
+  "Jinx": {
+    "name": "Jinx",
+    "key": 222,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "zaun",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Deux objets",
+      "Trois objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Reste en sécurité derrière la frontline puis se réinitialise sur chaque élimination pour raser les combats.",
+    "counter_tips": "Plonge-la avant qu'elle obtienne une élimination, elle n'a aucune mobilité."
+  },
+  "Kaisa": {
+    "name": "Kai'Sa",
+    "key": 145,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "MIXED",
+    "region": "void",
+    "groups": [
+      "void_born"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Évolution des compétences",
+      "Deux objets"
+    ],
+    "playstyle": "Isole une cible puis plonge avec son ultime pour finir les ennemis marqués.",
+    "counter_tips": "Reste groupé avec tes alliés et garde un contrôle pour sa plongée."
+  },
+  "Kalista": {
+    "name": "Kalista",
+    "key": 429,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "shadow_isles",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Premier objet",
+      "Niveau 6 (R)"
+    ],
+    "playstyle": "Domine la lane, sécurise les objectifs avec son E et sauve son soutien avec son ultime.",
+    "counter_tips": "Prends du temps à la lane et garde ton contrôle pour son ultime."
+  },
+  "Karma": {
+    "name": "Karma",
+    "key": 43,
+    "roles": [
+      "SUPPORT",
+      "MID",
+      "TOP"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 3,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 1-3 (lane)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke en lane et accélère ou protège ses alliés avec son E amélioré.",
+    "counter_tips": "Engage-la quand ses sorts sont en cooldown, elle a peu de défense."
+  },
+  "Karthus": {
+    "name": "Karthus",
+    "key": 30,
+    "roles": [
+      "JUNGLE",
+      "MID"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "shadow_isles",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Farm vite et utilise son ultime global pour achever les ennemis blessés n'importe où sur la carte.",
+    "counter_tips": "Gère sa vision et mets-lui de la pression au début, il est faible en lane."
+  },
+  "Kassadin": {
+    "name": "Kassadin",
+    "key": 38,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AP",
+    "region": "void",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 0,
+      "late": 3,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Niveau 11",
+      "Niveau 16"
+    ],
+    "playstyle": "Survit à la lane puis devient un assassin très mobile en fin de partie grâce à ses téléportations.",
+    "counter_tips": "Punis-le très tôt, il est extrêmement faible avant le niveau 6."
+  },
+  "Katarina": {
+    "name": "Katarina",
+    "key": 55,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 1,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Réinitialise ses dagues sur chaque élimination pour enchaîner les combats d'équipe chaotiques.",
+    "counter_tips": "Garde un contrôle pour interrompre son ultime et ne te bats pas près de ses dagues."
+  },
+  "Kayle": {
+    "name": "Kayle",
+    "key": 10,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "specialist",
+    "damage_type": "MIXED",
+    "region": "demacia",
+    "groups": [
+      "celestial",
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 3,
+      "splitpush": 2,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 0,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 11",
+      "Niveau 16",
+      "Deux objets"
+    ],
+    "playstyle": "Survit à une lane très difficile puis devient un monstre d'invulnérabilité et de dégâts en fin de partie.",
+    "counter_tips": "Punis-la énormément en lane et termine la partie avant le niveau 16."
+  },
+  "Kayn": {
+    "name": "Kayn",
+    "key": 141,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [
+      "darkin"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 3,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Transformation",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Choisit sa forme selon les ennemis et traverse les murs pour des ganks et des assassinats.",
+    "counter_tips": "Vise la forme qu'il va prendre et adapte ta vision et tes contres."
+  },
+  "Kennen": {
+    "name": "Kennen",
+    "key": 85,
+    "roles": [
+      "TOP",
+      "MID"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Flash dans l'équipe adverse avec son ultime pour étourdir plusieurs ennemis.",
+    "counter_tips": "Écarte-toi en combat et prépare ton contrôle pour l'interrompre."
+  },
+  "Khazix": {
+    "name": "Kha'Zix",
+    "key": 121,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "void",
+    "groups": [
+      "void_born"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Évolution des compétences"
+    ],
+    "playstyle": "Traque les cibles isolées et les élimine avec ses dégâts amplifiés.",
+    "counter_tips": "Reste groupé avec tes alliés, il est très faible face aux équipes groupées."
+  },
+  "Kindred": {
+    "name": "Kindred",
+    "key": 203,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "runeterra",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Cumuls de marques",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Chasse ses marques et sécurise les objectifs grâce à ses dégâts à distance.",
+    "counter_tips": "Envahis sa jungle et gêne ses marques pour retarder ses cumuls."
+  },
+  "Kled": {
+    "name": "Kled",
+    "key": 240,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Fonce dans l'équipe adverse avec son ultime et engage agressivement.",
+    "counter_tips": "Démonte-le pour le forcer à retourner à pied et kite-le pendant sa charge."
+  },
+  "KogMaw": {
+    "name": "Kog'Maw",
+    "key": 96,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "MIXED",
+    "region": "void",
+    "groups": [
+      "void_born"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Deux objets",
+      "Trois objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Reste protégé derrière sa frontline et ses enchanteurs pour tirer des dégâts massifs en continu.",
+    "counter_tips": "Plonge-le directement, il n'a aucune mobilité pour s'échapper."
+  },
+  "KSante": {
+    "name": "K'Santé",
+    "key": 897,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "warden",
+    "damage_type": "AD",
+    "region": "shurima",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Encaisse en première ligne puis passe en mode Tout-ou-rien pour plonger une cible clé.",
+    "counter_tips": "Gère son ultime et punis-le quand il a perdu ses défenses."
+  },
+  "Leblanc": {
+    "name": "LeBlanc",
+    "key": 7,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Explose une cible isolée avec ses combos et retourne en sécurité grâce à son retour de distorsion.",
+    "counter_tips": "Reste groupé et garde ton contrôle pour après son retour."
+  },
+  "LeeSin": {
+    "name": "Lee Sin",
+    "key": 64,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 2,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 1,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Gank tôt et utilise le Insec (W+R) pour renvoyer une cible clé dans son équipe.",
+    "counter_tips": "Reste près de ta tourelle en début de partie et ne te mets pas devant un mur."
+  },
+  "Leona": {
+    "name": "Leona",
+    "key": 89,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AD",
+    "region": "targon",
+    "groups": [
+      "celestial"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 3,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Engage avec son E et enferme les cibles sous ses contrôles pour lancer les combats.",
+    "counter_tips": "Reste derrière les sbires et punis-la quand son E est utilisé."
+  },
+  "Lillia": {
+    "name": "Lillia",
+    "key": 876,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [
+      "vastaya",
+      "spirit"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Farm vite et accumule de la vitesse, puis endort plusieurs ennemis avec son ultime.",
+    "counter_tips": "Reste groupé et engage-la quand ses compétences sont utilisées."
+  },
+  "Lissandra": {
+    "name": "Lissandra",
+    "key": 127,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "freljord",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 1,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Engage ou protège ses alliés avec son ultime qui gèle une cible ou la protège.",
+    "counter_tips": "Ne te bats pas groupé contre elle et garde un sort pour son combo E+R."
+  },
+  "Lucian": {
+    "name": "Lucian",
+    "key": 236,
+    "roles": [
+      "BOTTOM",
+      "MID"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Domine la lane par ses échanges courts et rapides grâce à son passif.",
+    "counter_tips": "Prends du temps à la lane, il décline en fin de partie."
+  },
+  "Lulu": {
+    "name": "Lulu",
+    "key": 117,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "bandle_city",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Protège son carry avec ses boucliers et accélère ou transforme les ennemis avec son W.",
+    "counter_tips": "Plonge sa cible protégée quand ses sorts sont utilisés."
+  },
+  "Lux": {
+    "name": "Lux",
+    "key": 99,
+    "roles": [
+      "SUPPORT",
+      "MID"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "demacia",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 2,
+      "poke": 3,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke avec son ultime longue portée et immobilise une cible avec son Q.",
+    "counter_tips": "Esquive son Q et reste derrière les sbires."
+  },
+  "Malphite": {
+    "name": "Malphite",
+    "key": 54,
+    "roles": [
+      "TOP",
+      "SUPPORT"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "ixtal",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet tank",
+      "Deux objets"
+    ],
+    "playstyle": "Charge dans l'équipe adverse avec son ultime et lance les combats d'équipe.",
+    "counter_tips": "Écarte-toi en combat et garde ton Flash pour son ultime."
+  },
+  "Malzahar": {
+    "name": "Malzahar",
+    "key": 90,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "void",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Suppresse une cible clé avec son ultime et repousse les vagues avec ses Voidlings.",
+    "counter_tips": "Achète un Gardien du dessein et brise son bouclier avant de l'engager."
+  },
+  "Maokai": {
+    "name": "Maokai",
+    "key": 57,
+    "roles": [
+      "SUPPORT",
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "shadow_isles",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet tank",
+      "Deux objets"
+    ],
+    "playstyle": "Engage avec son ultime et contrôle les combats avec ses pousses et son W.",
+    "counter_tips": "Évite les buissons et écarte-toi de son ultime."
+  },
+  "MasterYi": {
+    "name": "Maître Yi",
+    "key": 11,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Trois objets"
+    ],
+    "playstyle": "Farm vite puis réinitialise ses cooldowns sur chaque élimination pour raser les combats.",
+    "counter_tips": "Garde tes contrôles pour lui et achète des objets défensifs contre ses dégâts."
+  },
+  "Mel": {
+    "name": "Mel",
+    "key": 800,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 2,
+      "poke": 3,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à longue portée et renvoie les projectiles adverses avec son W.",
+    "counter_tips": "Ne lance pas tes sorts dans son reflet et engage-la quand il est utilisé."
+  },
+  "Milio": {
+    "name": "Milio",
+    "key": 902,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "ixtal",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 3,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Protège son carry, augmente sa portée et retire les contrôles avec son ultime.",
+    "counter_tips": "Engage quand son ultime est utilisé, il n'a pas de défense."
+  },
+  "MissFortune": {
+    "name": "Miss Fortune",
+    "key": 21,
+    "roles": [
+      "BOTTOM",
+      "SUPPORT"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "bilgewater",
+    "groups": [
+      "pirate"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 3,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Domine la lane et rafale les équipes groupées avec son ultime.",
+    "counter_tips": "Interromps son ultime avec un contrôle et ne te groupe pas devant elle."
+  },
+  "MonkeyKing": {
+    "name": "Wukong",
+    "key": 62,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet (Trinity Force)",
+      "Deux objets"
+    ],
+    "playstyle": "Plonge sur la backline avec Q/E puis enchaîne l'ultime en zone pour knock-up plusieurs ennemis.",
+    "counter_tips": "Garde tes sorts de contrôle pour son E et ne te regroupe pas quand il a son ultime."
+  },
+  "Mordekaiser": {
+    "name": "Mordekaiser",
+    "key": 82,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 2,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Isole la cible clé dans son royaume de mort pour l'affronter en 1v1.",
+    "counter_tips": "Garde ton Purifier ou ton anti-soin pour son ultime et kite-le hors de sa zone."
+  },
+  "Morgana": {
+    "name": "Morgana",
+    "key": 25,
+    "roles": [
+      "SUPPORT",
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "catcher",
+    "damage_type": "AP",
+    "region": "demacia",
+    "groups": [
+      "celestial",
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Immobilise une cible avec son Q et protège ses alliés avec son bouclier anti-contrôle.",
+    "counter_tips": "Reste derrière les sbires et engage quand son bouclier est utilisé."
+  },
+  "Naafiri": {
+    "name": "Naafiri",
+    "key": 950,
+    "roles": [
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "shurima",
+    "groups": [
+      "darkin"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Lance sa meute sur une cible isolée et l'assassine rapidement.",
+    "counter_tips": "Reste groupé et achète une armure, elle est très faible contre les tanks."
+  },
+  "Nami": {
+    "name": "Nami",
+    "key": 267,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "bilgewater",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 3,
+      "late": 1,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Soigne et améliore son tireur, puis engage ou désengage avec son ultime.",
+    "counter_tips": "Esquive sa bulle et reste écarté face à son ultime."
+  },
+  "Nasus": {
+    "name": "Nasus",
+    "key": 75,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "shurima",
+    "groups": [
+      "ascended",
+      "sibling"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 0,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 3,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Cumuls de Q",
+      "Niveau 6 (R)",
+      "Fin de partie"
+    ],
+    "playstyle": "Accumule les cumuls sur son Q puis split-push en fin de partie.",
+    "counter_tips": "Gêne son farm tôt et punis-le avant qu'il accumule ses cumuls."
+  },
+  "Nautilus": {
+    "name": "Nautilus",
+    "key": 111,
+    "roles": [
+      "SUPPORT",
+      "JUNGLE"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "bilgewater",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 3,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Engage avec son grappin et enchaîne les contrôles sur la cible.",
+    "counter_tips": "Reste derrière les sbires et garde ton Flash pour son ultime."
+  },
+  "Neeko": {
+    "name": "Neeko",
+    "key": 518,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "catcher",
+    "damage_type": "AP",
+    "region": "ixtal",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Se déguise en allié et saute dans l'équipe adverse avec son ultime.",
+    "counter_tips": "Écarte-toi en combat et méfie-toi des faux alliés."
+  },
+  "Nidalee": {
+    "name": "Nidalee",
+    "key": 76,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "ixtal",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke avec ses lances et chasse les cibles blessées en forme de cougar.",
+    "counter_tips": "Reste groupé et esquive ses lances avec des mouvements latéraux."
+  },
+  "Nilah": {
+    "name": "Nilah",
+    "key": 895,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "bilgewater",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Plonge en combat rapproché et attire les ennemis avec son ultime.",
+    "counter_tips": "Kite-la à distance, elle n'a pas de portée."
+  },
+  "Nocturne": {
+    "name": "Nocturne",
+    "key": 56,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Plonge sur une cible isolée avec son ultime de cécité de toute la carte.",
+    "counter_tips": "Reste groupé avec tes alliés quand son ultime est prêt."
+  },
+  "Nunu": {
+    "name": "Nunu et Willump",
+    "key": 20,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "freljord",
+    "groups": [
+      "beast"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Gank avec sa boule de neige géante et sécurise les objectifs avec son Q.",
+    "counter_tips": "Gère sa vision et esquive sa boule de neige."
+  },
+  "Olaf": {
+    "name": "Olaf",
+    "key": 2,
+    "roles": [
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "freljord",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 2,
+      "cc": 1,
+      "sustain": 3,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Premier objet",
+      "Niveau 6 (R)"
+    ],
+    "playstyle": "Fonce sur les cibles et ignore les contrôles avec son ultime.",
+    "counter_tips": "Kite-le à distance pendant son ultime, il ne peut pas être contrôlé."
+  },
+  "Orianna": {
+    "name": "Orianna",
+    "key": 61,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "piltover",
+    "groups": [
+      "machine"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 3,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Place sa balle sur un allié plongeur pour un engage massif avec son ultime.",
+    "counter_tips": "Écarte-toi et surveille où est sa balle."
+  },
+  "Ornn": {
+    "name": "Ornn",
+    "key": 516,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AD",
+    "region": "freljord",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet tank",
+      "Améliorations d'objets"
+    ],
+    "playstyle": "Engage avec son ultime et améliore les objets de ses alliés.",
+    "counter_tips": "Écarte-toi de son ultime et esquive ses piliers."
+  },
+  "Pantheon": {
+    "name": "Pantheon",
+    "key": 80,
+    "roles": [
+      "SUPPORT",
+      "TOP",
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "targon",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2-3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Domine la lane, roam avec son ultime global et étourdit les cibles.",
+    "counter_tips": "Prends du temps à la lane, il décline en fin de partie."
+  },
+  "Poppy": {
+    "name": "Poppy",
+    "key": 78,
+    "roles": [
+      "SUPPORT",
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "warden",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Empêche les dashes adverses avec son W et colle les cibles contre les murs.",
+    "counter_tips": "Ne te bats pas près des murs et ne dash pas près d'elle."
+  },
+  "Pyke": {
+    "name": "Pyke",
+    "key": 555,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "bilgewater",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Attrape les cibles avec son grappin et réinitialise son ultime sur chaque élimination.",
+    "counter_tips": "Reste derrière les sbires et garde ta vie au-dessus du seuil d'exécution."
+  },
+  "Qiyana": {
+    "name": "Qiyana",
+    "key": 246,
+    "roles": [
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "ixtal",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Utilise les murs et l'eau pour un ultime qui étourdit toute l'équipe adverse.",
+    "counter_tips": "Ne te bats pas près des murs ou de la rivière."
+  },
+  "Quinn": {
+    "name": "Quinn",
+    "key": 133,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [
+      "beast"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 3,
+      "pick": 2,
+      "teamfight": 0,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 2-3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Split-push et roam vite grâce à son ultime de vitesse.",
+    "counter_tips": "Ignore-la dans les combats et engage-la quand son E est utilisé."
+  },
+  "Rakan": {
+    "name": "Rakan",
+    "key": 497,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "catcher",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Engage avec son W et son ultime de charme, puis revient vers Xayah ou ses alliés.",
+    "counter_tips": "Écarte-toi en combat et garde ton contrôle pour l'interrompre."
+  },
+  "Rammus": {
+    "name": "Rammus",
+    "key": 33,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "shurima",
+    "groups": [
+      "beast"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet tank"
+    ],
+    "playstyle": "Fonce sur les cibles en boule et les provoque avec son E, surtout contre les équipes physiques.",
+    "counter_tips": "Achète des objets de dégâts magiques et évite d'attaquer quand il a son W."
+  },
+  "RekSai": {
+    "name": "Rek'Sai",
+    "key": 421,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "void",
+    "groups": [
+      "void_born"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Gank tôt grâce à ses tunnels et sécurise les objectifs.",
+    "counter_tips": "Gère sa vision et prépare-toi à ses ganks précoces."
+  },
+  "Rell": {
+    "name": "Rell",
+    "key": 526,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Engage en chargeant sur sa monture et attire plusieurs ennemis avec son ultime magnétique.",
+    "counter_tips": "Écarte-toi en combat et punis-la quand elle est descendue de sa monture."
+  },
+  "Renata": {
+    "name": "Renata Glasc",
+    "key": 888,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet de soutien",
+      "Deux objets"
+    ],
+    "playstyle": "Fait se battre les ennemis entre eux avec son ultime et ressuscite brièvement ses alliés.",
+    "counter_tips": "Écarte-toi pour limiter son ultime et achève ses alliés après la fin de son W."
+  },
+  "Renekton": {
+    "name": "Renekton",
+    "key": 58,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "shurima",
+    "groups": [
+      "ascended",
+      "sibling"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Domine la lane avec ses échanges courts et plonge les cibles avec ses dashes.",
+    "counter_tips": "Prends du temps à la lane, il décline en fin de partie."
+  },
+  "Rengar": {
+    "name": "Rengar",
+    "key": 107,
+    "roles": [
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "ixtal",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Saute depuis les buissons pour assassiner une cible en un instant.",
+    "counter_tips": "Place un Œil de contrôle dans les buissons et reste groupé."
+  },
+  "Riven": {
+    "name": "Riven",
+    "key": 92,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 1,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Enchaîne ses Q et ses dashes pour des combats rapides et exécute avec son ultime.",
+    "counter_tips": "Garde ton contrôle pour son E et prends des échanges courts."
+  },
+  "Rumble": {
+    "name": "Rumble",
+    "key": 68,
+    "roles": [
+      "TOP",
+      "MID"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "bandle_city",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 1,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Zone les combats avec son ultime et ses dégâts continus en surchauffe.",
+    "counter_tips": "Ne te bats pas dans la zone de son ultime et punis-le quand il surchauffe."
+  },
+  "Ryze": {
+    "name": "Ryze",
+    "key": 13,
+    "roles": [
+      "MID",
+      "TOP"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 2,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Niveau 11"
+    ],
+    "playstyle": "Scale avec son mana et repositionne son équipe avec son ultime.",
+    "counter_tips": "Punis-le tôt avant qu'il accumule ses objets."
+  },
+  "Samira": {
+    "name": "Samira",
+    "key": 360,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Plonge en combat avec un soutien d'engage et enchaîne les rangs de style.",
+    "counter_tips": "Garde ton contrôle pour interrompre son ultime."
+  },
+  "Sejuani": {
+    "name": "Sejuani",
+    "key": 113,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "freljord",
+    "groups": [
+      "beast"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet tank"
+    ],
+    "playstyle": "Engage avec son ultime et étourdit les ennemis avec son E.",
+    "counter_tips": "Écarte-toi de son ultime et ne te bats pas dans ses ralentissements."
+  },
+  "Senna": {
+    "name": "Senna",
+    "key": 235,
+    "roles": [
+      "SUPPORT",
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "shadow_isles",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 2,
+      "poke": 3,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Cumuls d'âmes",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à longue portée et accumule ses âmes pour scaler en fin de partie.",
+    "counter_tips": "Engage-la directement, elle est très fragile."
+  },
+  "Seraphine": {
+    "name": "Seraphine",
+    "key": 147,
+    "roles": [
+      "SUPPORT",
+      "MID",
+      "BOTTOM"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "piltover",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 2,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Soigne et protège ses alliés, puis charme toute l'équipe adverse avec son ultime.",
+    "counter_tips": "Écarte-toi de son ultime et engage-la directement."
+  },
+  "Sett": {
+    "name": "Sett",
+    "key": 875,
+    "roles": [
+      "TOP",
+      "SUPPORT"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 3,
+      "late": 1,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Encaisse les dégâts pour charger son W et renvoie une cible sur son équipe avec son ultime.",
+    "counter_tips": "Ne lui donne pas trop de dégâts avant son W et esquive son centre."
+  },
+  "Shaco": {
+    "name": "Shaco",
+    "key": 35,
+    "roles": [
+      "JUNGLE",
+      "SUPPORT"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 2,
+      "pick": 3,
+      "teamfight": 0,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Pose ses boîtes et gank par surprise grâce à son invisibilité.",
+    "counter_tips": "Gère sa vision et place des Yeux de contrôle dans sa jungle."
+  },
+  "Shen": {
+    "name": "Shen",
+    "key": 98,
+    "roles": [
+      "TOP",
+      "SUPPORT"
+    ],
+    "archetype": "warden",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 3,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Protège un allié de n'importe où sur la carte avec son ultime global.",
+    "counter_tips": "Punis sa lane quand il utilise son ultime ailleurs."
+  },
+  "Shyvana": {
+    "name": "Shyvana",
+    "key": 102,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "MIXED",
+    "region": "demacia",
+    "groups": [
+      "dragon"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 1,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Farm vite, prend les dragons et combat en forme de dragon.",
+    "counter_tips": "Envahis sa jungle et punis-la tôt."
+  },
+  "Singed": {
+    "name": "Singed",
+    "key": 27,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Split-push et proxy farm avec son poison pour attirer les ennemis.",
+    "counter_tips": "Ne le poursuis pas, ignore-le et prends des objectifs ailleurs."
+  },
+  "Sion": {
+    "name": "Sion",
+    "key": 14,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet tank",
+      "Fin de partie"
+    ],
+    "playstyle": "Accumule les PV et engage avec son ultime de charge.",
+    "counter_tips": "Esquive son Q chargé et kite-le à distance."
+  },
+  "Sivir": {
+    "name": "Sivir",
+    "key": 15,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "shurima",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 1,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Deux objets",
+      "Niveau 6 (R)",
+      "Fin de partie"
+    ],
+    "playstyle": "Nettoie les vagues et accélère son équipe avec son ultime.",
+    "counter_tips": "Engage-la avant qu'elle ait ses objets."
+  },
+  "Skarner": {
+    "name": "Skarner",
+    "key": 72,
+    "roles": [
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AD",
+    "region": "ixtal",
+    "groups": [
+      "beast"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Attrape une cible et la ramène vers son équipe avec son E et son ultime.",
+    "counter_tips": "Ne te bats pas près des murs et garde ton dash pour son E."
+  },
+  "Smolder": {
+    "name": "Smolder",
+    "key": 901,
+    "roles": [
+      "BOTTOM",
+      "MID"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "runeterra",
+    "groups": [
+      "dragon"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Cumuls de Q",
+      "225 cumuls",
+      "Fin de partie"
+    ],
+    "playstyle": "Accumule les cumuls tout au long de la partie pour devenir un carry dévastateur.",
+    "counter_tips": "Punis-le tôt avant qu'il accumule ses cumuls."
+  },
+  "Sona": {
+    "name": "Sona",
+    "key": 37,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 2,
+      "poke": 2,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Fin de partie"
+    ],
+    "playstyle": "Soigne et améliore ses alliés, puis étourdit l'équipe adverse avec son ultime.",
+    "counter_tips": "Engage-la directement, elle est très fragile."
+  },
+  "Soraka": {
+    "name": "Soraka",
+    "key": 16,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [
+      "celestial"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 3,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Soigne son équipe en continu et coupe les combos avec son E.",
+    "counter_tips": "Achète des anti-soins et engage-la directement."
+  },
+  "Swain": {
+    "name": "Swain",
+    "key": 50,
+    "roles": [
+      "SUPPORT",
+      "MID",
+      "BOTTOM"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 3,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Attrape une cible avec son E et draine plusieurs ennemis avec son ultime.",
+    "counter_tips": "Kite-le pendant son ultime et esquive son E."
+  },
+  "Sylas": {
+    "name": "Sylas",
+    "key": 517,
+    "roles": [
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Vole l'ultime d'un ennemi et l'utilise contre l'équipe adverse.",
+    "counter_tips": "Garde ton ultime pour quand il est utilisé."
+  },
+  "Syndra": {
+    "name": "Syndra",
+    "key": 134,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Contrôle les vagues et explose une cible avec ses sphères.",
+    "counter_tips": "Esquive son E et engage-la quand ses sorts sont utilisés."
+  },
+  "TahmKench": {
+    "name": "Tahm Kench",
+    "key": 223,
+    "roles": [
+      "TOP",
+      "SUPPORT"
+    ],
+    "archetype": "warden",
+    "damage_type": "AP",
+    "region": "bilgewater",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 1,
+      "early": 3,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 3,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Avale un allié pour le protéger ou un ennemi pour le ramener vers son équipe.",
+    "counter_tips": "Ne te bats pas trop près de lui et évite ses 3 cumuls."
+  },
+  "Taliyah": {
+    "name": "Taliyah",
+    "key": 163,
+    "roles": [
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "shurima",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Roam avec son ultime de mur et repousse les ennemis avec son W.",
+    "counter_tips": "Gère sa vision et esquive ses rochers."
+  },
+  "Talon": {
+    "name": "Talon",
+    "key": 91,
+    "roles": [
+      "MID",
+      "JUNGLE"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Roam en sautant les murs et assassine les cibles isolées.",
+    "counter_tips": "Reste groupé et place des Yeux de contrôle."
+  },
+  "Taric": {
+    "name": "Taric",
+    "key": 44,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "warden",
+    "damage_type": "AP",
+    "region": "targon",
+    "groups": [
+      "celestial"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 3,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Protège son équipe avec son ultime d'invulnérabilité et étourdit les ennemis.",
+    "counter_tips": "Engage avant son ultime ou attends qu'il se termine."
+  },
+  "Teemo": {
+    "name": "Teemo",
+    "key": 17,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "bandle_city",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 2,
+      "waveclear": 1,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Pose des champignons sur la carte et split-push en harcelant.",
+    "counter_tips": "Prends la Lentille d'oracle pour nettoyer ses champignons et engage-le directement."
+  },
+  "Thresh": {
+    "name": "Thresh",
+    "key": 412,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "catcher",
+    "damage_type": "AD",
+    "region": "shadow_isles",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 1,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Niveau 6 (R)",
+      "Premier objet de soutien"
+    ],
+    "playstyle": "Attrape une cible avec son grappin et sauve ses alliés avec sa lanterne.",
+    "counter_tips": "Reste derrière les sbires et garde ton Flash pour son grappin."
+  },
+  "Tristana": {
+    "name": "Tristana",
+    "key": 18,
+    "roles": [
+      "BOTTOM",
+      "MID"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "bandle_city",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 3,
+      "splitpush": 2,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 2,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 2",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Saute sur les cibles et détruit les tourelles grâce à son E.",
+    "counter_tips": "Engage-la quand son W est utilisé."
+  },
+  "Trundle": {
+    "name": "Trundle",
+    "key": 48,
+    "roles": [
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "freljord",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 3,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Vole les statistiques d'un tank avec son ultime et détruit les tourelles.",
+    "counter_tips": "Ne te bats pas dans son pilier et kite-le."
+  },
+  "Tryndamere": {
+    "name": "Tryndamere",
+    "key": 23,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "freljord",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 3,
+      "pick": 0,
+      "teamfight": 1,
+      "early": 2,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Niveau 6 (R)"
+    ],
+    "playstyle": "Split-push et devient invulnérable avec son ultime.",
+    "counter_tips": "Garde tes contrôles pour après son ultime."
+  },
+  "TwistedFate": {
+    "name": "Twisted Fate",
+    "key": 4,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "bilgewater",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 1,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Roam avec son ultime global et étourdit les cibles avec sa carte dorée.",
+    "counter_tips": "Gère sa vision et préviens tes alliés quand il ultime."
+  },
+  "Twitch": {
+    "name": "Twitch",
+    "key": 29,
+    "roles": [
+      "BOTTOM",
+      "JUNGLE"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Se rend invisible pour se positionner puis arrose l'équipe adverse avec son ultime.",
+    "counter_tips": "Place des Yeux de contrôle et engage-le directement."
+  },
+  "Udyr": {
+    "name": "Udyr",
+    "key": 77,
+    "roles": [
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "MIXED",
+    "region": "freljord",
+    "groups": [
+      "spirit"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Farm vite et fonce sur les cibles avec sa posture de vitesse.",
+    "counter_tips": "Kite-le à distance, il n'a pas de portée."
+  },
+  "Urgot": {
+    "name": "Urgot",
+    "key": 6,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Combat à moyenne portée avec ses jambes et exécute une cible avec son ultime.",
+    "counter_tips": "Ne reste pas sous son seuil d'exécution."
+  },
+  "Varus": {
+    "name": "Varus",
+    "key": 110,
+    "roles": [
+      "BOTTOM",
+      "MID"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [
+      "darkin"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à longue portée avec son Q et immobilise plusieurs ennemis avec son ultime.",
+    "counter_tips": "Esquive son ultime et engage-le directement."
+  },
+  "Vayne": {
+    "name": "Vayne",
+    "key": 67,
+    "roles": [
+      "BOTTOM",
+      "TOP"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 2,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Deux objets",
+      "Trois objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Survit à la lane puis devient une machine à tuer les tanks en fin de partie.",
+    "counter_tips": "Punis-la tôt avant qu'elle ait ses objets."
+  },
+  "Veigar": {
+    "name": "Veigar",
+    "key": 45,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "bandle_city",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 2,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Cumuls de Q",
+      "Niveau 6 (R)",
+      "Fin de partie"
+    ],
+    "playstyle": "Accumule la puissance avec son Q et enferme l'équipe adverse avec son E.",
+    "counter_tips": "Ne te bats pas dans sa cage et engage-le directement."
+  },
+  "Velkoz": {
+    "name": "Vel'Koz",
+    "key": 161,
+    "roles": [
+      "SUPPORT",
+      "MID"
+    ],
+    "archetype": "artillery",
+    "damage_type": "AP",
+    "region": "void",
+    "groups": [
+      "void_born"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 1,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à très longue portée et inflige des dégâts bruts avec son ultime.",
+    "counter_tips": "Engage-le directement, il n'a aucune mobilité."
+  },
+  "Vex": {
+    "name": "Vex",
+    "key": 711,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "shadow_isles",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 2,
+      "poke": 1,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Punit les champions mobiles avec son passif et poursuit les cibles avec son ultime.",
+    "counter_tips": "N'utilise pas de dash près d'elle."
+  },
+  "Vi": {
+    "name": "Vi",
+    "key": 254,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "piltover",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 3,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 3,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Fonce sur une cible avec son ultime imparable et l'immobilise.",
+    "counter_tips": "Garde ton bouclier ou ton Zhonya pour son ultime."
+  },
+  "Viego": {
+    "name": "Viego",
+    "key": 234,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "shadow_isles",
+    "groups": [
+      "undead"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Possède les ennemis tués pour enchaîner les éliminations en combat.",
+    "counter_tips": "Achève les cibles possédées et garde ton contrôle."
+  },
+  "Viktor": {
+    "name": "Viktor",
+    "key": 112,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [
+      "machine"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Évolution des compétences",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Contrôle les vagues et zone les combats avec son ultime.",
+    "counter_tips": "Engage-le directement, il a peu de mobilité."
+  },
+  "Vladimir": {
+    "name": "Vladimir",
+    "key": 8,
+    "roles": [
+      "MID",
+      "TOP"
+    ],
+    "archetype": "battlemage",
+    "damage_type": "AP",
+    "region": "noxus",
+    "groups": [],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 0,
+      "teamfight": 3,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 3,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Fin de partie"
+    ],
+    "playstyle": "Scale en fin de partie et se soigne massivement en combat.",
+    "counter_tips": "Achète des anti-soins et punis-le tôt."
+  },
+  "Volibear": {
+    "name": "Volibear",
+    "key": 106,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "MIXED",
+    "region": "freljord",
+    "groups": [
+      "spirit",
+      "beast"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 3,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Plonge sous les tourelles avec son ultime et étourdit les cibles.",
+    "counter_tips": "Kite-le et punis-le quand ses sorts sont utilisés."
+  },
+  "Warwick": {
+    "name": "Warwick",
+    "key": 19,
+    "roles": [
+      "JUNGLE",
+      "TOP"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "zaun",
+    "groups": [
+      "beast"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 2,
+      "teamfight": 1,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 3,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Traque les cibles blessées et les immobilise avec son ultime.",
+    "counter_tips": "Ne reste pas à faible vie près de lui."
+  },
+  "Xayah": {
+    "name": "Xayah",
+    "key": 498,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [
+      "vastaya"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Niveau 6 (R)"
+    ],
+    "playstyle": "Place ses plumes et immobilise plusieurs ennemis en les rappelant.",
+    "counter_tips": "Engage-la directement et esquive ses plumes."
+  },
+  "Xerath": {
+    "name": "Xerath",
+    "key": 101,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "artillery",
+    "damage_type": "AP",
+    "region": "shurima",
+    "groups": [
+      "ascended"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à très longue portée et achève les cibles avec son ultime.",
+    "counter_tips": "Engage-le directement, il n'a aucune mobilité."
+  },
+  "XinZhao": {
+    "name": "Xin Zhao",
+    "key": 5,
+    "roles": [
+      "JUNGLE"
+    ],
+    "archetype": "diver",
+    "damage_type": "AD",
+    "region": "demacia",
+    "groups": [],
+    "traits": {
+      "engage": 2,
+      "peel": 1,
+      "poke": 0,
+      "waveclear": 1,
+      "splitpush": 1,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 3,
+      "late": 1,
+      "mobility": 2,
+      "frontline": 2,
+      "cc": 2,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Gank tôt et plonge les cibles avec son E.",
+    "counter_tips": "Kite-le à distance et ne te bats pas dans son ultime."
+  },
+  "Yasuo": {
+    "name": "Yasuo",
+    "key": 157,
+    "roles": [
+      "MID",
+      "TOP",
+      "BOTTOM"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [
+      "sibling"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 1,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Deux objets (critique)",
+      "Niveau 6 (R)",
+      "Premier objet"
+    ],
+    "playstyle": "Bloque les projectiles avec son mur de vent et achève avec son ultime après un knock-up.",
+    "counter_tips": "Garde tes sorts pour après son mur et punis-le quand son E est utilisé."
+  },
+  "Yone": {
+    "name": "Yone",
+    "key": 777,
+    "roles": [
+      "MID",
+      "TOP"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [
+      "sibling",
+      "spirit"
+    ],
+    "traits": {
+      "engage": 2,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 3,
+      "early": 2,
+      "late": 3,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 1,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Deux objets (critique)",
+      "Niveau 6 (R)",
+      "Fin de partie"
+    ],
+    "playstyle": "Plonge en combat et immobilise plusieurs ennemis avec son ultime.",
+    "counter_tips": "Garde ton contrôle pour son retour d'E."
+  },
+  "Yorick": {
+    "name": "Yorick",
+    "key": 83,
+    "roles": [
+      "TOP"
+    ],
+    "archetype": "juggernaut",
+    "damage_type": "AD",
+    "region": "shadow_isles",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 3,
+      "splitpush": 3,
+      "pick": 0,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 2,
+      "cc": 1,
+      "sustain": 1,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Split-push avec ses goules et sa Vierge, détruit les tourelles.",
+    "counter_tips": "Tue ses goules et ne te bats pas dans sa cage."
+  },
+  "Yunara": {
+    "name": "Yunara",
+    "key": 804,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 1,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Reste en retrait derrière sa frontline et inflige des dégâts continus en combat prolongé.",
+    "counter_tips": "Engage-la directement quand son sort de déplacement est utilisé."
+  },
+  "Yuumi": {
+    "name": "Yuumi",
+    "key": 350,
+    "roles": [
+      "SUPPORT"
+    ],
+    "archetype": "enchanter",
+    "damage_type": "AP",
+    "region": "bandle_city",
+    "groups": [
+      "beast"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 1,
+      "waveclear": 0,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 3,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "S'attache à son carry pour le soigner et l'améliorer.",
+    "counter_tips": "Engage sur sa cible quand elle est détachée."
+  },
+  "Zaahen": {
+    "name": "Zaahen",
+    "key": 904,
+    "roles": [
+      "TOP",
+      "JUNGLE"
+    ],
+    "archetype": "skirmisher",
+    "damage_type": "AD",
+    "region": "runeterra",
+    "groups": [
+      "darkin"
+    ],
+    "traits": {
+      "engage": 1,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 2,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 2,
+      "frontline": 1,
+      "cc": 1,
+      "sustain": 2,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Combat en duel prolongé et utilise sa mobilité pour poursuivre les cibles.",
+    "counter_tips": "Achète des anti-soins et kite-le à distance."
+  },
+  "Zac": {
+    "name": "Zac",
+    "key": 154,
+    "roles": [
+      "JUNGLE",
+      "TOP",
+      "SUPPORT"
+    ],
+    "archetype": "vanguard",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 3,
+      "peel": 2,
+      "poke": 0,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 3,
+      "cc": 3,
+      "sustain": 2,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 3",
+      "Niveau 6 (R)",
+      "Premier objet tank"
+    ],
+    "playstyle": "Saute dans l'équipe adverse avec son E et ramène ses blobs pour se soigner.",
+    "counter_tips": "Ralentis-le pendant son E et tue ses blobs."
+  },
+  "Zed": {
+    "name": "Zed",
+    "key": 238,
+    "roles": [
+      "MID"
+    ],
+    "archetype": "assassin",
+    "damage_type": "AD",
+    "region": "ionia",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 1,
+      "waveclear": 2,
+      "splitpush": 3,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Split-push et assassine les cibles isolées avec ses ombres.",
+    "counter_tips": "Achète un Zhonya ou un bouclier, et reste groupé."
+  },
+  "Zeri": {
+    "name": "Zeri",
+    "key": 221,
+    "roles": [
+      "BOTTOM"
+    ],
+    "archetype": "marksman",
+    "damage_type": "AD",
+    "region": "zaun",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 0,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 3,
+      "frontline": 0,
+      "cc": 0,
+      "sustain": 1,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Premier objet",
+      "Deux objets",
+      "Fin de partie"
+    ],
+    "playstyle": "Fonce sur les cibles avec son E et nettoie les vagues.",
+    "counter_tips": "Engage-la directement et kite-la."
+  },
+  "Ziggs": {
+    "name": "Ziggs",
+    "key": 115,
+    "roles": [
+      "BOTTOM",
+      "MID"
+    ],
+    "archetype": "artillery",
+    "damage_type": "AP",
+    "region": "zaun",
+    "groups": [
+      "yordle"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 1,
+      "poke": 3,
+      "waveclear": 3,
+      "splitpush": 1,
+      "pick": 0,
+      "teamfight": 2,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 1,
+      "sustain": 0,
+      "objective": 3
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à longue portée et détruit les tourelles avec son W.",
+    "counter_tips": "Engage-le directement, il n'a pas beaucoup de mobilité."
+  },
+  "Zilean": {
+    "name": "Zilean",
+    "key": 26,
+    "roles": [
+      "SUPPORT",
+      "MID"
+    ],
+    "archetype": "specialist",
+    "damage_type": "AP",
+    "region": "runeterra",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 3,
+      "poke": 2,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 1,
+      "teamfight": 2,
+      "early": 1,
+      "late": 3,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Ressuscite un allié avec son ultime et accélère son équipe.",
+    "counter_tips": "Engage avant son ultime et esquive ses bombes."
+  },
+  "Zoe": {
+    "name": "Zoe",
+    "key": 142,
+    "roles": [
+      "MID",
+      "SUPPORT"
+    ],
+    "archetype": "burst_mage",
+    "damage_type": "AP",
+    "region": "targon",
+    "groups": [
+      "celestial"
+    ],
+    "traits": {
+      "engage": 0,
+      "peel": 0,
+      "poke": 3,
+      "waveclear": 2,
+      "splitpush": 0,
+      "pick": 3,
+      "teamfight": 1,
+      "early": 2,
+      "late": 2,
+      "mobility": 1,
+      "frontline": 0,
+      "cc": 2,
+      "sustain": 0,
+      "objective": 1
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Poke à très longue portée et endort les cibles avec sa bulle.",
+    "counter_tips": "Esquive sa bulle et engage-la directement."
+  },
+  "Zyra": {
+    "name": "Zyra",
+    "key": 143,
+    "roles": [
+      "SUPPORT",
+      "MID"
+    ],
+    "archetype": "catcher",
+    "damage_type": "AP",
+    "region": "ixtal",
+    "groups": [],
+    "traits": {
+      "engage": 0,
+      "peel": 2,
+      "poke": 2,
+      "waveclear": 3,
+      "splitpush": 0,
+      "pick": 2,
+      "teamfight": 3,
+      "early": 2,
+      "late": 2,
+      "mobility": 0,
+      "frontline": 0,
+      "cc": 3,
+      "sustain": 0,
+      "objective": 2
+    },
+    "power_spikes": [
+      "Niveau 6 (R)",
+      "Premier objet",
+      "Deux objets"
+    ],
+    "playstyle": "Zone les combats avec ses plantes et immobilise plusieurs ennemis.",
+    "counter_tips": "Esquive ses racines et engage-la directement."
+  }
+}

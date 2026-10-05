@@ -1,0 +1,15 @@
+[
+  {"key": "vanguard", "label": "Tank engage", "description": "Tank qui lance les combats en plongeant au milieu de l'équipe adverse avec de gros contrôles de zone. Idéal si tu aimes prendre l'initiative et encaisser pour ton équipe."},
+  {"key": "warden", "label": "Tank protecteur", "description": "Tank qui reste près de ses carries pour les protéger et repousser les plongeurs. Parfait si tu préfères défendre tes alliés plutôt que foncer."},
+  {"key": "juggernaut", "label": "Juggernaut", "description": "Combattant très résistant aux gros dégâts mais peu mobile, qui gagne les combats prolongés au corps à corps. Pour ceux qui aiment avancer et tout détruire sur leur passage."},
+  {"key": "diver", "label": "Plongeur", "description": "Combattant mobile qui saute sur la ligne arrière adverse pour éliminer ou neutraliser une cible prioritaire. Pour les joueurs agressifs qui aiment les entrées spectaculaires."},
+  {"key": "skirmisher", "label": "Duelliste", "description": "Combattant taillé pour les duels et les escarmouches, qui excelle en 1v1 et en split push. Pour ceux qui aiment les affrontements techniques au corps à corps."},
+  {"key": "assassin", "label": "Assassin", "description": "Champion fragile mais explosif qui élimine une cible isolée en quelques secondes puis s'échappe. Pour les joueurs qui aiment les éliminations rapides et les roams."},
+  {"key": "burst_mage", "label": "Mage burst", "description": "Mage qui enchaîne ses sorts pour infliger un énorme pic de dégâts sur une ou plusieurs cibles. Pour ceux qui aiment les combos qui font fondre une barre de vie."},
+  {"key": "battlemage", "label": "Mage de combat", "description": "Mage qui reste au cœur de la mêlée et inflige des dégâts de zone continus. Pour ceux qui aiment dominer un combat d'équipe dans la durée."},
+  {"key": "artillery", "label": "Mage artillerie", "description": "Mage à très longue portée qui affaiblit l'adversaire avant le combat (poke) depuis une position sûre. Pour les joueurs précis qui aiment viser de loin."},
+  {"key": "marksman", "label": "Tireur", "description": "Attaquant à distance qui inflige des dégâts continus avec ses auto-attaques et devient la principale source de dégâts en fin de partie. Demande un bon placement."},
+  {"key": "enchanter", "label": "Enchanteur", "description": "Soutien qui soigne, protège et renforce ses alliés plutôt que d'infliger des dégâts. Pour ceux qui aiment rendre leur équipe imbattable."},
+  {"key": "catcher", "label": "Attrapeur", "description": "Champion qui immobilise une cible isolée à distance (grappin, entrave) pour la livrer à son équipe. Pour ceux qui aiment créer des opportunités."},
+  {"key": "specialist", "label": "Spécialiste", "description": "Champion au style unique qui ne rentre dans aucune case (tourelles, poisons, pièges, mise à l'échelle particulière). Pour ceux qui aiment l'originalité."}
+]
