@@ -1,10 +1,6 @@
-# Hébergement Apache (OVH) : renvoie toutes les pages de l'appli vers index.html.
-Options -MultiViews
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-RewriteRule ^ index.html [L]
+# Hébergement Apache (OVH). L'appli utilise des URL en « #/... » : aucune réécriture
+# n'est nécessaire, à la racine du site comme dans un sous-dossier (www/lolhelper).
+Options -Indexes
 
 # Toujours relire index.html et config.js (les autres fichiers ont un nom versionné).
 <IfModule mod_headers.c>

@@ -25,7 +25,7 @@ function ensure_writable_dir(string $dir): bool
 }
 
 /**
- * Dossier de données : config data_dir, sinon <home>/lolhelper-data (hors www/),
+ * Dossier de données : config data_dir, sinon lolhelper-data à côté de la racine du site (hors www/),
  * et en dernier recours <api>/data/ (protégé par .htaccess). null si rien n'est inscriptible.
  */
 function resolve_data_dir(array $config, string $apiDir): ?string
@@ -35,9 +35,11 @@ function resolve_data_dir(array $config, string $apiDir): ?string
     if (array_key_exists($cacheKey, $cache)) {
         return $cache[$cacheKey];
     }
-    $primary = $config['data_dir'] ?? (dirname($apiDir, 2) . DIRECTORY_SEPARATOR . 'lolhelper-data');
+    $primary = $config['data_dir'] ?? default_data_dir($apiDir);
     $result = null;
     if (ensure_writable_dir($primary)) {
+        // Sans effet hors du site public ; protège les données si le dossier est quand même servi.
+        protect_web_dir($primary);
         $result = $primary;
     } else {
         $fallback = $apiDir . DIRECTORY_SEPARATOR . 'data';
@@ -50,6 +52,23 @@ function resolve_data_dir(array $config, string $apiDir): ?string
     }
     $cache[$cacheKey] = $result;
     return $result;
+}
+
+/**
+ * <parent de la racine du site>/lolhelper-data : hors de www/ même si l'appli est dans un
+ * sous-dossier (www/lolhelper/api). Sans DOCUMENT_ROOT exploitable : deux niveaux au-dessus de api/.
+ */
+function default_data_dir(string $apiDir): string
+{
+    $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? realpath((string) $_SERVER['DOCUMENT_ROOT']) : false;
+    $api = realpath($apiDir);
+    if ($docRoot !== false && $api !== false) {
+        $root = rtrim($docRoot, '/\\') . DIRECTORY_SEPARATOR;
+        if (str_starts_with($api . DIRECTORY_SEPARATOR, $root)) {
+            return dirname($docRoot) . DIRECTORY_SEPARATOR . 'lolhelper-data';
+        }
+    }
+    return dirname($apiDir, 2) . DIRECTORY_SEPARATOR . 'lolhelper-data';
 }
 
 /** Ajoute un .htaccess « tout refuser » et un index vide dans un dossier situé sous www/. */

@@ -1,1 +1,0 @@
-# LoL Helper - Main package

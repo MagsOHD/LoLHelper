@@ -1,49 +1,8 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
+node_modules/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
-venv/
-env/
-ENV/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Environment variables
-.env
-.env.local
-
-# Data and cache
-data/cache/
-*.cache
-*.db
-
-# Logs
+lolhelper-data/
 *.log
-
-# OS
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/

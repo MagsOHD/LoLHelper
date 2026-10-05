@@ -14,7 +14,7 @@ describe('backend wrapper', () => {
       'https://example.fr/api/index.php?r=riot%2Faccount&platform=euw1&gameName=Le+Fou+%C3%89l%C3%A9gant&tagLine=EUW',
     );
     installWindow('');
-    expect(apiUrl('meta')).toBe('/api/index.php?r=meta');
+    expect(apiUrl('meta')).toBe('api/index.php?r=meta');
   });
 
   it('sends the stored password and JSON body', async () => {
@@ -25,7 +25,7 @@ describe('backend wrapper', () => {
     const doc = await store.put('teams', { id: 'a', x: 1 });
     expect(doc).toEqual({ id: 'a', x: 1 });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('/api/index.php?r=store%2Fteams%2Fa');
+    expect(url).toBe('api/index.php?r=store%2Fteams%2Fa');
     expect(init.method).toBe('PUT');
     expect((init.headers as Record<string, string>)['X-App-Password']).toBe('secret');
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');

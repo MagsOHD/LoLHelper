@@ -30,7 +30,7 @@ export function setPassword(value: string): void {
   saveLocal(PASSWORD_KEY, value || null);
 }
 
-/** Base URL of the site hosting /api/index.php ("" = same origin). Set in public/config.js. */
+/** Base URL of the site hosting api/index.php ("" = next to the page, works in a sub-folder). Set in public/config.js. */
 export function apiBase(): string {
   const base = typeof window !== 'undefined' ? window.APP_CONFIG?.apiBase : undefined;
   return (base || '').trim().replace(/\/+$/, '');
@@ -43,7 +43,8 @@ export function apiUrl(route: string, params: Params = {}): string {
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null) qs.append(k, String(v));
   }
-  return `${apiBase()}/api/index.php?${qs.toString()}`;
+  const base = apiBase();
+  return `${base ? `${base}/` : ''}api/index.php?${qs.toString()}`;
 }
 
 function extractDetail(data: unknown): string | null {

@@ -1,5 +1,0 @@
-node_modules/
-frontend/dist/
-frontend/lolhelper-data/
-!frontend/src/lib/
-!frontend/public/api/lib/
