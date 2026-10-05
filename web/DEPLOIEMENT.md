@@ -1,105 +1,96 @@
-# Mise en ligne : interface sur OVH, serveur sur Railway
+# Mise en ligne sur OVH (hébergement Perso)
 
-L'hébergement OVH « Perso » ne sert que des fichiers statiques et du PHP : il ne
-peut pas faire tourner le serveur Python. On sépare donc l'appli en deux :
+Tout le site tient sur l'hébergement OVH, sans autre service :
 
-| Partie | Où | Rôle |
+| Partie | Où elle tourne | Rôle |
 |---|---|---|
-| Interface (HTML/JS/CSS) | OVH, dossier `www/` | Ce que vous voyez dans le navigateur |
-| Serveur Python + base SQLite | Railway | API Riot, moteur de compos, données |
+| Interface + moteur de compositions | Navigateur de chaque ami | Pages, génération des compos, plans de jeu |
+| `api/index.php` | OVH (PHP) | Garde la clé Riot, relaie les appels Riot, stocke joueurs/équipes/compos |
+| Dossier `lolhelper-data/` | OVH, à côté de `www/` (hors du site public) | Données partagées et cache des parties |
 
-La clé Riot reste sur Railway : elle n'est jamais envoyée aux navigateurs.
-L'accès est protégé par un mot de passe partagé entre amis.
-
-Les interfaces de Railway et d'OVH évoluent : si un intitulé a changé, cherchez
-l'équivalent le plus proche.
+La clé Riot n'est jamais envoyée aux navigateurs. L'accès est protégé par un mot de passe
+partagé entre amis.
 
 ---
 
 ## 1. Clé API Riot
 
 Sur <https://developer.riotgames.com>, demandez une **Personal API Key**
-(« Register Product » → Personal). Elle est gratuite et n'expire pas.
-La clé de développement marche aussi pour essayer, mais elle expire toutes les
-24 h : il faudrait la remplacer chaque jour dans Railway.
+(« Register Product » → Personal) : gratuite, elle n'expire pas.
+La clé de développement marche pour essayer, mais expire toutes les 24 h.
+Sans clé, le site fonctionne en mode manuel (pool de champions saisi à la main).
 
-## 2. Serveur sur Railway
+## 2. Préparer les fichiers (sur votre PC)
 
-1. Créez un compte sur <https://railway.com> avec votre compte GitHub.
-   Railway est payant à l'usage (offre « Hobby », quelques dollars par mois) : vérifiez le tarif actuel.
-2. **New Project → Deploy from GitHub repo** → choisissez `MagsOHD/LoLHelper`.
-3. Dans le service créé, onglet **Settings** :
-   - **Source → Root Directory** : `web/backend` (Railway trouve le `Dockerfile` tout seul) ;
-   - **Source → Branch** : la branche qui contient l'appli
-     (`claude/lol-team-composition-tool-011CUpnwGnQdGoMzCSU3ZkdT`, ou `main` après fusion).
-4. Ajoutez un **volume** au service (clic droit sur le service → *Attach volume*,
-   ou bouton *+ New → Volume*) avec le chemin de montage **`/data`**.
-   C'est là que vit la base SQLite : sans volume, tout est effacé à chaque redéploiement.
-5. Onglet **Variables** :
+Prérequis : Node.js 18+ (<https://nodejs.org>).
 
-   | Variable | Valeur |
-   |---|---|
-   | `RIOT_API_KEY` | votre clé `RGAPI-...` |
-   | `RIOT_PLATFORM` | `euw1` |
-   | `APP_PASSWORD` | un mot de passe à partager entre amis |
-   | `CORS_ORIGINS` | l'adresse de votre site OVH, ex. `https://mon-site.fr,https://www.mon-site.fr` |
+1. Copiez `web/frontend/public/api/config.example.php` en
+   `web/frontend/public/api/config.php` et remplissez-le :
+   ```php
+   return [
+       'riot_api_key' => 'RGAPI-xxxxxxxx',
+       'riot_platform' => 'euw1',
+       'app_password' => 'un-mot-de-passe-entre-amis',
+       'cors_origins' => [],
+       'data_dir' => null,
+   ];
+   ```
+   Ce fichier n'est pas versionné dans git ; il est recopié à chaque compilation.
+2. Compilez :
+   ```bash
+   cd web/frontend
+   npm install
+   npm run build
+   ```
+   Le site prêt à envoyer est dans `web/frontend/dist/`
+   (`index.html`, `config.js`, `.htaccess`, `assets/`, `api/`…).
 
-6. Onglet **Settings → Networking → Generate Domain**. Notez l'adresse obtenue,
-   par exemple `https://lolhelper-production.up.railway.app`.
-7. Vérifiez : ouvrez `https://<adresse-railway>/api/health` → `{"status":"ok"}`.
+## 3. Version de PHP chez OVH
 
-## 3. Interface sur OVH
+Espace client OVHcloud → *Web Cloud* → *Hébergements* → votre hébergement →
+*Informations générales* → **Version PHP globale** : choisissez **8.1 ou plus récent**
+(8.3 recommandé).
 
-### Préparer les fichiers (sur votre PC)
-
-```bash
-cd web/frontend
-npm install
-npm run build
-```
-
-Ouvrez ensuite `web/frontend/dist/config.js` et mettez l'adresse Railway :
-
-```js
-window.APP_CONFIG = { apiBase: "https://lolhelper-production.up.railway.app" };
-```
-
-### Envoyer les fichiers avec FileZilla
+## 4. Envoyer le site avec FileZilla
 
 1. Installez FileZilla (client) : <https://filezilla-project.org>.
 2. Connexion : hôte `ftp.cluster100.hosting.ovh.net`, utilisateur `fullstj`,
    votre mot de passe FTP, port `21`.
-   Mot de passe oublié : espace client OVH → Hébergements → onglet *FTP - SSH*.
-3. Activez **Serveur → Forcer l'affichage des fichiers cachés**,
-   sinon le fichier `.htaccess` ne sera pas envoyé.
-4. Côté serveur, ouvrez le dossier `www/`. S'il contient déjà un site,
-   téléchargez-en une copie d'abord.
-5. Envoyez **le contenu** de `web/frontend/dist/` dans `www/` :
-   `index.html`, `config.js`, `.htaccess`, `favicon.svg` et le dossier `assets/`.
+   Mot de passe oublié : espace client → Hébergements → onglet *FTP - SSH*.
+3. Activez **Serveur → Forcer l'affichage des fichiers cachés**
+   (sinon les fichiers `.htaccess` ne partent pas, et `api/` ne serait pas protégé).
+4. Ouvrez le dossier `www/` côté serveur. S'il contient déjà un site, téléchargez-en
+   une copie d'abord.
+5. Envoyez **le contenu** de `web/frontend/dist/` dans `www/`.
 
-L'appli doit être à la racine du site (ou d'un sous-domaine), pas dans un sous-dossier.
+Le site doit être à la racine de `www/` (ou d'un sous-domaine), pas dans un sous-dossier.
 
-### Activer le HTTPS
+## 5. Activer le HTTPS
 
-Espace client OVH → Hébergements → *Informations générales* → **Certificat SSL**
-→ activer (Let's Encrypt, gratuit). Le mot de passe circule ainsi chiffré.
+Espace client → Hébergements → *Informations générales* → **Certificat SSL** → activer
+(Let's Encrypt, gratuit). Le mot de passe circule ainsi chiffré.
 
-## 4. Tester
+## 6. Tester
 
-Ouvrez `https://mon-site.fr` (ordinateur ou téléphone) → écran **Accès réservé** →
-entrez le mot de passe. Il est retenu sur chaque appareil.
-
-En cas de problème :
+1. Ouvrez `https://votre-domaine/api/index.php?r=meta` : vous devez voir un texte qui
+   commence par `{"riot_configured":true` et contient `"storage_ok":true`.
+2. Ouvrez `https://votre-domaine` (ordinateur ou téléphone) → écran **Accès réservé** →
+   mot de passe. Il est retenu sur chaque appareil.
+3. Ajoutez un ami par son Riot ID : la synchronisation récupère rang, maîtrises et
+   parties (quelques secondes la première fois, plus rapide ensuite grâce au cache).
 
 | Symptôme | Cause probable |
 |---|---|
-| « Impossible de joindre le serveur » | `apiBase` incorrect dans `config.js`, ou `CORS_ORIGINS` ne contient pas l'adresse exacte du site (avec `https://`, et la version `www.` si vous l'utilisez) |
-| Page blanche ou 404 en rechargeant une page | `.htaccess` non envoyé (fichiers cachés) |
-| « Clé API Riot invalide ou expirée » | Clé expirée : mettez-la à jour dans Railway → Variables |
-| Joueurs disparus après un redéploiement | Volume non monté sur `/data` |
+| `riot_configured:false` | `api/config.php` absent ou clé vide (refaites l'étape 2 puis renvoyez `api/config.php`) |
+| `storage_ok:false` | Droits d'écriture : vérifiez que le dossier `lolhelper-data` (à côté de `www/`) peut être créé |
+| Page blanche, erreur 500 | Version PHP trop ancienne (étape 3) |
+| Page 404 en rechargeant une page | `.htaccess` non envoyé (fichiers cachés) |
+| « Clé API Riot invalide ou expirée » | Clé expirée : mettez à jour `api/config.php` et renvoyez-le |
+| `https://votre-domaine/api/config.php` affiche quelque chose | `api/.htaccess` non envoyé : renvoyez-le (fichiers cachés) |
 
-## 5. Mettre à jour
+## 7. Mettre à jour et sauvegarder
 
-- **Serveur** : chaque `git push` sur la branche choisie redéploie Railway automatiquement.
-- **Interface** : relancez `npm run build`, remettez votre adresse dans `dist/config.js`,
-  puis renvoyez le contenu de `dist/` par FTP.
+- **Mise à jour** : `npm run build` puis renvoyez le contenu de `dist/` dans `www/`
+  (votre `config.php` est recopié automatiquement depuis `public/api/`).
+- **Sauvegarde** : téléchargez par FTP le dossier `lolhelper-data/` (situé à côté de `www/`).
+  Il contient `players.json`, `teams.json`, `saved.json` et le cache des parties.

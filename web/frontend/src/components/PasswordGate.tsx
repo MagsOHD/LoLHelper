@@ -32,7 +32,7 @@ export function PasswordGate({ required, children }: { required: boolean; childr
     setError(null);
     setPassword(value.trim());
     try {
-      await api.listPlayers();
+      await api.listTeams(); // cheapest call that requires the password
       setLocked(false);
       setValue('');
       await queryClient.invalidateQueries();

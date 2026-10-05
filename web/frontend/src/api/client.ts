@@ -1,3 +1,9 @@
+// Page-facing data layer. Pages only use `api` (and the helpers re-exported here).
+//
+// Production (OVH shared hosting): static site + small PHP API (public/api/index.php) used as a
+// document store and Riot API proxy; Data Dragon is fetched by the browser and the composition
+// engine runs locally (src/engine). See service.ts.
+// VITE_MOCK=1: in-memory demo backend (mock.ts), never bundled in production builds.
 import type {
   ArchetypeInfo,
   ChampionInfo,
@@ -18,125 +24,65 @@ import type {
   TeamBody,
   ThemeInfo,
 } from './types';
-import { loadLocal, saveLocal } from '../lib/storage';
+import { localApi } from './service';
 
-export class ApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-    this.name = 'ApiError';
-  }
-}
+export { ApiError, AUTH_REQUIRED_EVENT, getPassword, setPassword } from './backend';
 
 export const MOCK_MODE = import.meta.env.VITE_MOCK === '1';
 
-declare global {
-  interface Window {
-    APP_CONFIG?: { apiBase?: string };
-  }
-}
-
-// Set in public/config.js (editable after build) so the static site can target a remote backend.
-const API_BASE = (window.APP_CONFIG?.apiBase || '').trim().replace(/\/+$/, '');
-
-const PASSWORD_KEY = 'password';
-export const AUTH_REQUIRED_EVENT = 'lolhelper:auth-required';
-
-export function getPassword(): string {
-  return loadLocal<string>(PASSWORD_KEY, '');
-}
-
-export function setPassword(value: string): void {
-  saveLocal(PASSWORD_KEY, value || null);
-}
-
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
-function extractDetail(data: unknown): string | null {
-  if (!data || typeof data !== 'object') return null;
-  const detail = (data as { detail?: unknown }).detail;
-  if (typeof detail === 'string') return detail;
-  // FastAPI validation errors: [{loc, msg, type}]
-  if (Array.isArray(detail)) {
-    const msgs = detail
-      .map((d) => (d && typeof d === 'object' && 'msg' in d ? String((d as { msg: unknown }).msg) : ''))
-      .filter(Boolean);
-    if (msgs.length) return msgs.join(' · ');
-  }
-  return null;
+async function mock<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  const { mockRequest } = await import('./mock');
+  return (await mockRequest(method, path, body)) as T;
 }
 
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  if (MOCK_MODE) {
-    const { mockRequest } = await import('./mock');
-    return (await mockRequest(method, path, body)) as T;
-  }
-  let res: Response;
-  try {
-    const headers: Record<string, string> = {};
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const password = getPassword();
-    if (password) headers['X-App-Password'] = password;
-    res = await fetch(`${API_BASE}/api${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  } catch {
-    throw new ApiError('Impossible de joindre le serveur. Vérifie que le backend est lancé.', 0);
-  }
-  if (res.status === 204) return undefined as T;
-  const text = await res.text();
-  let data: unknown = null;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = null;
-    }
-  }
-  if (res.status === 401) window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
-  if (!res.ok) {
-    throw new ApiError(extractDetail(data) ?? `Erreur ${res.status} du serveur.`, res.status);
-  }
-  return data as T;
-}
+const enc = encodeURIComponent;
 
 export const api = {
   // Meta
-  health: () => request<{ status: string }>('GET', '/health'),
-  meta: () => request<Meta>('GET', '/meta'),
-  champions: () => request<ChampionInfo[]>('GET', '/champions'),
-  archetypes: () => request<ArchetypeInfo[]>('GET', '/archetypes'),
-  themes: () => request<ThemeInfo[]>('GET', '/themes'),
+  health: (): Promise<{ status: string }> => (MOCK_MODE ? mock('GET', '/health') : localApi.health()),
+  meta: (): Promise<Meta> => (MOCK_MODE ? mock('GET', '/meta') : localApi.meta()),
+  champions: (): Promise<ChampionInfo[]> => (MOCK_MODE ? mock('GET', '/champions') : localApi.champions()),
+  archetypes: (): Promise<ArchetypeInfo[]> => (MOCK_MODE ? mock('GET', '/archetypes') : localApi.archetypes()),
+  themes: (): Promise<ThemeInfo[]> => (MOCK_MODE ? mock('GET', '/themes') : localApi.themes()),
 
   // Players
-  listPlayers: () => request<Player[]>('GET', '/players'),
-  getPlayer: (id: string) => request<Player>('GET', `/players/${encodeURIComponent(id)}`),
-  createPlayer: (body: CreatePlayerBody) => request<Player>('POST', '/players', body),
-  deletePlayer: (id: string) => request<void>('DELETE', `/players/${encodeURIComponent(id)}`),
-  syncPlayer: (id: string) => request<Player>('POST', `/players/${encodeURIComponent(id)}/sync`),
-  updatePreferences: (id: string, prefs: PlayerPreferences) =>
-    request<Player>('PUT', `/players/${encodeURIComponent(id)}/preferences`, prefs),
-  updatePool: (id: string, champions: ManualPoolEntry[]) =>
-    request<Player>('PUT', `/players/${encodeURIComponent(id)}/pool`, { champions }),
+  listPlayers: (): Promise<Player[]> => (MOCK_MODE ? mock('GET', '/players') : localApi.listPlayers()),
+  getPlayer: (id: string): Promise<Player> =>
+    MOCK_MODE ? mock('GET', `/players/${enc(id)}`) : localApi.getPlayer(id),
+  createPlayer: (body: CreatePlayerBody): Promise<Player> =>
+    MOCK_MODE ? mock('POST', '/players', body) : localApi.createPlayer(body),
+  deletePlayer: (id: string): Promise<void> =>
+    MOCK_MODE ? mock('DELETE', `/players/${enc(id)}`) : localApi.deletePlayer(id),
+  syncPlayer: (id: string): Promise<Player> =>
+    MOCK_MODE ? mock('POST', `/players/${enc(id)}/sync`) : localApi.syncPlayer(id),
+  updatePreferences: (id: string, prefs: PlayerPreferences): Promise<Player> =>
+    MOCK_MODE ? mock('PUT', `/players/${enc(id)}/preferences`, prefs) : localApi.updatePreferences(id, prefs),
+  updatePool: (id: string, champions: ManualPoolEntry[]): Promise<Player> =>
+    MOCK_MODE ? mock('PUT', `/players/${enc(id)}/pool`, { champions }) : localApi.updatePool(id, champions),
 
   // Teams
-  listTeams: () => request<Team[]>('GET', '/teams'),
-  getTeam: (id: string) => request<Team>('GET', `/teams/${encodeURIComponent(id)}`),
-  createTeam: (body: TeamBody) => request<Team>('POST', '/teams', body),
-  updateTeam: (id: string, body: TeamBody) => request<Team>('PUT', `/teams/${encodeURIComponent(id)}`, body),
-  deleteTeam: (id: string) => request<void>('DELETE', `/teams/${encodeURIComponent(id)}`),
+  listTeams: (): Promise<Team[]> => (MOCK_MODE ? mock('GET', '/teams') : localApi.listTeams()),
+  getTeam: (id: string): Promise<Team> => (MOCK_MODE ? mock('GET', `/teams/${enc(id)}`) : localApi.getTeam(id)),
+  createTeam: (body: TeamBody): Promise<Team> => (MOCK_MODE ? mock('POST', '/teams', body) : localApi.createTeam(body)),
+  updateTeam: (id: string, body: TeamBody): Promise<Team> =>
+    MOCK_MODE ? mock('PUT', `/teams/${enc(id)}`, body) : localApi.updateTeam(id, body),
+  deleteTeam: (id: string): Promise<void> =>
+    MOCK_MODE ? mock('DELETE', `/teams/${enc(id)}`) : localApi.deleteTeam(id),
 
   // Compositions
-  generate: (body: GenerateBody) =>
-    request<{ suggestions: CompositionSuggestion[] }>('POST', '/compositions/generate', body),
-  gamePlan: (picks: Pick[]) => request<GamePlan>('POST', '/compositions/game-plan', { picks }),
-  matchup: (body: MatchupBody) => request<MatchupPlan>('POST', '/compositions/matchup', body),
-  listSaved: () => request<SavedComposition[]>('GET', '/compositions/saved'),
-  saveComposition: (body: SaveCompositionBody) => request<SavedComposition>('POST', '/compositions/saved', body),
-  deleteSaved: (id: string) => request<void>('DELETE', `/compositions/saved/${encodeURIComponent(id)}`),
+  generate: (body: GenerateBody): Promise<{ suggestions: CompositionSuggestion[] }> =>
+    MOCK_MODE ? mock('POST', '/compositions/generate', body) : localApi.generate(body),
+  gamePlan: (picks: Pick[]): Promise<GamePlan> =>
+    MOCK_MODE ? mock('POST', '/compositions/game-plan', { picks }) : localApi.gamePlan(picks),
+  matchup: (body: MatchupBody): Promise<MatchupPlan> =>
+    MOCK_MODE ? mock('POST', '/compositions/matchup', body) : localApi.matchup(body),
+  listSaved: (): Promise<SavedComposition[]> => (MOCK_MODE ? mock('GET', '/compositions/saved') : localApi.listSaved()),
+  saveComposition: (body: SaveCompositionBody): Promise<SavedComposition> =>
+    MOCK_MODE ? mock('POST', '/compositions/saved', body) : localApi.saveComposition(body),
+  deleteSaved: (id: string): Promise<void> =>
+    MOCK_MODE ? mock('DELETE', `/compositions/saved/${enc(id)}`) : localApi.deleteSaved(id),
 };
 
 export function errorMessage(err: unknown): string {

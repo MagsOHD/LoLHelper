@@ -1,4 +1,4 @@
-// Mirrors web/backend/app/engine/models.py and the REST contract (snake_case JSON keys).
+// Shared data types (snake_case keys, as stored by the PHP API and produced by the engine).
 
 export type Role = 'TOP' | 'JUNGLE' | 'MID' | 'BOTTOM' | 'SUPPORT';
 export const ROLES: Role[] = ['TOP', 'JUNGLE', 'MID', 'BOTTOM', 'SUPPORT'];
@@ -87,6 +87,18 @@ export interface PoolEntry {
   comfort: number;
   desire: number;
   sources: PoolSource[];
+  mastery_points?: number;
+  mastery_level?: number;
+  recent_games?: number;
+  recent_wins?: number;
+}
+
+export interface PlayerInput {
+  player_id: string;
+  name: string;
+  preferences: PlayerPreferences;
+  role_games: Partial<Record<Role, number>>;
+  pool: PoolEntry[];
 }
 
 export interface GenerationOptions {
@@ -188,6 +200,8 @@ export interface Meta {
   region: string;
   platforms: string[];
   password_required?: boolean;
+  /** PHP store writable (OVH hosting). */
+  storage_ok?: boolean;
 }
 
 export interface Rank {

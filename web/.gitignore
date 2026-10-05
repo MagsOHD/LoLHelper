@@ -1,7 +1,5 @@
 node_modules/
 frontend/dist/
-backend/data/
-backend/.env
-*.db
+frontend/lolhelper-data/
 !frontend/src/lib/
 !frontend/public/api/lib/

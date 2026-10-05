@@ -1,0 +1,15 @@
+export type TraitName =
+  | 'engage'
+  | 'peel'
+  | 'poke'
+  | 'waveclear'
+  | 'splitpush'
+  | 'pick'
+  | 'teamfight'
+  | 'early'
+  | 'late'
+  | 'mobility'
+  | 'frontline'
+  | 'cc'
+  | 'sustain'
+  | 'objective';
