@@ -41,7 +41,8 @@ interface Cand {
   entry: FullPoolEntry | null;
   locked: boolean;
   iv: number; // individual value used to pre-rank candidates
-  comfortPart: number;
+  comfortPart: number; // real comfort, shown in the score breakdown
+  scorePart: number; // comfort part of the score, fading out as exploration rises
 }
 
 interface Player {
@@ -188,13 +189,17 @@ export function fmtPoints(points: number): string {
   return String(points);
 }
 
+const W_NOVELTY = 0.3;
+
 function evaluate(ctx: Ctx, theme: ThemeDef, picks: readonly Cand[]): [number, Parts] {
   const n = picks.length;
   const champs = picks.map((c) => c.champ);
   const sums = teamSums(champs);
   let cs = 0;
   let ds = 0;
-  for (const c of picks) cs += c.comfortPart;
+  let shown = 0;
+  for (const c of picks) cs += c.scorePart;
+  for (const c of picks) shown += c.comfortPart;
   for (const c of picks) ds += c.desire;
   const comfort = cs / n;
   const desire = ds / n;
@@ -202,7 +207,16 @@ function evaluate(ctx: Ctx, theme: ThemeDef, picks: readonly Cand[]): [number, P
   const bal = viability(champs, sums, theme.ignoreDamageMix);
   let total = ctx.wComfort * comfort + ctx.wDesire * desire + ctx.wTheme * fit + ctx.wBalance * bal;
   let weights = ctx.wComfort + ctx.wDesire + ctx.wTheme + ctx.wBalance;
-  const parts: Parts = { comfort, desire, theme_fit: fit, balance: bal };
+  const expl = ctx.options.exploration;
+  if (expl > 0) {
+    // Exploration is the target share of new champions in the lineup (0.2 ≈ one pick out of 5).
+    let novelty = 0;
+    // A champion counts as new when barely played: comfort 0 -> 1, 0.2 -> 0.5, >= 0.4 -> 0.
+    for (const c of picks) novelty += Math.max(0, 1 - c.comfort / 0.4);
+    total += W_NOVELTY * (1 - Math.abs(novelty / n - expl));
+    weights += W_NOVELTY;
+  }
+  const parts: Parts = { comfort: shown / n, desire, theme_fit: fit, balance: bal };
   if (ctx.enemy.length) {
     const cnt = counterScore(champs, ctx.enemy);
     total += ctx.wCounter * cnt;
@@ -220,7 +234,7 @@ function evaluate(ctx: Ctx, theme: ThemeDef, picks: readonly Cand[]): [number, P
 
 // --------------------------------------------------------------------------- setup
 
-function makeCand(pl: Player, role: Role, d: ChampData, e: FullPoolEntry | null, locked = false): Cand {
+function makeCand(pl: Player, role: Role, d: ChampData, e: FullPoolEntry | null, expl: number, locked = false): Cand {
   const comfort = e ? e.comfort : 0.0;
   let desire = e ? e.desire : 0.0;
   if (pl.wanted.has(d.id)) desire = 1.0;
@@ -237,6 +251,7 @@ function makeCand(pl: Player, role: Role, d: ChampData, e: FullPoolEntry | null,
     locked,
     iv: 0.0,
     comfortPart: 0.75 * comfort + 0.25 * roleFit,
+    scorePart: 0.75 * (1 - expl) * comfort + 0.25 * roleFit,
   };
 }
 
@@ -263,7 +278,7 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
     players: [],
     excluded,
     enemy: enemyData,
-    wComfort: 0.32 * (1 - 0.5 * expl),
+    wComfort: 0.32,
     wDesire: 0.14 + 0.06 * expl,
     wTheme: options.theme ? 0.3 : 0.26,
     wBalance: 0.18,
@@ -305,7 +320,7 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
         let viable = roles.filter((r) => d.roles.includes(r));
         if (!viable.length) viable = [...roles];
         const e = pl.pool.get(d.id) ?? null;
-        for (const r of viable) cands.push(makeCand(pl, r, d, e, true));
+        for (const r of viable) cands.push(makeCand(pl, r, d, e, expl, true));
       }
       pl.base = cands;
       continue;
@@ -325,7 +340,7 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
       if (!d) continue;
       for (const r of roles) {
         if (d.roles.includes(r)) {
-          cands.push(makeCand(pl, r, d, e));
+          cands.push(makeCand(pl, r, d, e, expl));
           seen.add(seenKey(cid, r));
         }
       }
@@ -343,7 +358,7 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
         );
         poolR.sort(sorter);
         for (const c of poolR.slice(0, nExtra)) {
-          cands.push(makeCand(pl, r, c, null));
+          cands.push(makeCand(pl, r, c, null, expl));
           seen.add(seenKey(c.id, r));
         }
       }
@@ -359,7 +374,7 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
         );
         poolR.sort(sorter);
         for (const c of poolR.slice(0, 3 - have)) {
-          cands.push(makeCand(pl, r, c, null));
+          cands.push(makeCand(pl, r, c, null, expl));
           seen.add(seenKey(c.id, r));
         }
       }
@@ -396,13 +411,13 @@ function themeCandidates(ctx: Ctx, pl: Player, theme: ThemeDef, explicit: boolea
               theme.affinity(c) > 0,
           );
         extra.sort(sorter);
-        for (const c of extra.slice(0, perRole)) cands.push(makeCand(pl, r, c, null));
+        for (const c of extra.slice(0, perRole)) cands.push(makeCand(pl, r, c, null, ctx.options.exploration));
       }
     }
   }
   const wt = ctx.wTheme * (theme.thematic ? 1.0 : 0.8);
   for (const c of cands) {
-    c.iv = ctx.wComfort * c.comfortPart + ctx.wDesire * c.desire + wt * theme.affinity(c.champ);
+    c.iv = ctx.wComfort * c.scorePart + ctx.wDesire * c.desire + wt * theme.affinity(c.champ);
   }
   cands.sort(byIv);
   // keep the best overall while guaranteeing a few options per role

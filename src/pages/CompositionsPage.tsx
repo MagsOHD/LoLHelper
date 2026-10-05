@@ -41,6 +41,17 @@ function ChampionMultiPicker({ label, ids, onChange, max }: { label: string; ids
   );
 }
 
+/** Exploration is the target share of new champions per composition (engine contract). */
+function explorationHint(exploration: number, players: number): string {
+  if (exploration <= 0) return 'Uniquement les champions que vous jouez déjà';
+  if (exploration >= 1) return 'Uniquement des champions à découvrir';
+  const n = exploration * players;
+  const lo = Math.floor(n + 1e-9);
+  const hi = Math.ceil(n - 1e-9);
+  const count = lo === hi ? `${lo}` : `${lo} à ${hi}`;
+  return `Environ ${count} champion${hi > 1 ? 's' : ''} à découvrir par compo`;
+}
+
 export function CompositionsPage() {
   const players = usePlayers();
   const teams = useTeams();
@@ -57,7 +68,7 @@ export function CompositionsPage() {
   const [locks, setLocks] = useState<Record<string, string>>({});
   const [bans, setBans] = useState<string[]>([]);
   const [enemies, setEnemies] = useState<string[]>([]);
-  const [exploration, setExploration] = useState(0.2);
+  const [exploration, setExploration] = useState(0);
   const [count, setCount] = useState(5);
   const [planPicks, setPlanPicks] = useState<Pick[] | null>(null);
   const [planTitle, setPlanTitle] = useState('');
@@ -267,9 +278,10 @@ export function CompositionsPage() {
                   step={5}
                   value={Math.round(exploration * 100)}
                   onChange={(e) => setExploration(Number(e.target.value) / 100)}
-                  aria-valuetext={`${Math.round(exploration * 100)} %`}
+                  aria-valuetext={`${Math.round(exploration * 100)} % — ${explorationHint(exploration, selectedPlayers.length || 5)}`}
                 />
                 <div className="range-labels"><span>Rester sur nos champions</span><span>Découvrir de nouveaux champions</span></div>
+                <p className="hint">{explorationHint(exploration, selectedPlayers.length || 5)}</p>
               </div>
               <div className="field">
                 <label htmlFor={`${id}-count`} className="field__label">Nombre de résultats</label>
