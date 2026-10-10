@@ -6,6 +6,7 @@ import {
   buildMatchupPlan,
   computePool,
   generateCompositions,
+  guessEnemyRoles,
   listArchetypes,
   listThemes,
   type ChampionCatalog,
@@ -451,17 +452,10 @@ function validatePicks(catalog: ChampionCatalog, picks: Pick[], label = 'La comp
 
 /** Fill missing enemy roles: first catalog role not already taken, else any free role. */
 export function assignEnemyRoles(enemy: EnemyPick[], catalog: { get: ChampionCatalog['get'] }): Pick[] {
-  const taken = new Set<Role>(enemy.filter((e) => e.role).map((e) => e.role as Role));
-  return enemy.map((e) => {
-    let role = e.role ?? null;
-    if (!role) {
-      const champ = catalog.get(e.champion_id);
-      const candidates = (champ?.roles ?? []).filter((r) => !taken.has(r));
-      for (const r of ROLES) if (!taken.has(r) && !candidates.includes(r)) candidates.push(r);
-      role = candidates[0];
-      if (!role) throw unprocessable("L'équipe adverse ne peut pas contenir plus de 5 champions.");
-      taken.add(role);
-    }
+  const roles = guessEnemyRoles(enemy, catalog);
+  return enemy.map((e, i) => {
+    const role = roles[i];
+    if (!role) throw unprocessable("L'équipe adverse ne peut pas contenir plus de 5 champions.");
     return { role, champion_id: e.champion_id };
   });
 }
@@ -544,7 +538,6 @@ async function matchup(body: MatchupBody): Promise<MatchupPlan> {
     throw unprocessable("L'équipe adverse contient plusieurs champions sur le même rôle.");
   }
   validatePicks(catalog, ally, 'Votre composition');
-  // TODO(integration): switch to the engine's enemy-role helper once it is exported.
   const enemy = assignEnemyRoles(enemyIn, catalog);
   validatePicks(catalog, enemy, "L'équipe adverse");
   const [meta, players] = await Promise.all([getMetaStats(), allyPlayers(ally, catalog)]);

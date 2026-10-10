@@ -1,7 +1,27 @@
 // Game plan ("comment jouer la compo") and matchup plan ("comment jouer contre eux").
-import type { GamePlan, LaneMatchup, MatchupPlan, PhasePlan, Pick, Role, RoleTip, ThreatInfo } from '../api/types';
+import type {
+  EngineContext,
+  GamePlan,
+  LaneMatchup,
+  MatchupPlan,
+  MetaStats,
+  PhasePlan,
+  Pick,
+  PlayerInput,
+  Role,
+  RoleTip,
+  ThreatInfo,
+} from '../api/types';
 import { counterDetails, DIVE_ARCHES, DPS_ARCHES, joinNames, SQUISHY_CARRY_ARCHES, teamNotes } from './analysis';
 import { archetypeLabel, DAMAGE_ARCHETYPES, placeholderData, type ChampData, type Catalog } from './catalog';
+import {
+  historyLaneEdge,
+  laneHistory,
+  LANE_META_CITE_MIN,
+  metaLaneEdge,
+  metaMatchup,
+  metaUsable,
+} from './meta';
 import { cmpNum, cmpStr, pyRound } from './pycompat';
 import {
   ARCH_JOB,
@@ -731,6 +751,35 @@ function laneAdvice(a: Champ, e: Champ, catalog: Catalog): string {
   return parts.slice(0, 3).join(' ');
 }
 
+/** One sentence citing the meta duel when the sample is meaningful, else null. */
+function metaLaneSentence(meta: MetaStats | null, role: Role, a: Champ, e: Champ): string | null {
+  if (!meta) return null;
+  const m = metaMatchup(meta, role, a.id, e.id);
+  if (!m || m[0] < LANE_META_CITE_MIN) return null;
+  const pct = pyRound((100 * m[1]) / m[0]);
+  return `Sur ce patch (haut elo) : ${a.name} gagne ${pct} % de ses duels contre ${e.name} (${m[0]} parties).`;
+}
+
+// Threat danger adjustment from lane data (edges are -1..1, positive = our laner wins the duel).
+/** Weight of the ally player's own duels (already weighted by games) next to the meta duel. */
+const THREAT_HIST_WEIGHT = 0.5;
+/** |edge| needed to move the danger by one level (meta: ≈ 53 % smoothed winrate). */
+const THREAT_EDGE_STEP = 0.06;
+
+function laneEdgeVs(
+  meta: MetaStats | null,
+  role: Role,
+  ally: Champ,
+  enemy: Champ,
+  player: PlayerInput | null,
+  resolve: (id: string) => string | null,
+): number {
+  let edge = 0;
+  if (meta) edge += metaLaneEdge(meta, role, ally.id, enemy.id);
+  if (player) edge += THREAT_HIST_WEIGHT * historyLaneEdge(laneHistory(player, ally.id, enemy.id, resolve));
+  return edge;
+}
+
 function suggestedBans(ours: Team, enemy: Team, catalog: Catalog, limit = 3): string[] {
   if (!ours.n) return [];
   const taken = new Set([...ours.champs.map((c) => c.id), ...enemy.champs.map((c) => c.id)]);
@@ -801,7 +850,21 @@ function objectivesVs(ours: Team, enemy: Team, theirStrat: ThemeDef | null, thei
 }
 
 /** Unelided matchup plan (the public wrapper applies French elision). */
-export function buildMatchupPlanRaw(ally: Pick[], enemy: Pick[], catalog: Catalog): MatchupPlan {
+export function buildMatchupPlanRaw(
+  ally: Pick[],
+  enemy: Pick[],
+  catalog: Catalog,
+  context: EngineContext = {},
+): MatchupPlan {
+  const meta = metaUsable(context.meta) ? context.meta : null;
+  const playerByRole = new Map<Role, PlayerInput>();
+  if (context.players?.length) {
+    for (const p of ally) {
+      const pl = p.player_id ? context.players.find((x) => x.player_id === p.player_id) : undefined;
+      if (pl && p.role && !playerByRole.has(p.role)) playerByRole.set(p.role, pl);
+    }
+  }
+  const resolve = (id: string): string | null => catalog.resolve(id);
   const ours = makeTeam(ally, catalog);
   const theirs = makeTeam(enemy, catalog);
   const theirThemes = detectThemes(theirs.champs);
@@ -845,6 +908,17 @@ export function buildMatchupPlanRaw(ally: Pick[], enemy: Pick[], catalog: Catalo
     const v = threatValue(c, ours);
     let danger = v >= 6 ? 3 : v >= 4 ? 2 : 1;
     if (rank === 0) danger = Math.max(danger, 2);
+    if (meta || playerByRole.size) {
+      // the laner facing it wins / loses this duel (meta or own games): one level less / more
+      const role = theirs.picks.find(([, x]) => x === c)?.[0] ?? null;
+      const mine = role ? ours.byRole(role) : null;
+      if (role && mine) {
+        const edge = laneEdgeVs(meta, role, mine, c, playerByRole.get(role) ?? null, resolve);
+        if (edge >= THREAT_EDGE_STEP) danger -= 1;
+        else if (edge <= -THREAT_EDGE_STEP) danger += 1;
+        danger = Math.max(1, Math.min(3, danger));
+      }
+    }
     threats.push({
       champion_id: c.id,
       danger,
@@ -858,7 +932,10 @@ export function buildMatchupPlanRaw(ally: Pick[], enemy: Pick[], catalog: Catalo
     const a = ours.byRole(role);
     const e = theirs.byRole(role);
     if (a && e) {
-      lanes.push({ role, ally_champion_id: a.id, enemy_champion_id: e.id, advice: laneAdvice(a, e, catalog) });
+      let advice = laneAdvice(a, e, catalog);
+      const cite = metaLaneSentence(meta, role, a, e);
+      if (cite) advice += ` ${cite}`;
+      lanes.push({ role, ally_champion_id: a.id, enemy_champion_id: e.id, advice });
     }
   }
 

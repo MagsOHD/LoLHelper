@@ -1,6 +1,7 @@
 // Test doubles for the data-layer tests (node environment, no jsdom).
 import { vi } from 'vitest';
 import type { ChampionCatalog } from '../../engine';
+import { guessEnemyRoles } from '../../engine/meta';
 import { ApiError } from '../backend';
 import type { ChampionInfo, ChampionTraits, PoolEntry, Role } from '../types';
 import account from './account.json';
@@ -84,6 +85,8 @@ export function fakeEngine() {
     generateCompositions: vi.fn(() => []),
     buildGamePlan: vi.fn(() => ({ identity: 'Compo test' })),
     buildMatchupPlan: vi.fn(() => ({ enemy_identity: 'Adversaire test' })),
+    // Pure rule shared with the engine: use the real one.
+    guessEnemyRoles,
   };
 }
 
