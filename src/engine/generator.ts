@@ -36,9 +36,9 @@ const AUTO_THEMATIC_FACTOR = 0.95;
 
 // History / meta terms. They are all OFF (exactly zero effect) when the data is absent.
 /** Weight of the mean meta value (0..1) among the weighted parts (comfort 0.32, theme ~0.3...). */
-const W_META = 0.08;
+const W_META = 0.16;
 /** Added to the final score: W_FORM * mean form (-1..1) of the picks (form fades out with exploration). */
-const W_FORM = 0.05;
+const W_FORM = 0.08;
 /** Added to the final score: W_DUO * clamp(sum over pairs of duo values (-1..1), -1, 1). */
 const W_DUO = 0.04;
 // Counter part with lane data: trait counter (0..1) + sum over lanes of laneW * (2 * laneVal - 1), clamped to

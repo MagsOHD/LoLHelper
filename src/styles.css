@@ -595,3 +595,6 @@ a.member:hover { border-color: var(--gold); }
 
 .password-gate { max-width: 420px; width: 100%; margin: 24px auto; display: flex; flex-direction: column; gap: 14px; }
 .password-gate h1 { font-family: var(--font-title); color: var(--gold); font-size: 1.4rem; }
+
+.banner--action { flex-wrap: wrap; align-items: center; }
+.banner--action .banner__text { flex: 1 1 220px; min-width: 0; }
