@@ -3,6 +3,7 @@
 import type {
   ArchetypeInfo,
   CompositionSuggestion,
+  EngineContext,
   GamePlan,
   GenerationOptions,
   ManualPoolEntry,
@@ -86,7 +87,9 @@ export function generateCompositions(
   players: PlayerInput[],
   options: GenerationOptions,
   catalog: ChampionCatalog,
+  context: EngineContext = {},
 ): CompositionSuggestion[] {
+  void context; // CONTRACT: meta stats + players' history (lane_history, allies, form) — not used yet
   return elideAll(generateCompositionsRaw(players, options, asCatalog(catalog)));
 }
 
@@ -95,6 +98,12 @@ export function buildGamePlan(picks: Pick[], catalog: ChampionCatalog): GamePlan
 }
 
 /** Enemy picks always carry a role (callers guess missing ones before calling). */
-export function buildMatchupPlan(ally: Pick[], enemy: Pick[], catalog: ChampionCatalog): MatchupPlan {
+export function buildMatchupPlan(
+  ally: Pick[],
+  enemy: Pick[],
+  catalog: ChampionCatalog,
+  context: EngineContext = {},
+): MatchupPlan {
+  void context; // CONTRACT: meta matchups + ally players' lane history — not used yet
   return elideAll(buildMatchupPlanRaw(ally, enemy, asCatalog(catalog)));
 }
