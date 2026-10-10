@@ -1,7 +1,11 @@
 // Composition generator: beam search over (role, champion) per player + local improvement.
 import type {
+  AllyHistory,
   CompositionSuggestion,
+  EngineContext,
   GenerationOptions,
+  LaneHistoryEntry,
+  MetaStats,
   PlayerInput,
   PlayerPreferences,
   PoolEntry,
@@ -10,6 +14,17 @@ import type {
 } from '../api/types';
 import { counterDetails, counterScore, teamNotes, teamSums, viability } from './analysis';
 import { archetypeLabel, TRAITS, type ChampData, type Catalog } from './catalog';
+import {
+  DUO_PRIOR,
+  LANE_HIST_HALF,
+  LANE_HIST_PRIOR,
+  LANE_META_PRIOR,
+  guessEnemyRoles,
+  metaMatchup,
+  metaPickValue,
+  metaUsable,
+  smoothedRate,
+} from './meta';
 import { cmpNum, cmpStr, pyFixed, pyRound } from './pycompat';
 import { COUNTER_FR, ROLE_LABELS, TRAIT_FR } from './tables';
 import { allThemes, getTheme, lorePairs, type ThemeDef } from './themes';
@@ -18,6 +33,22 @@ export const ROLE_ORDER: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'BOTTOM', 'S
 const PREF_FIT = [1.0, 0.8, 0.6, 0.45, 0.35];
 const UNLISTED_ROLE_FIT = 0.15;
 const AUTO_THEMATIC_FACTOR = 0.95;
+
+// History / meta terms. They are all OFF (exactly zero effect) when the data is absent.
+/** Weight of the mean meta value (0..1) among the weighted parts (comfort 0.32, theme ~0.3...). */
+const W_META = 0.08;
+/** Added to the final score: W_FORM * mean form (-1..1) of the picks (form fades out with exploration). */
+const W_FORM = 0.05;
+/** Added to the final score: W_DUO * clamp(sum over pairs of duo values (-1..1), -1, 1). */
+const W_DUO = 0.04;
+// Counter part with lane data: trait counter (0..1) + sum over lanes of laneW * (2 * laneVal - 1), clamped to
+// 0..1, so a neutral duel (laneVal 0.5) changes nothing and one lane moves the counter by at most ±0.27.
+/** Max weight of one meta lane matchup (scaled by games / (games + 30)). */
+const W_LANE_META = 0.15;
+/** Max weight of the player's own duels vs that opponent (scaled by games / (games + 3)). */
+const W_LANE_HIST = 0.12;
+/** Meta duel winrate deviation mapped to the full 0..1 range (50 % ± 10 %). */
+const LANE_META_SPAN = 0.1;
 
 /** Pool entry with every optional field filled (pydantic defaults). */
 interface FullPoolEntry {
@@ -29,6 +60,7 @@ interface FullPoolEntry {
   mastery_level: number;
   recent_games: number;
   recent_wins: number;
+  form: number;
 }
 
 interface Cand {
@@ -43,6 +75,10 @@ interface Cand {
   iv: number; // individual value used to pre-rank candidates
   comfortPart: number; // real comfort, shown in the score breakdown
   scorePart: number; // comfort part of the score, fading out as exploration rises
+  formPart: number; // recent form (-1..1), fading out as exploration rises
+  meta: number; // 0..1 meta value of (champion, role), 0 when meta is off
+  laneVal: number; // 0..1 lane matchup value vs the enemy guessed in this role
+  laneW: number; // weight of the lane edge in the counter part (0 = no data)
 }
 
 interface Player {
@@ -56,6 +92,7 @@ interface Player {
   wantedArch: Set<string>;
   avoided: Set<string>;
   base: Cand[];
+  laneHist: Map<string, [number, number]>; // `${champ}\u0001${opponent}` -> [games, wins]
 }
 
 interface NormPlayer {
@@ -64,6 +101,9 @@ interface NormPlayer {
   preferences: PlayerPreferences;
   role_games: Partial<Record<Role, number>>;
   pool: FullPoolEntry[];
+  puuid: string | null;
+  lane_history: LaneHistoryEntry[];
+  allies: AllyHistory[];
 }
 
 interface NormOptions {
@@ -82,7 +122,11 @@ interface Parts {
   theme_fit: number;
   balance: number;
   counter?: number;
+  meta?: number;
 }
+
+/** champion of player i -> champion of player j -> duo value (-1..1). */
+type DuoTable = Map<string, Map<string, number>>;
 
 interface Ctx {
   catalog: Catalog;
@@ -96,6 +140,12 @@ interface Ctx {
   wBalance: number;
   wCounter: number;
   penalty: Map<string, number> | null; // diversification during the search
+  meta: MetaStats | null; // only when usable (enough games)
+  metaCache: Map<string, number>;
+  formOn: boolean;
+  duo: (DuoTable | null)[][] | null; // [pidx][pidx]
+  enemyRole: Map<Role, string>; // guessed enemy laners (only when lane data may be used)
+  laneOn: boolean;
 }
 
 /** A lineup's sorted (player index, role, champion) key, as Python's `_key` tuple. */
@@ -116,6 +166,9 @@ function normPlayer(p: PlayerInput): NormPlayer {
     },
     role_games: p.role_games ?? {},
     pool: (p.pool ?? []).map(normEntry),
+    puuid: p.puuid ?? null,
+    lane_history: p.lane_history ?? [],
+    allies: p.allies ?? [],
   };
 }
 
@@ -129,6 +182,7 @@ function normEntry(e: PoolEntry): FullPoolEntry {
     mastery_level: e.mastery_level ?? 0,
     recent_games: e.recent_games ?? 0,
     recent_wins: e.recent_wins ?? 0,
+    form: typeof e.form === 'number' && Number.isFinite(e.form) ? Math.max(-1, Math.min(1, e.form)) : 0,
   };
 }
 
@@ -175,12 +229,26 @@ function genericStrength(c: ChampData): number {
   return s;
 }
 
-/** Sort key used for exploration / safety-net / theme extras. */
-function extraSort(wantedArch: Set<string>): (a: ChampData, b: ChampData) => number {
+/** Sort key used for exploration / safety-net / theme extras (strength scaled ±25 % by the meta, when on). */
+function extraSort(ctx: Ctx, wantedArch: Set<string>, role: Role): (a: ChampData, b: ChampData) => number {
+  const strength = ctx.meta
+    ? (c: ChampData): number => genericStrength(c) * (0.75 + 0.5 * metaValue(ctx, c.id, role))
+    : genericStrength;
   return (a, b) =>
     cmpNum(wantedArch.has(a.archetype) ? 0 : 1, wantedArch.has(b.archetype) ? 0 : 1) ||
-    cmpNum(genericStrength(b), genericStrength(a)) ||
+    cmpNum(strength(b), strength(a)) ||
     cmpStr(a.id, b.id);
+}
+
+function metaValue(ctx: Ctx, cid: string, role: Role): number {
+  if (!ctx.meta) return 0;
+  const k = `${cid}\u0001${role}`;
+  let v = ctx.metaCache.get(k);
+  if (v === undefined) {
+    v = metaPickValue(ctx.meta, cid, role);
+    ctx.metaCache.set(k, v);
+  }
+  return v;
 }
 
 export function fmtPoints(points: number): string {
@@ -218,12 +286,42 @@ function evaluate(ctx: Ctx, theme: ThemeDef, picks: readonly Cand[]): [number, P
   }
   const parts: Parts = { comfort: shown / n, desire, theme_fit: fit, balance: bal };
   if (ctx.enemy.length) {
-    const cnt = counterScore(champs, ctx.enemy);
+    let cnt = counterScore(champs, ctx.enemy);
+    if (ctx.laneOn) {
+      // shift the trait-based counter by the lane matchups (meta + own duels), weighted by their samples
+      let shift = 0;
+      for (const c of picks) if (c.laneW > 0) shift += c.laneW * (2 * c.laneVal - 1);
+      if (shift !== 0) cnt = Math.max(0, Math.min(1, cnt + shift));
+    }
     total += ctx.wCounter * cnt;
     weights += ctx.wCounter;
     parts.counter = cnt;
   }
+  if (ctx.meta) {
+    let m = 0;
+    for (const c of picks) m += c.meta;
+    m /= n;
+    total += W_META * m;
+    weights += W_META;
+    parts.meta = m;
+  }
   let score = total / weights;
+  if (ctx.formOn) {
+    let f = 0;
+    for (const c of picks) f += c.formPart;
+    score += (W_FORM * f) / n;
+  }
+  if (ctx.duo) {
+    let d = 0;
+    for (let a = 0; a < n; a++) {
+      const row = ctx.duo[picks[a].pidx];
+      for (let b = a + 1; b < n; b++) {
+        const t = row[picks[b].pidx];
+        if (t !== null) d += t.get(picks[a].champ.id)?.get(picks[b].champ.id) ?? 0;
+      }
+    }
+    if (d !== 0) score += W_DUO * Math.max(-1, Math.min(1, d));
+  }
   if (ctx.penalty && ctx.penalty.size) {
     let pen = 0;
     for (const c of picks) pen += ctx.penalty.get(c.champ.id) ?? 0.0;
@@ -234,12 +332,35 @@ function evaluate(ctx: Ctx, theme: ThemeDef, picks: readonly Cand[]): [number, P
 
 // --------------------------------------------------------------------------- setup
 
-function makeCand(pl: Player, role: Role, d: ChampData, e: FullPoolEntry | null, expl: number, locked = false): Cand {
+function makeCand(ctx: Ctx, pl: Player, role: Role, d: ChampData, e: FullPoolEntry | null, locked = false): Cand {
+  const expl = ctx.options.exploration;
   const comfort = e ? e.comfort : 0.0;
   let desire = e ? e.desire : 0.0;
   if (pl.wanted.has(d.id)) desire = 1.0;
   else if (pl.wantedArch.has(d.archetype)) desire = Math.max(desire, 0.6);
   const roleFit = pl.roleFit[role];
+  let laneVal = 0.5;
+  let laneW = 0;
+  const opp = ctx.laneOn ? ctx.enemyRole.get(role) : undefined;
+  if (opp !== undefined) {
+    let acc = 0;
+    if (ctx.meta) {
+      const m = metaMatchup(ctx.meta, role, d.id, opp);
+      if (m) {
+        const w = (W_LANE_META * m[0]) / (m[0] + LANE_META_PRIOR);
+        const wr = smoothedRate(m[1], m[0], LANE_META_PRIOR);
+        acc += w * Math.max(0, Math.min(1, 0.5 + (wr - 0.5) / (2 * LANE_META_SPAN)));
+        laneW += w;
+      }
+    }
+    const h = pl.laneHist.get(`${d.id}\u0001${opp}`);
+    if (h) {
+      const w = (W_LANE_HIST * h[0]) / (h[0] + LANE_HIST_HALF);
+      acc += w * smoothedRate(h[1], h[0], LANE_HIST_PRIOR);
+      laneW += w;
+    }
+    if (laneW > 0) laneVal = acc / laneW;
+  }
   return {
     pidx: pl.idx,
     role,
@@ -252,10 +373,60 @@ function makeCand(pl: Player, role: Role, d: ChampData, e: FullPoolEntry | null,
     iv: 0.0,
     comfortPart: 0.75 * comfort + 0.25 * roleFit,
     scorePart: 0.75 * (1 - expl) * comfort + 0.25 * roleFit,
+    formPart: e ? (1 - expl) * e.form : 0,
+    meta: metaValue(ctx, d.id, role),
+    laneVal,
+    laneW,
   };
 }
 
-function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog): Ctx {
+/** Duo tables: pairs of selected players who played together (matched by puuid), per champion pair. */
+function duoTables(players: NormPlayer[], catalog: Catalog): (DuoTable | null)[][] | null {
+  const n = players.length;
+  const raw: Map<string, [number, number]>[][] = players.map(() => players.map(() => new Map()));
+  let any = false;
+  for (let i = 0; i < n; i++) {
+    for (const ally of players[i].allies) {
+      if (!ally || !ally.puuid) continue;
+      for (let j = 0; j < n; j++) {
+        if (j === i || players[j].puuid !== ally.puuid) continue;
+        for (const pr of ally.pairs ?? []) {
+          if (!(pr.games > 0)) continue;
+          const a = catalog.resolve(pr.champion_id);
+          const b = catalog.resolve(pr.ally_champion_id);
+          if (!a || !b) continue;
+          const wins = Math.max(0, Math.min(pr.games, pr.wins || 0));
+          // both players report the same games: keep the larger sample, stored in both directions
+          for (const [x, y, ka, kb] of [
+            [i, j, a, b],
+            [j, i, b, a],
+          ] as const) {
+            const k = `${ka}\u0001${kb}`;
+            const cur = raw[x][y].get(k);
+            if (!cur || pr.games > cur[0]) raw[x][y].set(k, [pr.games, wins]);
+          }
+          any = true;
+        }
+      }
+    }
+  }
+  if (!any) return null;
+  return raw.map((row) =>
+    row.map((m) => {
+      if (!m.size) return null;
+      const t: DuoTable = new Map();
+      for (const [k, [g, w]] of m) {
+        const [a, b] = k.split('\u0001');
+        let inner = t.get(a);
+        if (!inner) t.set(a, (inner = new Map()));
+        inner.set(b, 2 * (smoothedRate(w, g, DUO_PRIOR) - 0.5));
+      }
+      return t;
+    }),
+  );
+}
+
+function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog, context: EngineContext): Ctx {
   const expl = options.exploration;
   const excluded = new Set(options.bans.map((b) => catalog.resolve(b) ?? b));
   const enemyData: ChampData[] = [];
@@ -284,7 +455,23 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
     wBalance: 0.18,
     wCounter: 0.12,
     penalty: null,
+    meta: metaUsable(context.meta) ? context.meta : null,
+    metaCache: new Map(),
+    formOn: players.some((p) => p.pool.some((e) => e.form !== 0)),
+    duo: players.length > 1 ? duoTables(players, catalog) : null,
+    enemyRole: new Map(),
+    laneOn: false,
   };
+  if (enemyData.length && (ctx.meta || players.some((p) => p.lane_history.length))) {
+    const roles = guessEnemyRoles(
+      enemyData.map((d) => ({ champion_id: d.id })),
+      catalog,
+    );
+    roles.forEach((r, i) => {
+      if (r !== null && !ctx.enemyRole.has(r)) ctx.enemyRole.set(r, enemyData[i].id);
+    });
+    ctx.laneOn = ctx.enemyRole.size > 0;
+  }
   const allChamps = catalog.allData();
   players.forEach((p, idx) => {
     const forced = Object.prototype.hasOwnProperty.call(options.role_assignments, p.player_id)
@@ -294,6 +481,18 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
     for (const e of p.pool) {
       const cid = catalog.resolve(e.champion_id);
       if (cid && !pool.has(cid)) pool.set(cid, e);
+    }
+    const laneHist = new Map<string, [number, number]>();
+    if (ctx.laneOn) {
+      for (const h of p.lane_history) {
+        if (!h || !(h.games > 0)) continue;
+        const a = catalog.resolve(h.champion_id);
+        const b = catalog.resolve(h.opponent_id);
+        if (!a || !b) continue;
+        const k = `${a}\u0001${b}`;
+        const cur = laneHist.get(k) ?? [0, 0];
+        laneHist.set(k, [cur[0] + h.games, cur[1] + Math.max(0, Math.min(h.games, h.wins || 0))]);
+      }
     }
     ctx.players.push({
       idx,
@@ -306,6 +505,7 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
       wantedArch: new Set(p.preferences.wanted_archetypes),
       avoided: new Set(p.preferences.avoided_champions.map((c) => catalog.resolve(c) ?? c)),
       base: [],
+      laneHist,
     });
   });
 
@@ -320,7 +520,7 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
         let viable = roles.filter((r) => d.roles.includes(r));
         if (!viable.length) viable = [...roles];
         const e = pl.pool.get(d.id) ?? null;
-        for (const r of viable) cands.push(makeCand(pl, r, d, e, expl, true));
+        for (const r of viable) cands.push(makeCand(ctx, pl, r, d, e, true));
       }
       pl.base = cands;
       continue;
@@ -340,12 +540,11 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
       if (!d) continue;
       for (const r of roles) {
         if (d.roles.includes(r)) {
-          cands.push(makeCand(pl, r, d, e, expl));
+          cands.push(makeCand(ctx, pl, r, d, e));
           seen.add(seenKey(cid, r));
         }
       }
     }
-    const sorter = extraSort(pl.wantedArch);
     // exploration: unknown champions of the player's main roles
     const nExtra = pyRound(expl * 10);
     if (nExtra) {
@@ -356,9 +555,9 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
           (c) =>
             c.roles.includes(r) && !seen.has(seenKey(c.id, r)) && !blocked.has(c.id) && !pl.avoided.has(c.id),
         );
-        poolR.sort(sorter);
+        poolR.sort(extraSort(ctx, pl.wantedArch, r));
         for (const c of poolR.slice(0, nExtra)) {
-          cands.push(makeCand(pl, r, c, null, expl));
+          cands.push(makeCand(ctx, pl, r, c, null));
           seen.add(seenKey(c.id, r));
         }
       }
@@ -372,9 +571,9 @@ function prepare(players: NormPlayer[], options: NormOptions, catalog: Catalog):
           (c) =>
             c.roles.includes(r) && !seen.has(seenKey(c.id, r)) && !blocked.has(c.id) && !pl.avoided.has(c.id),
         );
-        poolR.sort(sorter);
+        poolR.sort(extraSort(ctx, pl.wantedArch, r));
         for (const c of poolR.slice(0, 3 - have)) {
-          cands.push(makeCand(pl, r, c, null, expl));
+          cands.push(makeCand(ctx, pl, r, c, null));
           seen.add(seenKey(c.id, r));
         }
       }
@@ -398,7 +597,6 @@ function themeCandidates(ctx: Ctx, pl: Player, theme: ThemeDef, explicit: boolea
       }
       const have = new Set(cands.map((c) => `${c.champ.id}\u0001${c.role}`));
       const roles: readonly Role[] = pl.forced ? [pl.forced] : ROLE_ORDER;
-      const sorter = extraSort(pl.wantedArch);
       for (const r of roles) {
         const extra = ctx.catalog
           .allData()
@@ -410,14 +608,16 @@ function themeCandidates(ctx: Ctx, pl: Player, theme: ThemeDef, explicit: boolea
               !pl.avoided.has(c.id) &&
               theme.affinity(c) > 0,
           );
-        extra.sort(sorter);
-        for (const c of extra.slice(0, perRole)) cands.push(makeCand(pl, r, c, null, ctx.options.exploration));
+        extra.sort(extraSort(ctx, pl.wantedArch, r));
+        for (const c of extra.slice(0, perRole)) cands.push(makeCand(ctx, pl, r, c, null));
       }
     }
   }
   const wt = ctx.wTheme * (theme.thematic ? 1.0 : 0.8);
   for (const c of cands) {
     c.iv = ctx.wComfort * c.scorePart + ctx.wDesire * c.desire + wt * theme.affinity(c.champ);
+    if (ctx.formOn) c.iv += W_FORM * c.formPart;
+    if (ctx.meta) c.iv += W_META * c.meta;
   }
   cands.sort(byIv);
   // keep the best overall while guaranteeing a few options per role
@@ -677,6 +877,7 @@ function suggestion(ctx: Ctx, theme: ThemeDef, score: number, parts: Parts, pick
       theme_fit: pyRound(parts.theme_fit * 100, 1),
       balance: pyRound(parts.balance * 100, 1),
       counter: parts.counter !== undefined ? pyRound(parts.counter * 100, 1) : null,
+      ...(parts.meta !== undefined ? { meta: pyRound(parts.meta * 100, 1) } : {}),
     },
     picks: sp,
     strengths: strengths.slice(0, 6),
@@ -702,11 +903,12 @@ export function generateCompositionsRaw(
   playersIn: PlayerInput[],
   optionsIn: GenerationOptions,
   catalog: Catalog,
+  context: EngineContext = {},
 ): CompositionSuggestion[] {
   if (!playersIn.length) return [];
   if (playersIn.length > 5) throw new Error('Une composition compte au plus 5 joueurs');
   const options = normOptions(optionsIn);
-  const ctx = prepare(playersIn.map(normPlayer), options, catalog);
+  const ctx = prepare(playersIn.map(normPlayer), options, catalog, context ?? {});
   const count = options.count;
   const sat = (t: ThemeDef, picks: readonly Cand[]): boolean => t.satisfied(picks.map((c) => c.champ));
 

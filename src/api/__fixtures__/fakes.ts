@@ -1,6 +1,7 @@
 // Test doubles for the data-layer tests (node environment, no jsdom).
 import { vi } from 'vitest';
 import type { ChampionCatalog } from '../../engine';
+import { guessEnemyRoles } from '../../engine/meta';
 import { ApiError } from '../backend';
 import type { ChampionInfo, ChampionTraits, PoolEntry, Role } from '../types';
 import account from './account.json';
@@ -14,6 +15,10 @@ import m3 from './match_EUW1_7000000003.json';
 import m4 from './match_EUW1_7000000004.json';
 import m5 from './match_EUW1_7000000005.json';
 import m6 from './match_EUW1_7000000006.json';
+import m7 from './match_EUW1_7000000007.json';
+
+/** Second tracked account: teammate of the fixture account in matches 5 (Lulu) and 7 (Leona). */
+export const FRIEND_PUUID = 'friend-puuid-tracked-0001';
 
 export const FIXTURES = {
   account,
@@ -28,6 +33,7 @@ export const FIXTURES = {
     EUW1_7000000004: m4,
     EUW1_7000000005: m5,
     EUW1_7000000006: m6,
+    EUW1_7000000007: m7, // not in match_ids.json (sync fixtures unchanged)
   } as Record<string, unknown>,
 };
 
@@ -79,6 +85,8 @@ export function fakeEngine() {
     generateCompositions: vi.fn(() => []),
     buildGamePlan: vi.fn(() => ({ identity: 'Compo test' })),
     buildMatchupPlan: vi.fn(() => ({ enemy_identity: 'Adversaire test' })),
+    // Pure rule shared with the engine: use the real one.
+    guessEnemyRoles,
   };
 }
 
@@ -118,6 +126,10 @@ export function json(body: unknown, status = 200, headers: Record<string, string
 export interface FakeServerOptions {
   riotConfigured?: boolean;
   password?: string;
+  /** r=meta-stats payload, or an HTTP status to fail with; absent = route unknown (404). */
+  metaStats?: Record<string, unknown> | number;
+  /** `meta_stats` summary returned by r=meta. */
+  metaSummary?: Record<string, unknown> | null;
 }
 
 /**
@@ -131,6 +143,7 @@ export function fakeServer(opts: FakeServerOptions = {}) {
     saved: new Map(),
   };
   const riotCalls: string[] = [];
+  const metaStatsCalls: string[] = [];
   const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input), 'http://site.test');
     if (url.hostname === 'ddragon.leagueoflegends.com') return json({ detail: 'offline' }, 503);
@@ -145,10 +158,17 @@ export function fakeServer(opts: FakeServerOptions = {}) {
         platforms: ['euw1', 'eun1', 'na1', 'kr'],
         password_required: Boolean(opts.password),
         storage_ok: true,
+        ...(opts.metaSummary !== undefined ? { meta_stats: opts.metaSummary } : {}),
       });
     }
     if (opts.password && headers['X-App-Password'] !== opts.password) {
       return json({ detail: 'Mot de passe requis ou incorrect.' }, 401);
+    }
+    if (route === 'meta-stats' && opts.metaStats !== undefined) {
+      metaStatsCalls.push(route);
+      return typeof opts.metaStats === 'number'
+        ? json({ detail: 'Erreur.' }, opts.metaStats)
+        : json(opts.metaStats);
     }
     const storeMatch = /^store\/(players|teams|saved)(?:\/([A-Za-z0-9-]{1,64}))?$/.exec(route);
     if (storeMatch) {
@@ -189,7 +209,7 @@ export function fakeServer(opts: FakeServerOptions = {}) {
     return json({ detail: 'Route inconnue.' }, 404);
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { fetchMock, db, riotCalls };
+  return { fetchMock, db, riotCalls, metaStatsCalls };
 }
 
 /** Awaits a promise expected to reject with an ApiError and returns that error. */

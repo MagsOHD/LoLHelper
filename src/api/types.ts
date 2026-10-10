@@ -66,6 +66,32 @@ export interface RecentChampionStat {
   deaths: number;
   assists: number;
   role?: Role | null;
+  /** Epoch ms of the most recent game on this champion (recent form / recency). */
+  last_played?: number | null;
+}
+
+/** One lane duel actually played by a player in their recent games (same position, opposite team). */
+export interface LaneHistoryEntry {
+  champion_id: string; // champion the player used
+  opponent_id: string; // enemy laner's champion
+  role: Role;
+  games: number;
+  wins: number;
+}
+
+export interface AllyChampionPair {
+  champion_id: string; // champion the player used
+  ally_champion_id: string; // champion the ally used in the same game
+  games: number;
+  wins: number;
+}
+
+/** Recent games played on the same team as another account (identified by puuid). */
+export interface AllyHistory {
+  puuid: string;
+  games: number;
+  wins: number;
+  pairs: AllyChampionPair[];
 }
 
 export interface PlayerPreferences {
@@ -91,6 +117,8 @@ export interface PoolEntry {
   mastery_level?: number;
   recent_games?: number;
   recent_wins?: number;
+  /** Recent form on this champion, -1 (losing streak) .. 1 (winning streak), 0 = neutral/unknown. */
+  form?: number;
 }
 
 export interface PlayerInput {
@@ -99,6 +127,34 @@ export interface PlayerInput {
   preferences: PlayerPreferences;
   role_games: Partial<Record<Role, number>>;
   pool: PoolEntry[];
+  /** Riot account, used to match `allies` between team members. */
+  puuid?: string | null;
+  lane_history?: LaneHistoryEntry[];
+  allies?: AllyHistory[];
+}
+
+/** [games, wins] */
+export type GamesWins = [number, number];
+
+/** Aggregated high-elo stats for one patch, champion keys already mapped to Data Dragon ids. */
+export interface MetaStats {
+  patch: string;
+  platform: string;
+  games: number; // matches aggregated
+  updated_at: string;
+  /** champion_id -> role -> [games, wins] */
+  champions: Record<string, Partial<Record<Role, GamesWins>>>;
+  /** champion_id -> number of matches where it was banned */
+  bans: Record<string, number>;
+  /** role -> champion_id -> opponent champion_id (same role, enemy team) -> [games, wins of champion_id] */
+  matchups: Partial<Record<Role, Record<string, Record<string, GamesWins>>>>;
+}
+
+/** Optional data shared by the engine entry points; every field is optional and ignored when absent. */
+export interface EngineContext {
+  meta?: MetaStats | null;
+  /** Players of the ally team (history used by the matchup plan). */
+  players?: PlayerInput[];
 }
 
 export interface GenerationOptions {
@@ -117,6 +173,8 @@ export interface ScoreBreakdown {
   theme_fit: number;
   balance: number;
   counter?: number | null;
+  /** Only when meta stats are available (0..100). */
+  meta?: number | null;
 }
 
 export interface Pick {
@@ -202,6 +260,8 @@ export interface Meta {
   password_required?: boolean;
   /** PHP store writable (OVH hosting). */
   storage_ok?: boolean;
+  /** Summary of the collected high-elo meta, null when nothing has been collected yet. */
+  meta_stats?: { patch: string; games: number; updated_at: string } | null;
 }
 
 export interface Rank {
@@ -217,6 +277,8 @@ export interface RecentSummary {
   games: number;
   roles: Partial<Record<Role, number>>;
   champions: RecentChampionStat[];
+  lane_matchups?: LaneHistoryEntry[];
+  allies?: AllyHistory[];
 }
 
 export interface Player {

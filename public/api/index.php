@@ -16,6 +16,7 @@ require $apiDir . '/lib/http.php';
 require $apiDir . '/lib/config.php';
 require $apiDir . '/lib/storage.php';
 require $apiDir . '/lib/riot.php';
+require $apiDir . '/lib/meta.php';
 
 send_common_headers();
 
@@ -53,6 +54,7 @@ function handle_request(string $apiDir): void
             'platforms' => array_keys(PLATFORM_REGIONS),
             'password_required' => $config['app_password'] !== '',
             'storage_ok' => storage_probe($dataDir),
+            'meta_stats' => meta_stats_info($dataDir, $config['meta_min_games']),
         ]);
         return;
     }
@@ -63,6 +65,12 @@ function handle_request(string $apiDir): void
         if (!hash_equals($config['app_password'], $given)) {
             throw new HttpError(401, 'Mot de passe requis ou incorrect.');
         }
+    }
+
+    if ($route === 'meta-stats') {
+        require_method(['GET']);
+        handle_meta_stats($config, $apiDir);
+        return;
     }
 
     $parts = explode('/', $route);

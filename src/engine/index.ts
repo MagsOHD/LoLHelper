@@ -3,6 +3,7 @@
 import type {
   ArchetypeInfo,
   CompositionSuggestion,
+  EngineContext,
   GamePlan,
   GenerationOptions,
   ManualPoolEntry,
@@ -35,6 +36,8 @@ export type { ChampData, ChampionExtraMeta } from './catalog';
 export { archetypeLabel, placeholderData } from './catalog';
 export { detectThemes, getTheme, themeLabel } from './themes';
 export { ROLE_ORDER } from './generator';
+export { computeForm } from './pool';
+export { guessEnemyRoles, metaMatchup, metaPickValue, metaUsable, META_MIN_GAMES } from './meta';
 
 const adapted = new WeakMap<ChampionCatalog, Catalog>();
 
@@ -69,7 +72,7 @@ export function buildCatalog(
   return buildCatalogImpl(ddragonChampions, version, meta);
 }
 
-/** `nowMs` defaults to the most recent mastery play time (deterministic). */
+/** `nowMs` defaults to the most recent mastery play time / recent `last_played` (deterministic). */
 export function computePool(
   masteries: MasteryEntry[],
   recent: RecentChampionStat[],
@@ -81,20 +84,34 @@ export function computePool(
   return computePoolImpl(masteries, recent, manual, preferences, asCatalog(catalog), nowMs);
 }
 
-/** Throws Error('Une composition compte au plus 5 joueurs') above 5 players. */
+/**
+ * Throws Error('Une composition compte au plus 5 joueurs') above 5 players.
+ * `context.meta` (high-elo stats) and the players' `pool[].form`, `lane_history`, `allies` add small
+ * terms to the score; without them the output is exactly the same as before.
+ */
 export function generateCompositions(
   players: PlayerInput[],
   options: GenerationOptions,
   catalog: ChampionCatalog,
+  context: EngineContext = {},
 ): CompositionSuggestion[] {
-  return elideAll(generateCompositionsRaw(players, options, asCatalog(catalog)));
+  return elideAll(generateCompositionsRaw(players, options, asCatalog(catalog), context));
 }
 
 export function buildGamePlan(picks: Pick[], catalog: ChampionCatalog): GamePlan {
   return elideAll(buildGamePlanRaw(picks, asCatalog(catalog)));
 }
 
-/** Enemy picks always carry a role (callers guess missing ones before calling). */
-export function buildMatchupPlan(ally: Pick[], enemy: Pick[], catalog: ChampionCatalog): MatchupPlan {
-  return elideAll(buildMatchupPlanRaw(ally, enemy, asCatalog(catalog)));
+/**
+ * Enemy picks always carry a role (callers guess missing ones with `guessEnemyRoles`).
+ * `context.meta` may add a meta duel sentence to lane advice; meta duels and the ally players'
+ * `lane_history` (`context.players`, matched by `Pick.player_id`) may adjust threat danger.
+ */
+export function buildMatchupPlan(
+  ally: Pick[],
+  enemy: Pick[],
+  catalog: ChampionCatalog,
+  context: EngineContext = {},
+): MatchupPlan {
+  return elideAll(buildMatchupPlanRaw(ally, enemy, asCatalog(catalog), context));
 }

@@ -80,6 +80,9 @@ export function App() {
       </main>
       <footer className="footer">
         {meta.data && <span>Patch {meta.data.ddragon_version} · {meta.data.platform.toUpperCase()}</span>}
+        {meta.data?.meta_stats && (
+          <span>Méta : patch {meta.data.meta_stats.patch} · {meta.data.meta_stats.games.toLocaleString('fr-FR')} parties haut elo</span>
+        )}
         {MOCK_MODE && <span className="chip chip--amber">Mode démo (données fictives)</span>}
         <span>Projet non affilié à Riot Games.</span>
       </footer>

@@ -9,7 +9,8 @@ simplement `lolhelper` par le nom choisi.
 |---|---|---|
 | Interface + moteur de compositions | Navigateur de chaque ami | Pages, génération des compos, plans de jeu |
 | `www/lolhelper/api/index.php` | OVH (PHP) | Garde la clé Riot, relaie les appels Riot, stocke les données |
-| `lolhelper-data/` | OVH, à côté de `www/` (créé automatiquement) | Joueurs, équipes, compos, cache des parties — hors du site public |
+| `lolhelper-data/` | OVH, à côté de `www/` (créé automatiquement) | Joueurs, équipes, compos, cache des parties, stats de méta — hors du site public |
+| `api/cron/collect-meta.php` | OVH, tâche planifiée toutes les heures | Collecte des parties haut elo (Challenger/Grandmaster) pour la méta et les matchups |
 
 La clé Riot n'est jamais envoyée aux navigateurs. L'accès est protégé par un mot de passe
 partagé entre amis.
@@ -93,7 +94,42 @@ c'est ce qui permet à l'appli de marcher dans un sous-dossier sans configuratio
 | `api/config.php` ne renvoie pas 403 | `.htaccess` non envoyés : refaites l'étape 4 avec les fichiers cachés affichés |
 | « Clé API Riot invalide ou expirée » | Clé expirée : mettez à jour `public/api/config.php`, recompilez, renvoyez `api/config.php` |
 
-## 7. Mettre à jour et sauvegarder
+## 7. Collecte de la méta (tâche planifiée)
+
+La méta (taux de victoire par champion et par rôle, bans, duels de lane) est calculée à partir
+de parties classées Challenger et Grandmaster de votre serveur, récupérées avec votre clé Riot.
+Il faut une clé Riot configurée (étape 1).
+
+Espace client OVH → *Web Cloud* → *Hébergements* → votre hébergement → onglet
+**Tâches planifiées - Cron** → **Ajouter une planification** :
+
+| Champ | Valeur |
+|---|---|
+| Commande à exécuter | `www/lolhelper/api/cron/collect-meta.php` |
+| Langage | PHP 8.1 ou plus récent (le même qu'à l'étape 3) |
+| Activation | Activée |
+| Fréquence | Toutes les heures |
+| Alerte e-mail | au choix (utile les premiers jours) |
+
+Chaque passage dure au plus 10 minutes et n'utilise qu'une partie du quota de la clé (0,5 requête
+par seconde), pour laisser de la place aux synchronisations de vos amis. Comptez environ 1 à 2
+jours pour atteindre quelques centaines de parties sur le patch en cours ; avant cela, l'appli
+fonctionne normalement sans méta. Le bas de page affiche ensuite
+« Méta : patch … · N parties haut elo ».
+
+Réglages optionnels dans `api/config.php` (voir `config.example.php`) : `meta_tiers`
+(ajouter `'MASTER'`), `meta_time_budget`, `meta_rate`, `meta_min_games`, `meta_enabled`.
+
+Si votre nom de domaine pointe directement sur `www/lolhelper/` (et non sur `www/`), renseignez
+`'data_dir'` avec un chemin absolu dans `config.php`, pour que le site et la tâche planifiée
+utilisent le même dossier de données.
+
+| Symptôme | Cause probable |
+|---|---|
+| Pas de ligne « Méta » en bas de page après une journée | Tâche planifiée absente ou désactivée, ou clé Riot manquante/expirée (voir les journaux de la tâche dans l'espace OVH) |
+| Les journaux indiquent « clé invalide » | Clé de développement expirée : passez à une Personal API Key |
+
+## 8. Mettre à jour et sauvegarder
 
 - **Mise à jour** : `npm run build`, puis renvoyez le contenu de `dist/` dans
   `www/lolhelper/` en écrasant les anciens fichiers (FileZilla demande : *Écraser*).

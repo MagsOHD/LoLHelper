@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FIXTURES, fakeServer, installWindow } from './__fixtures__/fakes';
+import { FIXTURES, FRIEND_PUUID, fakeServer, installWindow } from './__fixtures__/fakes';
 import { failure } from './__fixtures__/fakes';
 
 const engine = vi.hoisted(() => ({ current: null as unknown as ReturnType<typeof fakeEngine> }));
@@ -281,6 +281,140 @@ describe('compositions', () => {
       fakeCatalog(),
     ).map((p) => p.role);
     expect(roles).toEqual(['TOP', 'JUNGLE', 'MID']);
+  });
+});
+
+describe('history and meta context', () => {
+  const RAW_META = {
+    available: true,
+    patch: '16.19',
+    platform: 'euw1',
+    games: 4213,
+    updated_at: '2026-10-10T12:00:00Z',
+    champions: { '103': { MID: [120, 63] }, '424242': { MID: [1, 1] } },
+    bans: { '103': 45 },
+    matchups: { MID: { '103': { '99': [12, 7] } } },
+  };
+  const EXPECTED_META = {
+    patch: '16.19',
+    platform: 'euw1',
+    games: 4213,
+    updated_at: '2026-10-10T12:00:00Z',
+    champions: { Ahri: { MID: [120, 63] } },
+    bans: { Ahri: 45 },
+    matchups: { MID: { Ahri: { Lux: [12, 7] } } },
+  };
+
+  /** A player stored before history/meta existed: no lane_matchups, allies or last_played. */
+  function oldDoc(id: string, puuid: string | null) {
+    return {
+      id,
+      game_name: `Old ${id}`,
+      tag_line: 'EUW',
+      platform: 'euw1',
+      puuid,
+      profile_icon_id: null,
+      summoner_level: 30,
+      rank: null,
+      masteries: [],
+      recent: {
+        games: 3,
+        roles: { TOP: 0, JUNGLE: 0, MID: 3, BOTTOM: 0, SUPPORT: 0 },
+        champions: [{ champion_id: 'Ahri', games: 3, wins: 2, kills: 5, deaths: 3, assists: 6, role: 'MID' }],
+      },
+      preferences: { roles: ['MID'], wanted_archetypes: [], wanted_champions: [], avoided_champions: [] },
+      manual_pool: [],
+      last_synced_at: '2025-01-01T00:00:00Z',
+      created_at: '2025-01-01T00:00:00Z',
+    };
+  }
+
+  type Input = { player_id: string; puuid?: string | null; lane_history?: unknown[]; allies?: { puuid: string }[] };
+
+  it('meta exposes the collected meta summary (null when absent)', async () => {
+    expect((await api.meta()).meta_stats).toBeNull();
+    resetServiceForTests();
+    setup({ metaSummary: { patch: '16.19', games: 4213, updated_at: '2026-10-10T12:00:00Z' } });
+    expect((await api.meta()).meta_stats).toEqual({ patch: '16.19', games: 4213, updated_at: '2026-10-10T12:00:00Z' });
+    resetServiceForTests();
+    setup({ metaSummary: { games: 'x' } });
+    expect((await api.meta()).meta_stats).toBeNull();
+  });
+
+  it('generate passes the mapped meta and the players history to the engine', async () => {
+    setup({ riotConfigured: true, metaStats: RAW_META });
+    const p = await add('Le Fou Élégant', 'EUW');
+    server.db.players.set('friend', oldDoc('friend', FRIEND_PUUID));
+    await api.generate({ player_ids: [p.id, 'friend'], options: {} });
+    const [players, , , context] = lastCall(engine.current.generateCompositions) as [Input[], unknown, unknown, unknown];
+    expect(context).toEqual({ meta: EXPECTED_META });
+    expect(players[0].puuid).toBe(FIXTURES.account.puuid);
+    expect(players[0].lane_history?.[0]).toEqual({ champion_id: 'Ahri', opponent_id: 'Syndra', role: 'MID', games: 2, wins: 1 });
+    expect(players[0].allies?.[0].puuid).toBe(FRIEND_PUUID);
+    // Old document: still works, empty history.
+    expect(players[1]).toMatchObject({ player_id: 'friend', puuid: FRIEND_PUUID, lane_history: [], allies: [] });
+
+    // Meta fetched once per session.
+    await api.generate({ player_ids: [p.id], options: {} });
+    expect(server.metaStatsCalls).toHaveLength(1);
+  });
+
+  it('generate still works when meta stats are unavailable or failing', async () => {
+    server.db.players.set('old', oldDoc('old', null));
+    await api.generate({ player_ids: ['old'], options: {} });
+    expect(lastCall(engine.current.generateCompositions)[3]).toEqual({ meta: null });
+    resetServiceForTests();
+    setup({ metaStats: 500 });
+    server.db.players.set('old', oldDoc('old', null));
+    await api.generate({ player_ids: ['old'], options: {} });
+    expect(lastCall(engine.current.generateCompositions)[3]).toEqual({ meta: null });
+  });
+
+  it('old player documents keep working (no history fields)', async () => {
+    const doc = oldDoc('old', 'p-old');
+    delete (doc.recent as { roles?: unknown }).roles;
+    server.db.players.set('old', doc);
+    const player = await api.getPlayer('old');
+    expect(player.recent).toMatchObject({ games: 3, lane_matchups: [], allies: [] });
+    expect(player.recent.champions[0].last_played).toBeUndefined();
+    server.db.players.set('bare', { ...oldDoc('bare', null), recent: null });
+    expect((await api.getPlayer('bare')).recent).toEqual({
+      games: 0,
+      roles: { TOP: 0, JUNGLE: 0, MID: 0, BOTTOM: 0, SUPPORT: 0 },
+      champions: [],
+      lane_matchups: [],
+      allies: [],
+    });
+    await api.generate({ player_ids: ['old', 'bare'], options: {} });
+    const [players] = lastCall(engine.current.generateCompositions) as [Input[]];
+    expect(players.map((p) => [p.puuid, p.lane_history, p.allies])).toEqual([
+      ['p-old', [], []],
+      [null, [], []],
+    ]);
+  });
+
+  it('matchup passes the meta and the ally players with a known id', async () => {
+    setup({ metaStats: RAW_META });
+    server.db.players.set('a', oldDoc('a', 'pa'));
+    server.db.players.set('b', oldDoc('b', 'pb'));
+    await api.matchup({
+      ally: [
+        { role: 'MID', champion_id: 'Ahri', player_id: 'b' },
+        { role: 'TOP', champion_id: 'Garen', player_id: 'ghost' },
+        { role: 'SUPPORT', champion_id: 'Thresh', player_id: 'a' },
+        { role: 'JUNGLE', champion_id: 'LeeSin' },
+      ],
+      enemy: [{ champion_id: 'Lux', role: 'MID' }],
+    });
+    const context = lastCall(engine.current.buildMatchupPlan)[3] as { meta: unknown; players: Input[] };
+    expect(context.meta).toEqual(EXPECTED_META);
+    expect(context.players.map((p) => [p.player_id, p.puuid])).toEqual([
+      ['b', 'pb'],
+      ['a', 'pa'],
+    ]);
+
+    await api.matchup({ ally: [{ role: 'MID', champion_id: 'Ahri' }], enemy: [{ champion_id: 'Lux' }] });
+    expect(lastCall(engine.current.buildMatchupPlan)[3]).toEqual({ meta: EXPECTED_META, players: [] });
   });
 });
 

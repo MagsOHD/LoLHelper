@@ -1,7 +1,16 @@
 // Browser-side Riot sync: orchestrates the PHP proxy routes (r=riot/...).
 // Ported from the former Python backend (riot/ package).
 import type { ChampionCatalog } from '../engine';
-import type { MasteryEntry, Rank, RecentChampionStat, RecentSummary, Role } from './types';
+import type {
+  AllyChampionPair,
+  AllyHistory,
+  LaneHistoryEntry,
+  MasteryEntry,
+  Rank,
+  RecentChampionStat,
+  RecentSummary,
+  Role,
+} from './types';
 import { ROLES } from './types';
 import { ApiError, backendRequest, type Params } from './backend';
 
@@ -231,6 +240,8 @@ export function mapMasteries(raw: RawMastery[] | null | undefined, catalog: Cata
 
 export interface MatchParticipant {
   puuid?: string;
+  /** 100 (blue) / 200 (red); null when absent from the payload. */
+  teamId: number | null;
   championName?: string;
   championId?: number;
   teamPosition: string;
@@ -251,6 +262,7 @@ interface RawParticipant {
   puuid?: string;
   championName?: string;
   championId?: number;
+  teamId?: number;
   teamPosition?: string;
   individualPosition?: string;
   win?: boolean;
@@ -273,6 +285,7 @@ export function summarizeMatch(raw: RawMatch): MatchSummary {
     game_creation: info.gameCreation ?? null,
     participants: (info.participants ?? []).map((p) => ({
       puuid: p.puuid,
+      teamId: typeof p.teamId === 'number' ? p.teamId : null,
       championName: p.championName,
       championId: p.championId,
       teamPosition: p.teamPosition || p.individualPosition || '',
@@ -302,20 +315,61 @@ export function emptyRoles(): Record<Role, number> {
 }
 
 export function emptyRecent(): RecentSummary {
-  return { games: 0, roles: emptyRoles(), champions: [] };
+  return { games: 0, roles: emptyRoles(), champions: [], lane_matchups: [], allies: [] };
+}
+
+/** Caps on the stored history (the player doc is rewritten on every sync). */
+export const MAX_LANE_MATCHUPS = 50;
+export const MAX_ALLIES = 50;
+export const MAX_ALLY_PAIRS = 20;
+
+const cmpStr = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const roleIndex = (r: Role) => ROLES.indexOf(r);
+
+function sameTeam(a: MatchParticipant, b: MatchParticipant): boolean | null {
+  if (a.teamId === null || b.teamId === null) return null;
+  return a.teamId === b.teamId;
+}
+
+/** The enemy laner: the only opposite-team participant on the same position (null if none/ambiguous). */
+export function findLaneOpponent(me: MatchParticipant, participants: MatchParticipant[]): MatchParticipant | null {
+  const role = mapPosition(me.teamPosition);
+  if (!role) return null;
+  const found = participants.filter((p) => p !== me && sameTeam(me, p) === false && mapPosition(p.teamPosition) === role);
+  return found.length === 1 ? found[0] : null;
+}
+
+export interface AggregateOptions {
+  /** Puuids always kept in `allies` even beyond MAX_ALLIES (other tracked players). */
+  keepPuuids?: Iterable<string>;
 }
 
 /** Python's round(x, 2) for the averages (banker's rounding is irrelevant at this precision). */
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
 /** Aggregate match summaries into the Player `recent` block. */
-export function aggregateRecent(summaries: MatchSummary[], puuid: string, catalog: CatalogLike): RecentSummary {
+export function aggregateRecent(
+  summaries: MatchSummary[],
+  puuid: string,
+  catalog: CatalogLike,
+  options: AggregateOptions = {},
+): RecentSummary {
   const roles = emptyRoles();
   let games = 0;
   const perChamp = new Map<
     string,
-    { games: number; wins: number; kills: number; deaths: number; assists: number; roles: Map<Role, number> }
+    {
+      games: number;
+      wins: number;
+      kills: number;
+      deaths: number;
+      assists: number;
+      roles: Map<Role, number>;
+      lastPlayed: number | null;
+    }
   >();
+  const lanes = new Map<string, LaneHistoryEntry>();
+  const allies = new Map<string, { games: number; wins: number; pairs: Map<string, AllyChampionPair> }>();
   for (const summary of summaries) {
     if (summary.queue_id === null || !SUMMONERS_RIFT_QUEUES.has(summary.queue_id)) continue;
     const me = summary.participants.find((p) => p.puuid === puuid);
@@ -323,19 +377,55 @@ export function aggregateRecent(summaries: MatchSummary[], puuid: string, catalo
     const championId = resolveChampionId(me, catalog);
     if (!championId) continue;
     games += 1;
+    const win = me.win ? 1 : 0;
     const role = mapPosition(me.teamPosition);
     if (role) roles[role] += 1;
     let stat = perChamp.get(championId);
     if (!stat) {
-      stat = { games: 0, wins: 0, kills: 0, deaths: 0, assists: 0, roles: new Map() };
+      stat = { games: 0, wins: 0, kills: 0, deaths: 0, assists: 0, roles: new Map(), lastPlayed: null };
       perChamp.set(championId, stat);
     }
     stat.games += 1;
-    stat.wins += me.win ? 1 : 0;
+    stat.wins += win;
     stat.kills += me.kills;
     stat.deaths += me.deaths;
     stat.assists += me.assists;
     if (role) stat.roles.set(role, (stat.roles.get(role) ?? 0) + 1);
+    const created = summary.game_creation;
+    if (typeof created === 'number' && Number.isFinite(created) && (stat.lastPlayed === null || created > stat.lastPlayed)) {
+      stat.lastPlayed = created;
+    }
+
+    // Lane duel actually played (same position, enemy team).
+    const opponent = role ? findLaneOpponent(me, summary.participants) : null;
+    const opponentId = opponent ? resolveChampionId(opponent, catalog) : null;
+    if (role && opponentId) {
+      const key = `${role}|${championId}|${opponentId}`;
+      const entry = lanes.get(key) ?? { champion_id: championId, opponent_id: opponentId, role, games: 0, wins: 0 };
+      entry.games += 1;
+      entry.wins += win;
+      lanes.set(key, entry);
+    }
+
+    // Games played on the same team as other accounts.
+    for (const p of summary.participants) {
+      if (p === me || !p.puuid || p.puuid === puuid || sameTeam(me, p) !== true) continue;
+      const allyChamp = resolveChampionId(p, catalog);
+      let ally = allies.get(p.puuid);
+      if (!ally) {
+        ally = { games: 0, wins: 0, pairs: new Map() };
+        allies.set(p.puuid, ally);
+      }
+      ally.games += 1;
+      ally.wins += win;
+      if (allyChamp) {
+        const key = `${championId}|${allyChamp}`;
+        const pair = ally.pairs.get(key) ?? { champion_id: championId, ally_champion_id: allyChamp, games: 0, wins: 0 };
+        pair.games += 1;
+        pair.wins += win;
+        ally.pairs.set(key, pair);
+      }
+    }
   }
 
   const champions: RecentChampionStat[] = [];
@@ -357,13 +447,45 @@ export function aggregateRecent(summaries: MatchSummary[], puuid: string, catalo
       deaths: round2(s.deaths / s.games),
       assists: round2(s.assists / s.games),
       role: best,
+      last_played: s.lastPlayed,
     });
   }
-  champions.sort(
-    (a, b) => b.games - a.games || b.wins - a.wins || (a.champion_id < b.champion_id ? -1 : a.champion_id > b.champion_id ? 1 : 0),
-  );
+  champions.sort((a, b) => b.games - a.games || b.wins - a.wins || cmpStr(a.champion_id, b.champion_id));
+
+  const lane_matchups = [...lanes.values()]
+    .sort(
+      (a, b) =>
+        b.games - a.games ||
+        b.wins - a.wins ||
+        roleIndex(a.role) - roleIndex(b.role) ||
+        cmpStr(a.champion_id, b.champion_id) ||
+        cmpStr(a.opponent_id, b.opponent_id),
+    )
+    .slice(0, MAX_LANE_MATCHUPS);
+
+  const allyList: AllyHistory[] = [...allies.entries()]
+    .map(([allyPuuid, a]) => ({
+      puuid: allyPuuid,
+      games: a.games,
+      wins: a.wins,
+      pairs: [...a.pairs.values()]
+        .sort(
+          (x, y) =>
+            y.games - x.games ||
+            y.wins - x.wins ||
+            cmpStr(x.champion_id, y.champion_id) ||
+            cmpStr(x.ally_champion_id, y.ally_champion_id),
+        )
+        .slice(0, MAX_ALLY_PAIRS),
+    }))
+    .sort((a, b) => b.games - a.games || b.wins - a.wins || cmpStr(a.puuid, b.puuid));
+  // Keep the most frequent teammates, plus every tracked player whatever the cap.
+  const keep = new Set(options.keepPuuids ?? []);
+  const kept = new Set(allyList.slice(0, MAX_ALLIES).map((a) => a.puuid));
+  const alliesOut = allyList.filter((a) => kept.has(a.puuid) || keep.has(a.puuid));
+
   const orderedRoles = Object.fromEntries(ROLES.map((r) => [r, roles[r]])) as Record<Role, number>;
-  return { games, roles: orderedRoles, champions };
+  return { games, roles: orderedRoles, champions, lane_matchups, allies: alliesOut };
 }
 
 // ---- high level (player_data.py) -------------------------------------------------------------
@@ -416,6 +538,7 @@ export async function fetchPlayerData(
   platform: string,
   catalog: CatalogLike,
   t?: RiotTransport,
+  options: AggregateOptions = {},
 ): Promise<RiotFields> {
   const [summoner, entries, masteriesRaw, matchIds] = await Promise.all([
     getSummoner(puuid, platform, t),
@@ -429,6 +552,6 @@ export async function fetchPlayerData(
     summoner_level: summoner.summonerLevel ?? null,
     rank: pickRank(entries),
     masteries: mapMasteries(masteriesRaw, catalog),
-    recent: aggregateRecent(summaries, puuid, catalog),
+    recent: aggregateRecent(summaries, puuid, catalog, options),
   };
 }
