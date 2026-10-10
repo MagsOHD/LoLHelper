@@ -7,7 +7,7 @@
       "other-puuid-EUW1_7000000005-0",
       "other-puuid-EUW1_7000000005-1",
       "other-puuid-EUW1_7000000005-2",
-      "other-puuid-EUW1_7000000005-3",
+      "friend-puuid-tracked-0001",
       "other-puuid-EUW1_7000000005-4",
       "other-puuid-EUW1_7000000005-5",
       "other-puuid-EUW1_7000000005-6",
@@ -113,7 +113,7 @@
         "totalDamageDealtToChampions": 15000
       },
       {
-        "puuid": "other-puuid-EUW1_7000000005-3",
+        "puuid": "friend-puuid-tracked-0001",
         "riotIdGameName": "Player3",
         "riotIdTagline": "EUW",
         "championName": "Lulu",

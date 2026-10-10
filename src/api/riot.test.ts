@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './backend';
 import {
   aggregateRecent,
+  findLaneOpponent,
+  MAX_ALLIES,
+  type MatchSummary,
   fetchPlayerData,
   getAccount,
   mapMasteries,
@@ -15,7 +18,7 @@ import {
   type RawMatch,
   type RiotTransport,
 } from './riot';
-import { FIXTURES, fakeCatalog, fakeServer, installWindow, json } from './__fixtures__/fakes';
+import { FIXTURES, FRIEND_PUUID, fakeCatalog, fakeServer, installWindow, json } from './__fixtures__/fakes';
 import { failure } from './__fixtures__/fakes';
 
 const PUUID = FIXTURES.account.puuid;
@@ -68,6 +71,129 @@ describe('aggregation', () => {
   });
 });
 
+describe('history aggregation (last_played, lane_matchups, allies)', () => {
+  const all = () => Object.values(FIXTURES.matches).map((m) => summarizeMatch(m as RawMatch));
+
+  it('summarizes teamId and game creation', () => {
+    const s = summarizeMatch(FIXTURES.matches.EUW1_7000000007 as RawMatch);
+    expect(s.game_creation).toBe(1759700000000);
+    expect(s.participants.map((p) => p.teamId)).toEqual([100, 100, 100, 100, 100, 200, 200, 200, 200, 200]);
+    expect(summarizeMatch({ info: { participants: [{ puuid: 'x' }] } }).participants[0].teamId).toBeNull();
+  });
+
+  it('keeps the most recent game per champion', () => {
+    const recent = aggregateRecent(all(), PUUID, fakeCatalog());
+    const byId = Object.fromEntries(recent.champions.map((c) => [c.champion_id, c]));
+    expect(byId.Ahri.last_played).toBe(1759700000000); // match 7 is the latest
+    expect(byId.Ahri.games).toBe(3);
+    expect(byId.Thresh.last_played).toBe(1759600000000);
+    const noDate = all().map((s) => ({ ...s, game_creation: null }));
+    expect(aggregateRecent(noDate, PUUID, fakeCatalog()).champions.every((c) => c.last_played === null)).toBe(true);
+  });
+
+  it('records the lane duels against the enemy on the same position', () => {
+    const recent = aggregateRecent(all(), PUUID, fakeCatalog());
+    expect(recent.lane_matchups).toEqual([
+      { champion_id: 'Ahri', opponent_id: 'Syndra', role: 'MID', games: 3, wins: 2 },
+      { champion_id: 'MonkeyKing', opponent_id: 'Vi', role: 'JUNGLE', games: 1, wins: 1 },
+      { champion_id: 'Thresh', opponent_id: 'Nami', role: 'SUPPORT', games: 1, wins: 1 },
+      { champion_id: 'Fiddlesticks', opponent_id: 'Vi', role: 'JUNGLE', games: 1, wins: 0 },
+    ]);
+  });
+
+  it('skips lane duels when a position or team is missing', () => {
+    const base = summarizeMatch(FIXTURES.matches.EUW1_7000000001 as RawMatch);
+    const withParticipants = (f: (p: MatchSummary['participants'][number]) => object): MatchSummary => ({
+      ...base,
+      participants: base.participants.map((p) => ({ ...p, ...f(p) })),
+    });
+    const noEnemyPos = withParticipants((p) => (p.championName === 'Syndra' ? { teamPosition: '' } : {}));
+    expect(aggregateRecent([noEnemyPos], PUUID, fakeCatalog()).lane_matchups).toEqual([]);
+    const noMyPos = withParticipants((p) => (p.puuid === PUUID ? { teamPosition: '' } : {}));
+    const r = aggregateRecent([noMyPos], PUUID, fakeCatalog());
+    expect([r.games, r.lane_matchups]).toEqual([1, []]);
+    const noTeams = withParticipants(() => ({ teamId: null }));
+    const t = aggregateRecent([noTeams], PUUID, fakeCatalog());
+    expect([t.lane_matchups, t.allies]).toEqual([[], []]);
+    // Two enemies on the same position: ambiguous, skipped.
+    const twoMids = withParticipants((p) => (p.championName === 'Caitlyn' ? { teamPosition: 'MIDDLE' } : {}));
+    const me = twoMids.participants.find((p) => p.puuid === PUUID)!;
+    expect(findLaneOpponent(me, twoMids.participants)).toBeNull();
+  });
+
+  it('counts games and champion pairs with teammates (both tracked players see each other)', () => {
+    const recent = aggregateRecent(all(), PUUID, fakeCatalog());
+    const allies = recent.allies!;
+    expect(allies[0]).toEqual({
+      puuid: FRIEND_PUUID,
+      games: 2,
+      wins: 2,
+      pairs: [
+        { champion_id: 'Ahri', ally_champion_id: 'Leona', games: 1, wins: 1 },
+        { champion_id: 'MonkeyKing', ally_champion_id: 'Lulu', games: 1, wins: 1 },
+      ],
+    });
+    // 6 Summoner's Rift games x 4 teammates, the friend counted once; enemies never listed.
+    expect(allies).toHaveLength(23);
+    expect(allies.some((a) => a.puuid === 'other-puuid-EUW1_7000000001-4')).toBe(false);
+    expect(allies.some((a) => a.puuid === PUUID)).toBe(false);
+    expect(allies.slice(1).every((a) => a.games === 1)).toBe(true);
+    const loss = allies.find((a) => a.puuid === 'other-puuid-EUW1_7000000002-0')!;
+    expect([loss.games, loss.wins, loss.pairs]).toEqual([1, 0, [{ champion_id: 'Ahri', ally_champion_id: 'Garen', games: 1, wins: 0 }]]);
+
+    const friend = aggregateRecent(all(), FRIEND_PUUID, fakeCatalog());
+    expect(friend.games).toBe(2);
+    expect(friend.allies!.find((a) => a.puuid === PUUID)).toEqual({
+      puuid: PUUID,
+      games: 2,
+      wins: 2,
+      pairs: [
+        { champion_id: 'Leona', ally_champion_id: 'Ahri', games: 1, wins: 1 },
+        { champion_id: 'Lulu', ally_champion_id: 'MonkeyKing', games: 1, wins: 1 },
+      ],
+    });
+    expect(friend.lane_matchups!.map((l) => [l.champion_id, l.opponent_id, l.role])).toEqual([
+      ['Leona', 'Nami', 'SUPPORT'],
+      ['Lulu', 'Nami', 'SUPPORT'],
+    ]);
+  });
+
+  it('is deterministic whatever the match order', () => {
+    const a = aggregateRecent(all(), PUUID, fakeCatalog());
+    const b = aggregateRecent(all().reverse(), PUUID, fakeCatalog());
+    expect(b.lane_matchups).toEqual(a.lane_matchups);
+    expect(b.allies).toEqual(a.allies);
+    expect(b.champions.map((c) => c.champion_id)).toEqual(a.champions.map((c) => c.champion_id));
+  });
+
+  it('caps allies at MAX_ALLIES but always keeps tracked players', () => {
+    const summaries: MatchSummary[] = Array.from({ length: 20 }, (_, i) => ({
+      match_id: `M${i}`,
+      queue_id: 420,
+      game_creation: 1_000 + i,
+      participants: [
+        { puuid: PUUID, teamId: 100, championName: 'Ahri', teamPosition: 'MIDDLE', win: true, kills: 0, deaths: 0, assists: 0 },
+        ...[0, 1, 2, 3].map((k) => ({
+          puuid: `mate-${String(i * 4 + k).padStart(2, '0')}`,
+          teamId: 100,
+          championName: 'Garen',
+          teamPosition: '',
+          win: true,
+          kills: 0,
+          deaths: 0,
+          assists: 0,
+        })),
+      ],
+    }));
+    const capped = aggregateRecent(summaries, PUUID, fakeCatalog()).allies!;
+    expect(capped).toHaveLength(MAX_ALLIES);
+    expect(capped[MAX_ALLIES - 1].puuid).toBe('mate-49');
+    const kept = aggregateRecent(summaries, PUUID, fakeCatalog(), { keepPuuids: ['mate-77', 'unknown'] }).allies!;
+    expect(kept).toHaveLength(MAX_ALLIES + 1);
+    expect(kept[MAX_ALLIES].puuid).toBe('mate-77');
+  });
+});
+
 describe('sync through the PHP proxy', () => {
   it('fetches everything (count 30 masteries, 20 match ids) and aggregates', async () => {
     installWindow('');
@@ -78,6 +204,8 @@ describe('sync through the PHP proxy', () => {
     expect(data.rank?.tier).toBe('GOLD');
     expect(data.masteries[0].champion_id).toBe('Ahri');
     expect(data.recent.games).toBe(5);
+    expect(data.recent.lane_matchups?.[0]).toEqual({ champion_id: 'Ahri', opponent_id: 'Syndra', role: 'MID', games: 2, wins: 1 });
+    expect(data.recent.allies?.[0]).toMatchObject({ puuid: FRIEND_PUUID, games: 1, wins: 1 });
     expect(riotCalls.find((c) => c.startsWith('riot/masteries'))).toContain('count=30');
     expect(riotCalls.find((c) => c.startsWith('riot/match-ids'))).toContain('count=20');
     expect(riotCalls.filter((c) => c.startsWith('riot/match?'))).toHaveLength(6);

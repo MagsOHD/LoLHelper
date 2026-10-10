@@ -11,6 +11,7 @@ import {
   type ChampionCatalog,
 } from '../engine';
 import type {
+  AllyHistory,
   ArchetypeInfo,
   ChampionInfo,
   CompositionSuggestion,
@@ -19,6 +20,7 @@ import type {
   GamePlan,
   GenerateBody,
   GenerationOptions,
+  LaneHistoryEntry,
   ManualPoolEntry,
   MasteryEntry,
   MatchupBody,
@@ -40,6 +42,7 @@ import type {
 import { ROLES } from './types';
 import { ApiError, backendRequest, store } from './backend';
 import { getCatalog, profileIconUrl } from './ddragon';
+import { getMetaStats, resetMetaForTests } from './meta';
 import { emptyRecent, emptyRoles, fetchPlayerData, getAccount, type RiotFields } from './riot';
 
 // ---- helpers ---------------------------------------------------------------------------------
@@ -101,6 +104,7 @@ function phpMeta(): Promise<PhpMeta> {
 /** Tests only. */
 export function resetServiceForTests(): void {
   phpMetaPromise = null;
+  resetMetaForTests();
 }
 
 // ---- stored documents ------------------------------------------------------------------------
@@ -137,10 +141,17 @@ function docPreferences(doc: Partial<PlayerDoc>): PlayerPreferences {
   };
 }
 
+/** Players stored before a field existed keep working: missing history = empty. */
 function docRecent(doc: Partial<PlayerDoc>): RecentSummary {
   const r = doc.recent;
   if (!r) return emptyRecent();
-  return { games: r.games ?? 0, roles: r.roles ?? emptyRoles(), champions: asArray(r.champions) };
+  return {
+    games: r.games ?? 0,
+    roles: r.roles ?? emptyRoles(),
+    champions: asArray(r.champions),
+    lane_matchups: asArray<LaneHistoryEntry>(r.lane_matchups),
+    allies: asArray<AllyHistory>(r.allies),
+  };
 }
 
 function playerPool(doc: Partial<PlayerDoc>, catalog: ChampionCatalog) {
@@ -173,15 +184,18 @@ export function toPlayer(doc: PlayerDoc, catalog: ChampionCatalog, version: stri
 }
 
 export function toPlayerInput(doc: PlayerDoc, catalog: ChampionCatalog): PlayerInput {
-  const roles = docRecent(doc).roles;
+  const recent = docRecent(doc);
   const role_games: Partial<Record<Role, number>> = {};
-  for (const [k, v] of Object.entries(roles)) if (isRole(k)) role_games[k] = Math.trunc(Number(v) || 0);
+  for (const [k, v] of Object.entries(recent.roles)) if (isRole(k)) role_games[k] = Math.trunc(Number(v) || 0);
   return {
     player_id: doc.id,
     name: doc.game_name,
     preferences: docPreferences(doc),
     role_games,
     pool: playerPool(doc, catalog),
+    puuid: doc.puuid ?? null,
+    lane_history: recent.lane_matchups ?? [],
+    allies: recent.allies ?? [],
   };
 }
 
@@ -196,6 +210,11 @@ async function getPlayerDoc(id: string): Promise<PlayerDoc> {
 }
 
 const fold = (s: string) => s.trim().toLowerCase();
+
+/** Puuids of the stored players (always kept in a synced player's `allies`). */
+function trackedPuuids(docs: PlayerDoc[]): string[] {
+  return docs.map((p) => p.puuid).filter((p): p is string => typeof p === 'string' && p !== '');
+}
 
 function findByRiotId(docs: PlayerDoc[], gameName: string, tagLine: string): PlayerDoc | undefined {
   const gn = fold(gameName);
@@ -264,9 +283,11 @@ async function createPlayer(body: CreatePlayerBody): Promise<Player> {
     doc.puuid = account.puuid;
     doc.game_name = account.gameName || gameName;
     doc.tag_line = account.tagLine || tagLine;
-    if ((await listPlayerDocs()).some((p) => p.puuid === account.puuid)) throw duplicate(doc.game_name, doc.tag_line);
+    const existing = await listPlayerDocs();
+    if (existing.some((p) => p.puuid === account.puuid)) throw duplicate(doc.game_name, doc.tag_line);
     const { catalog } = await getCatalog();
-    Object.assign(doc, riotFieldsWithTimestamp(await fetchPlayerData(account.puuid, platform, catalog)));
+    const keepPuuids = trackedPuuids(existing);
+    Object.assign(doc, riotFieldsWithTimestamp(await fetchPlayerData(account.puuid, platform, catalog, undefined, { keepPuuids })));
     // Re-check after the (slow) Riot calls to avoid concurrent duplicates.
     const docs = await listPlayerDocs();
     if (docs.some((p) => p.puuid === account.puuid) || findByRiotId(docs, doc.game_name, doc.tag_line)) {
@@ -287,7 +308,9 @@ async function deletePlayer(id: string): Promise<void> {
 }
 
 async function syncPlayer(id: string): Promise<Player> {
-  const doc = await getPlayerDoc(id);
+  const docs = await listPlayerDocs();
+  const doc = docs.find((p) => p.id === id);
+  if (!doc) throw notFound('Joueur introuvable.');
   const meta = await phpMeta();
   if (!meta.riot_configured) {
     throw new ApiError('Aucune clé API Riot configurée : impossible de synchroniser ce joueur.', 400);
@@ -305,7 +328,8 @@ async function syncPlayer(id: string): Promise<Player> {
     updated.tag_line = account.tagLine || doc.tag_line;
   }
   const { catalog } = await getCatalog();
-  Object.assign(updated, riotFieldsWithTimestamp(await fetchPlayerData(puuid, doc.platform, catalog)));
+  const keepPuuids = trackedPuuids(docs);
+  Object.assign(updated, riotFieldsWithTimestamp(await fetchPlayerData(puuid, doc.platform, catalog, undefined, { keepPuuids })));
   // Merge onto the latest stored version (preferences/pool may have changed meanwhile).
   const latest = (await listPlayerDocs()).find((p) => p.id === id);
   if (!latest) throw notFound('Joueur introuvable.'); // deleted meanwhile
@@ -467,7 +491,7 @@ async function generate(body: GenerateBody): Promise<{ suggestions: CompositionS
   const ids = asArray<string>(body?.player_ids);
   if (ids.length < 1 || ids.length > 5) throw unprocessable('Sélectionnez entre 1 et 5 joueurs.');
   if (new Set(ids).size !== ids.length) throw unprocessable('Un joueur est sélectionné plusieurs fois.');
-  const [docs, { catalog }] = await Promise.all([listPlayerDocs(), getCatalog()]);
+  const [docs, { catalog }, meta] = await Promise.all([listPlayerDocs(), getCatalog(), getMetaStats()]);
   const rows = ids.map((pid) => {
     const row = docs.find((d) => d.id === pid);
     if (!row) throw notFound(`Joueur introuvable : ${pid}.`);
@@ -496,7 +520,7 @@ async function generate(body: GenerateBody): Promise<{ suggestions: CompositionS
     if (!known.has(opts.theme)) throw unprocessable(`Thème inconnu : ${opts.theme}.`);
   }
   const players = rows.map((row) => toPlayerInput(row, catalog));
-  return { suggestions: generateCompositions(players, opts, catalog) };
+  return { suggestions: generateCompositions(players, opts, catalog, { meta }) };
 }
 
 async function gamePlan(picks: Pick[]): Promise<GamePlan> {
@@ -520,9 +544,22 @@ async function matchup(body: MatchupBody): Promise<MatchupPlan> {
     throw unprocessable("L'équipe adverse contient plusieurs champions sur le même rôle.");
   }
   validatePicks(catalog, ally, 'Votre composition');
+  // TODO(integration): switch to the engine's enemy-role helper once it is exported.
   const enemy = assignEnemyRoles(enemyIn, catalog);
   validatePicks(catalog, enemy, "L'équipe adverse");
-  return buildMatchupPlan(ally, enemy, catalog);
+  const [meta, players] = await Promise.all([getMetaStats(), allyPlayers(ally, catalog)]);
+  return buildMatchupPlan(ally, enemy, catalog, { meta, players });
+}
+
+/** PlayerInput of the ally picks' known players (pick order, unknown/deleted ids ignored). */
+async function allyPlayers(ally: Pick[], catalog: ChampionCatalog): Promise<PlayerInput[]> {
+  const ids = unique(ally.map((p) => p.player_id).filter((id): id is string => typeof id === 'string' && id !== ''));
+  if (!ids.length) return [];
+  const docs = await listPlayerDocs();
+  return ids.flatMap((id) => {
+    const doc = docs.find((d) => d.id === id);
+    return doc ? [toPlayerInput(doc, catalog)] : [];
+  });
 }
 
 async function listSaved(): Promise<SavedComposition[]> {
@@ -562,9 +599,16 @@ async function deleteSaved(id: string): Promise<void> {
 
 // ---- static data -----------------------------------------------------------------------------
 
+function metaSummary(v: unknown): Meta['meta_stats'] {
+  if (!v || typeof v !== 'object') return null;
+  const { patch, games, updated_at } = v as Record<string, unknown>;
+  if (typeof patch !== 'string' || !patch || typeof games !== 'number' || !Number.isFinite(games)) return null;
+  return { patch, games, updated_at: typeof updated_at === 'string' ? updated_at : '' };
+}
+
 async function meta(): Promise<Meta> {
   const [m, { version }] = await Promise.all([phpMeta(), getCatalog()]);
-  return { ...m, ddragon_version: version };
+  return { ...m, meta_stats: metaSummary(m.meta_stats), ddragon_version: version };
 }
 
 async function champions(): Promise<ChampionInfo[]> {

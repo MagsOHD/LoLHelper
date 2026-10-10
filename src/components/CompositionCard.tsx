@@ -29,6 +29,7 @@ export function CompositionCard({ suggestion, champions, players, rank, onPlan, 
     ['Thème', b.theme_fit],
     ['Équilibre', b.balance],
     ['Contre', b.counter],
+    ['Méta', b.meta],
   ];
   return (
     <article className="card comp" aria-labelledby={`comp-${rank}`}>
@@ -45,7 +46,7 @@ export function CompositionCard({ suggestion, champions, players, rank, onPlan, 
           <div key={label} className="breakdown__item">
             <dt>{label}</dt>
             <dd>
-              <Bar value={(v as number) / 100} label={`${label} : ${Math.round(v as number)} sur 100`} size="sm" tone={label === 'Contre' ? 'red' : 'blue'} />
+              <Bar value={(v as number) / 100} label={`${label} : ${Math.round(v as number)} sur 100`} size="sm" tone={label === 'Contre' ? 'red' : label === 'Méta' ? 'teal' : 'blue'} />
               <span className="breakdown__val">{Math.round(v as number)}</span>
             </dd>
           </div>

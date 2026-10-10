@@ -193,6 +193,8 @@ let saved: SavedComposition[] = [
 const META = {
   ddragon_version: '15.19.1', riot_configured: false, platform: 'euw1', region: 'europe',
   platforms: ['euw1', 'eun1', 'na1', 'kr', 'br1', 'jp1', 'la1', 'la2', 'oc1', 'tr1', 'ru', 'me1', 'sg2', 'tw2', 'vn2'],
+  // Fake high-elo meta summary (the real one comes from the PHP cron collector).
+  meta_stats: { patch: '16.19', games: 4213, updated_at: '2026-10-10T12:00:00Z' },
 };
 
 let seq = 100;
@@ -272,6 +274,7 @@ function generate(body: GenerateBody): { suggestions: CompositionSuggestion[] } 
       comfort: Math.round(avgC * 100), desire: Math.round(avgD * 100),
       theme_fit: 85 - i * 7, balance: 70 + ((i * 13) % 25),
       counter: o.enemy_champions?.length ? 62 - i * 3 : null,
+      meta: 68 - ((i * 11) % 30),
     };
     out.push({
       theme: theme.key, theme_label: theme.label,
