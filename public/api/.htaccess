@@ -1,5 +1,6 @@
 # API PHP : seul index.php est accessible depuis le web.
-# lib/, config.php, config.example.php, data/ (stockage de secours) et tout le reste sont refusés.
+# lib/, cron/ (scripts CLI), config.php, config.example.php, data/ (stockage de secours) et tout le reste
+# sont refusés.
 
 Options -Indexes
 
@@ -29,5 +30,5 @@ Options -Indexes
 # il reçoit en plus son propre .htaccess « tout refuser » à sa création.
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^(data|lib)(/|$) - [F,L]
+  RewriteRule ^(data|lib|cron)(/|$) - [F,L]
 </IfModule>

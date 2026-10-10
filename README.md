@@ -21,6 +21,9 @@ PHP garde la clé Riot et stocke les données partagées.
   Split push, Dive, Early, Scaling, Escarmouches) et 19 thèmes fun (Yordles, Néant,
   Noxus, Full AP, Liens de lore…). Options : rôles imposés, champions verrouillés,
   bans, champions adverses, curseur « rester sur nos champions ↔ découvrir ».
+- **Historique et méta** : la forme récente de chacun (20 dernières parties), les duels de lane
+  déjà joués, les champions qui ont bien marché quand vous jouiez ensemble, et la méta du patch
+  (parties Challenger/Grandmaster collectées automatiquement) influencent les compos et les matchups.
 - **Plan de jeu**, **Matchup** et **compositions sauvegardées**.
 - Accès protégé par un mot de passe partagé, utilisable sur téléphone.
 

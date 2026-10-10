@@ -20,12 +20,13 @@ const RIOT_MSG_NO_KEY = 'Clé API Riot non configurée.';
 /**
  * URL de base d'un hôte Riot (« europe », « euw1 »…).
  * Surcharge possible UNIQUEMENT pour les tests : variable d'environnement du processus
- * LOLHELPER_RIOT_BASE (http://127.0.0.1:<port>), et seulement sous le serveur intégré `php -S`.
+ * LOLHELPER_RIOT_BASE (http://127.0.0.1:<port>), et seulement sous le serveur intégré `php -S`
+ * ou en ligne de commande (collecteur cron : l'environnement n'y vient pas d'un visiteur).
  * Aucune valeur venant de la requête n'est prise en compte.
  */
 function riot_base_url(string $host): string
 {
-    if (PHP_SAPI === 'cli-server') {
+    if (PHP_SAPI === 'cli-server' || PHP_SAPI === 'cli') {
         $override = getenv('LOLHELPER_RIOT_BASE', true);
         if (is_string($override) && preg_match('#^http://127\.0\.0\.1:[0-9]{1,5}$#D', $override) === 1) {
             return $override . '/' . $host;

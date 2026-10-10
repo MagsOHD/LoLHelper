@@ -1,0 +1,29 @@
+{
+  "tier": "GRANDMASTER",
+  "leagueId": "gm",
+  "queue": "RANKED_SOLO_5x5",
+  "name": "Fake",
+  "entries": [
+    {
+      "puuid": "meta-player-04-abcdefghijklmnopqrstuvwxyz0123456789",
+      "leaguePoints": 800
+    },
+    {
+      "puuid": "meta-player-03-abcdefghijklmnopqrstuvwxyz0123456789",
+      "leaguePoints": 900
+    },
+    {
+      "puuid": "meta-player-01-abcdefghijklmnopqrstuvwxyz0123456789",
+      "leaguePoints": 700
+    },
+    {
+      "puuid": "bad",
+      "leaguePoints": 5000
+    },
+    "not-an-object",
+    {
+      "puuid": 12345,
+      "leaguePoints": 4000
+    }
+  ]
+}

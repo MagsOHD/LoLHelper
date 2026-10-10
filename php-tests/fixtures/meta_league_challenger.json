@@ -1,0 +1,28 @@
+{
+  "tier": "CHALLENGER",
+  "leagueId": "chal",
+  "queue": "RANKED_SOLO_5x5",
+  "name": "Fake",
+  "entries": [
+    {
+      "puuid": "meta-player-02-abcdefghijklmnopqrstuvwxyz0123456789",
+      "leaguePoints": 1200,
+      "rank": "I",
+      "wins": 100,
+      "losses": 80
+    },
+    {
+      "puuid": "meta-player-01-abcdefghijklmnopqrstuvwxyz0123456789",
+      "leaguePoints": 1500,
+      "rank": "I",
+      "wins": 120,
+      "losses": 90
+    },
+    {
+      "leaguePoints": 1000,
+      "rank": "I",
+      "wins": 1,
+      "losses": 1
+    }
+  ]
+}

@@ -77,6 +77,80 @@ if (preg_match('#^/lol/champion-mastery/v4/champion-masteries/by-puuid/([^/]+)/t
     return true;
 }
 
+// ---- Collecteur méta : ligues apex + parties classées décrites dans fixtures/meta_matches.json.
+// FAKE_CTRL (fichier JSON écrit par les tests) : {"challenger":"b", "match_429":"<id>", "retry_after":"1"}.
+$ctrlFile = getenv('FAKE_CTRL');
+$ctrl = (is_string($ctrlFile) && is_file($ctrlFile)) ? (json_decode((string) file_get_contents($ctrlFile), true) ?: []) : [];
+
+if (preg_match('#^/lol/league/v4/(challenger|grandmaster|master)leagues/by-queue/RANKED_SOLO_5x5$#', $rest, $m)) {
+    $file = "$fixtures/meta_league_{$m[1]}" . ($m[1] === 'challenger' && ($ctrl['challenger'] ?? '') === 'b' ? '_b' : '') . '.json';
+    is_file($file) ? out(200, file_get_contents($file)) : out(404, '{}');
+    return true;
+}
+
+$meta = json_decode(file_get_contents("$fixtures/meta_matches.json"), true);
+
+if (preg_match('#^/lol/match/v5/matches/by-puuid/(meta-player-[^/]+)/ids$#', $rest, $m)) {
+    parse_str((string) parse_url($uri, PHP_URL_QUERY), $q);
+    $windowStart = time() - 3 * 86400;
+    $okQuery = ($q['queue'] ?? '') === '420' && ($q['type'] ?? '') === 'ranked' && ($q['count'] ?? '') === '20'
+        && ctype_digit($q['startTime'] ?? 'x') && abs((int) $q['startTime'] - $windowStart) < 120;
+    if (!$okQuery) {
+        out(400, '{"status":{"message":"bad ids query"}}');
+        return true;
+    }
+    out(200, json_encode($meta['players'][$m[1]] ?? []));
+    return true;
+}
+
+if (preg_match('#^/lol/match/v5/matches/(EUW1_80[0-9]+)$#', $rest, $m)) {
+    $id = $m[1];
+    if (($ctrl['match_429'] ?? '') === $id) {
+        out(429, '{}', ['Retry-After' => (string) ($ctrl['retry_after'] ?? '1')]);
+        return true;
+    }
+    $spec = $meta['matches'][$id] ?? null;
+    if ($spec === null) {
+        out(404, '{"status":{"status_code":404}}');
+        return true;
+    }
+    if (isset($spec['raw'])) {
+        out(200, json_encode($spec['raw']));
+        return true;
+    }
+    $participants = [];
+    $puuids = [];
+    foreach ([100 => $spec['blue'], 200 => $spec['red']] as $team => $list) {
+        foreach ($list as $i => [$champ, $pos]) {
+            $puuid = "fake-$id-$team-$i";
+            $puuids[] = $puuid;
+            $participants[] = [
+                'puuid' => $puuid, 'championId' => $champ, 'championName' => "C$champ",
+                'teamPosition' => $pos, 'individualPosition' => $pos, 'teamId' => $team,
+                'win' => $spec['win'] === $team, 'kills' => 1, 'deaths' => 1, 'assists' => 1,
+                'gameEndedInEarlySurrender' => $spec['dur'] < 300,
+            ];
+        }
+    }
+    $teams = [];
+    foreach ([100, 200] as $team) {
+        $bans = [];
+        foreach ($spec['bans'][(string) $team] ?? [] as $i => $c) {
+            $bans[] = ['championId' => $c, 'pickTurn' => $i + 1];
+        }
+        $teams[] = ['teamId' => $team, 'win' => $spec['win'] === $team, 'bans' => $bans];
+    }
+    out(200, json_encode([
+        'metadata' => ['dataVersion' => '2', 'matchId' => $id, 'participants' => $puuids],
+        'info' => [
+            'gameCreation' => 1760000000000, 'gameDuration' => $spec['dur'], 'gameEndTimestamp' => 1760000000000 + $spec['dur'] * 1000,
+            'gameVersion' => $spec['v'], 'queueId' => $spec['q'], 'mapId' => 11, 'platformId' => 'EUW1',
+            'participants' => $participants, 'teams' => $teams,
+        ],
+    ]));
+    return true;
+}
+
 if (preg_match('#^/lol/match/v5/matches/by-puuid/([^/]+)/ids$#', $rest)) {
     out(200, file_get_contents("$fixtures/match_ids.json"));
     return true;
