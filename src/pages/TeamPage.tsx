@@ -254,6 +254,53 @@ function TeamsSection({ players }: { players: Player[] }) {
   );
 }
 
+/** Synced before detailed history existed (no per-champion date): lane duels and games together are missing. */
+function hasLegacyHistory(p: Player): boolean {
+  const champions = p.recent?.champions ?? [];
+  return Boolean(p.puuid) && champions.length > 0 && !champions.some((c) => c.last_played);
+}
+
+function ResyncBanner({ players }: { players: Player[] }) {
+  const meta = useMeta();
+  const sync = useSyncPlayer();
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const outdated = players.filter(hasLegacyHistory);
+  if (!meta.data?.riot_configured || (!outdated.length && !progress)) return null;
+
+  const run = async () => {
+    setError(null);
+    setProgress({ done: 0, total: outdated.length });
+    for (const [i, p] of outdated.entries()) {
+      try {
+        await sync.mutateAsync(p.id);
+      } catch (err) {
+        setError(err);
+        break;
+      }
+      setProgress({ done: i + 1, total: outdated.length });
+    }
+    setProgress(null);
+  };
+
+  return (
+    <div className="banner banner--action" role="status">
+      <span aria-hidden="true">ⓘ</span>
+      <span className="banner__text">
+        {progress
+          ? `Synchronisation ${progress.done + 1} sur ${progress.total}…`
+          : outdated.length > 1
+            ? `${outdated.length} joueurs ont été synchronisés avant l’historique détaillé : resynchronise-les pour que leurs duels de lane et vos parties ensemble comptent dans les compos.`
+            : `${outdated[0].game_name} a été synchronisé avant l’historique détaillé : resynchronise-le pour que ses duels de lane et vos parties ensemble comptent dans les compos.`}
+      </span>
+      {!progress && (
+        <button type="button" className="btn btn--primary btn--sm" onClick={run}>Tout resynchroniser</button>
+      )}
+      {error !== null && <ErrorMessage error={error} />}
+    </div>
+  );
+}
+
 export function TeamPage() {
   const players = usePlayers();
   return (
@@ -262,6 +309,7 @@ export function TeamPage() {
         <h1>Équipe</h1>
         <p className="lead">Ajoute tes amis, indique ce qu’ils savent jouer et ce qu’ils ont envie de jouer.</p>
       </header>
+      {players.data && <ResyncBanner players={players.data} />}
       <AddFriendForm />
       <section className="section">
         <SectionTitle>Joueurs</SectionTitle>

@@ -393,6 +393,15 @@ describe('history and meta context', () => {
     ]);
   });
 
+  it('old player documents use their sync date as last_played for recent form', async () => {
+    server.db.players.set('old', { ...oldDoc('old', 'p-old'), last_synced_at: '2026-10-01T12:00:00Z' });
+    await api.getPlayer('old');
+    const [, recent] = lastCall(engine.current.computePool) as [unknown, { champion_id: string; last_played?: number }[]];
+    expect(recent[0]).toMatchObject({ champion_id: 'Ahri', last_played: Date.parse('2026-10-01T12:00:00Z') });
+    const player = await api.getPlayer('old');
+    expect(player.recent.champions[0].last_played).toBeUndefined();
+  });
+
   it('matchup passes the meta and the ally players with a known id', async () => {
     setup({ metaStats: RAW_META });
     server.db.players.set('a', oldDoc('a', 'pa'));

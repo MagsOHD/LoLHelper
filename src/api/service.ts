@@ -28,6 +28,7 @@ import type {
   MatchupPlan,
   Meta,
   Pick,
+  RecentChampionStat,
   Player,
   PlayerInput,
   PlayerPreferences,
@@ -155,10 +156,21 @@ function docRecent(doc: Partial<PlayerDoc>): RecentSummary {
   };
 }
 
+/**
+ * Players synced before `last_played` existed: their recent games happened shortly before the
+ * sync, so the sync date stands in for it and recent form still counts.
+ */
+function championsWithLastPlayed(doc: Partial<PlayerDoc>): RecentChampionStat[] {
+  const champions = docRecent(doc).champions;
+  const synced = doc.last_synced_at ? Date.parse(doc.last_synced_at) : NaN;
+  if (Number.isNaN(synced)) return champions;
+  return champions.map((c) => (c.last_played ? c : { ...c, last_played: synced }));
+}
+
 function playerPool(doc: Partial<PlayerDoc>, catalog: ChampionCatalog) {
   return computePool(
     asArray<MasteryEntry>(doc.masteries),
-    docRecent(doc).champions,
+    championsWithLastPlayed(doc),
     asArray<ManualPoolEntry>(doc.manual_pool),
     docPreferences(doc),
     catalog,
