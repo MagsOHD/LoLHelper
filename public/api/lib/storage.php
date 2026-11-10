@@ -6,7 +6,13 @@ if (!defined('LOLHELPER_API')) {
     exit;
 }
 
-const STORE_COLLECTIONS = ['players', 'teams', 'saved'];
+/** Collections exposées par les routes génériques store/<collection>[/<id>]. */
+const STORE_COLLECTIONS = ['players', 'teams', 'saved', 'drafts'];
+/**
+ * Collections internes : jamais lisibles ni modifiables par store/…, seulement par leurs routes dédiées
+ * (live : données du programme compagnon, validées et horodatées par la route live-draft).
+ */
+const STORE_INTERNAL_COLLECTIONS = ['live'];
 const STORE_MAX_DOCS = 500;
 const STORE_ID_PATTERN = '/^[A-Za-z0-9-]{1,64}$/D';
 
@@ -125,9 +131,16 @@ final class DocumentStore
         $this->dir = $dir;
     }
 
+    /** Collection publique (routes store/…). */
     public static function isValidCollection(string $c): bool
     {
         return in_array($c, STORE_COLLECTIONS, true);
+    }
+
+    /** Collection publique ou interne (usage côté serveur uniquement). */
+    private static function isKnownCollection(string $c): bool
+    {
+        return self::isValidCollection($c) || in_array($c, STORE_INTERNAL_COLLECTIONS, true);
     }
 
     public static function isValidId(string $id): bool
@@ -214,7 +227,7 @@ final class DocumentStore
      */
     private function withLock(string $collection, int $mode, callable $fn): mixed
     {
-        if (!self::isValidCollection($collection)) {
+        if (!self::isKnownCollection($collection)) {
             throw new InvalidArgumentException('collection invalide');
         }
         $file = $this->dir . '/' . $collection . '.json';

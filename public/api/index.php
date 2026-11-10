@@ -17,6 +17,7 @@ require $apiDir . '/lib/config.php';
 require $apiDir . '/lib/storage.php';
 require $apiDir . '/lib/riot.php';
 require $apiDir . '/lib/meta.php';
+require $apiDir . '/lib/live.php';
 
 send_common_headers();
 
@@ -73,6 +74,11 @@ function handle_request(string $apiDir): void
         return;
     }
 
+    if ($route === 'live-draft') {
+        handle_live_draft($config, $apiDir);
+        return;
+    }
+
     $parts = explode('/', $route);
 
     if ($parts[0] === 'store' && (count($parts) === 2 || count($parts) === 3)) {
@@ -107,7 +113,7 @@ function handle_request(string $apiDir): void
     }
 
     if ($parts[0] === 'riot' && count($parts) === 2
-        && in_array($parts[1], ['account', 'summoner', 'league', 'masteries', 'match-ids', 'match'], true)) {
+        && in_array($parts[1], ['account', 'summoner', 'league', 'masteries', 'match-ids', 'match', 'active-game'], true)) {
         require_method(['GET']);
         handle_riot($parts[1], $config, $apiDir);
         return;

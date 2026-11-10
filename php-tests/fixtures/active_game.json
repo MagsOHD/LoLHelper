@@ -1,0 +1,19 @@
+{
+  "gameId": 7123456789,
+  "mapId": 11,
+  "gameMode": "CLASSIC",
+  "gameType": "MATCHED",
+  "gameQueueConfigId": 420,
+  "platformId": "EUW1",
+  "gameStartTime": 1762804800000,
+  "gameLength": 95,
+  "observers": {"encryptionKey": "fakeObserverKey"},
+  "bannedChampions": [
+    {"championId": 55, "teamId": 100, "pickTurn": 1},
+    {"championId": 238, "teamId": 200, "pickTurn": 2}
+  ],
+  "participants": [
+    {"puuid": "kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k", "teamId": 100, "championId": 103, "spell1Id": 4, "spell2Id": 14, "profileIconId": 5367, "riotId": "Le Fou Élégant#EUW", "bot": false, "gameCustomizationObjects": [], "perks": {"perkIds": [8112], "perkStyle": 8100, "perkSubStyle": 8300}},
+    {"puuid": "enemyPuuid0000000000000000000000000000000000000000000000000000000000000000001", "teamId": 200, "championId": 238, "spell1Id": 4, "spell2Id": 12, "profileIconId": 1, "riotId": "Adversaire#EUW", "bot": false, "gameCustomizationObjects": [], "perks": {"perkIds": [8010], "perkStyle": 8000, "perkSubStyle": 8400}}
+  ]
+}
