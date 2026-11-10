@@ -26,6 +26,7 @@ import {
   type DDragonChampion,
   type RawMeta,
 } from './catalog';
+import { recommendDraftRaw } from './draft';
 import { generateCompositionsRaw } from './generator';
 import { buildGamePlanRaw, buildMatchupPlanRaw } from './plans';
 import { computePool as computePoolImpl } from './pool';
@@ -39,6 +40,7 @@ export { archetypeLabel, placeholderData } from './catalog';
 export { detectThemes, getTheme, themeLabel } from './themes';
 export { ROLE_ORDER } from './generator';
 export { computeForm } from './pool';
+export { DRAFT_KNOWN_COMFORT, DRAFT_W_COUNTER, DRAFT_W_LANE, ONE_TRICK_POINTS } from './draft';
 export { guessEnemyRoles, metaMatchup, metaPickValue, metaUsable, META_MIN_GAMES } from './meta';
 
 const adapted = new WeakMap<ChampionCatalog, Catalog>();
@@ -119,8 +121,15 @@ export function buildMatchupPlan(
 }
 
 /**
- * CONTRACT (live draft): per-player pick advice for friends who have not locked yet, ban advice and
- * an analysis of the enemy team from the picks known so far. Implemented by the engine agent.
+ * Live draft: per-friend pick advice (3–5 champions for every friend slot not locked, slot order; locked
+ * friends get `locked_champion_id` and no picks), up to 3 ban suggestions (never banned / picked / hovered)
+ * and a read of the enemy team from the picks known so far (null without enemy pick).
+ * Friends = ally slots whose `player_id` matches one of `players`; other slots are unknown teammates (their
+ * locked champions count for balance, synergy and counters). Roles: slot role, else guessed (locked
+ * champions) or assigned from preferences / role games (friends still to pick). Enemy roles are guessed
+ * with `guessEnemyRoles` when missing. `draft.enemy_accounts` (game started) adjust the threats with the
+ * enemy players' mastery and rank. `context.meta` adds meta values, lane duels and ban presence.
+ * Deterministic; every sentence goes through French elision.
  */
 export function recommendDraft(
   players: PlayerInput[],
@@ -128,6 +137,5 @@ export function recommendDraft(
   catalog: ChampionCatalog,
   context: EngineContext = {},
 ): DraftAdvice {
-  void [players, draft, catalog, context];
-  return { players: [], bans: [], enemy: null };
+  return elideAll(recommendDraftRaw(players, draft, asCatalog(catalog), context ?? {}));
 }
