@@ -6,6 +6,10 @@
 // VITE_MOCK=1: in-memory demo backend (mock.ts), never bundled in production builds.
 import type {
   ArchetypeInfo,
+  DraftAdvice,
+  DraftInput,
+  DraftState,
+  PlayerInput,
   ChampionInfo,
   CompositionSuggestion,
   CreatePlayerBody,
@@ -25,10 +29,31 @@ import type {
   ThemeInfo,
 } from './types';
 import { localApi } from './service';
+import { recommendDraft, type ChampionCatalog } from '../engine';
+import { fetchLiveDraft, loadDraft, saveDraft, type LiveDraft } from './draft';
+import { getCatalog } from './ddragon';
+import { getMetaStats } from './meta';
+import { detectActiveGame, type DetectedGame, type DetectFriend, type DetectOptions } from './spectator';
 
 export { ApiError, AUTH_REQUIRED_EVENT, getPassword, setPassword } from './backend';
 
 export const MOCK_MODE = import.meta.env.VITE_MOCK === '1';
+
+/** Champion catalog + draft advisor (engine with meta stats; fake advice in mock mode). */
+export interface DraftEngine {
+  catalog: ChampionCatalog;
+  advise(players: PlayerInput[], draft: DraftInput): DraftAdvice;
+}
+
+async function realDraftEngine(): Promise<DraftEngine> {
+  const [{ catalog }, meta] = await Promise.all([getCatalog(), getMetaStats()]);
+  return { catalog, advise: (players, draft) => recommendDraft(players, draft, catalog, { meta }) };
+}
+
+async function mockDraftEngine(): Promise<DraftEngine> {
+  const m = await import('./mock');
+  return { catalog: m.mockCatalog(), advise: m.mockDraftAdvice };
+}
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
@@ -83,6 +108,18 @@ export const api = {
     MOCK_MODE ? mock('POST', '/compositions/saved', body) : localApi.saveComposition(body),
   deleteSaved: (id: string): Promise<void> =>
     MOCK_MODE ? mock('DELETE', `/compositions/saved/${enc(id)}`) : localApi.deleteSaved(id),
+
+  // Live draft
+  getDraft: (id: string): Promise<DraftState | null> => (MOCK_MODE ? mock('GET', `/drafts/${enc(id)}`) : loadDraft(id)),
+  saveDraft: (doc: DraftState): Promise<DraftState> =>
+    MOCK_MODE ? mock('PUT', `/drafts/${enc(doc.id)}`, doc) : saveDraft(doc),
+  liveDraft: (playerIds: string[]): Promise<LiveDraft | null> =>
+    MOCK_MODE ? mock('POST', '/live-draft', { players: playerIds }) : fetchLiveDraft(playerIds),
+  detectGame: (friends: DetectFriend[], options: Omit<DetectOptions, 'transport'> = {}): Promise<DetectedGame | null> =>
+    MOCK_MODE
+      ? mock('POST', '/draft/detect', { friends })
+      : getCatalog().then(({ catalog }) => detectActiveGame(friends, catalog, options)).then((r) => r?.game ?? null),
+  draftEngine: (): Promise<DraftEngine> => (MOCK_MODE ? mockDraftEngine() : realDraftEngine()),
 };
 
 export function errorMessage(err: unknown): string {

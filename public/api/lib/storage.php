@@ -156,6 +156,18 @@ final class DocumentStore
         });
     }
 
+    public function get(string $collection, string $id): ?stdClass
+    {
+        return $this->withLock($collection, LOCK_SH, function (string $file) use ($id): ?stdClass {
+            foreach ($this->readDocs($file) as $doc) {
+                if (($doc->id ?? null) === $id) {
+                    return $doc;
+                }
+            }
+            return null;
+        });
+    }
+
     public function put(string $collection, string $id, stdClass $doc): stdClass
     {
         $doc->id = $id;

@@ -7,6 +7,12 @@ import type {
   ChampionTraits,
   CompositionSuggestion,
   DamageType,
+  DraftAdvice,
+  DraftEnemyAccount,
+  DraftInput,
+  DraftState,
+  PlayerInput,
+  PlayerPickAdvice,
   GamePlan,
   GenerateBody,
   MatchupBody,
@@ -21,6 +27,9 @@ import type {
   ThemeInfo,
 } from './types';
 import { ROLES } from './types';
+import type { ChampionCatalog } from '../engine';
+import type { LiveDraft } from './draft';
+import type { DetectedGame } from './spectator';
 
 const ZERO: ChampionTraits = {
   engage: 0, peel: 0, poke: 0, waveclear: 0, splitpush: 0, pick: 0, teamfight: 0,
@@ -340,6 +349,166 @@ function matchup(body: MatchupBody): MatchupPlan {
   };
 }
 
+// ---- live draft (demo) ------------------------------------------------------------------------
+
+const drafts = new Map<string, DraftState>([
+  ['team-t1', {
+    id: 'team-t1', team_id: 't1', player_ids: ['p1', 'p2', 'p3'], source: 'manual', phase: 'pick', side: 'blue',
+    ally_bans: ['Teemo', 'Draven', 'Sett'], enemy_bans: ['Thresh', 'Kaisa'],
+    ally: [
+      { player_id: 'p2', champion_id: 'Malphite', role: 'TOP', locked: true },
+      { player_id: null, champion_id: 'Vi', role: 'JUNGLE', locked: true },
+      { player_id: 'p1', champion_id: 'Ahri', role: 'MID', locked: false },
+      { player_id: 'p3', champion_id: null, role: 'BOTTOM', locked: false },
+      { player_id: null, champion_id: null, role: 'SUPPORT', locked: false },
+    ],
+    enemy: [
+      { champion_id: 'Zed', role: 'MID', locked: true },
+      { champion_id: 'Darius', role: null, locked: true },
+      { champion_id: 'Leona', role: null, locked: true },
+      { champion_id: null, role: null, locked: false },
+      { champion_id: null, role: null, locked: false },
+    ],
+    enemy_accounts: [], game_id: null, updated_at: '2026-11-10T20:00:00.000Z',
+  }],
+]);
+
+/** Fake companion data, only when localStorage "lolhelper:mock-live" is "1" (demo of the sync). */
+function mockLive(ids: string[]): LiveDraft | null {
+  let on = false;
+  try {
+    on = window.localStorage.getItem('lolhelper:mock-live') === '1';
+  } catch {
+    on = false;
+  }
+  if (!on || !ids.includes('p1')) return null;
+  const now = new Date().toISOString();
+  return {
+    version: 1, puuid: 'puuid-1', phase: 'ban_pick', queue_id: 420, local_cell: 2,
+    my_team: [
+      { cell: 0, puuid: 'puuid-2', champion_key: 54, intent_key: 0, position: 'top' },
+      { cell: 1, puuid: '', champion_key: 113, intent_key: 0, position: 'jungle' },
+      { cell: 2, puuid: '', champion_key: 61, intent_key: 0, position: 'middle' },
+      { cell: 3, puuid: '', champion_key: 0, intent_key: 51, position: 'bottom' },
+      { cell: 4, puuid: '', champion_key: 0, intent_key: 0, position: 'utility' },
+    ],
+    their_team: [
+      { cell: 5, champion_key: 238 }, { cell: 6, champion_key: 122 }, { cell: 7, champion_key: 89 },
+      { cell: 8, champion_key: 0 }, { cell: 9, champion_key: 0 },
+    ],
+    bans: { mine: [17, 119, 875], theirs: [412, 145] },
+    actions: [
+      { type: 'pick', champion_key: 54, completed: true, ally: true, cell: 0, in_progress: false },
+      { type: 'pick', champion_key: 238, completed: true, ally: false, cell: 5, in_progress: false },
+      { type: 'pick', champion_key: 122, completed: true, ally: false, cell: 6, in_progress: false },
+      { type: 'pick', champion_key: 113, completed: true, ally: true, cell: 1, in_progress: false },
+      { type: 'pick', champion_key: 61, completed: false, ally: true, cell: 2, in_progress: true },
+      { type: 'pick', champion_key: 89, completed: true, ally: false, cell: 7, in_progress: false },
+    ],
+    timer_remaining_ms: 21000, sent_at: now, player_id: 'p1', received_at: now,
+  };
+}
+
+function mockDetect(friends: { player_id: string }[]): DetectedGame {
+  const ids = friends.map((f) => f.player_id);
+  const acc = (riot_id: string, champion_id: string, tier: string, points: number, otp = false): DraftEnemyAccount => ({
+    puuid: `enemy-${champion_id}`, riot_id, champion_id, role: null,
+    rank: { queue: 'RANKED_SOLO_5x5', tier, division: 'II', lp: 40, wins: 61, losses: 50 },
+    champion_mastery: { champion_id, level: otp ? 7 : 5, points },
+    masteries: [{ champion_id, level: otp ? 7 : 5, points }],
+  });
+  return {
+    game_id: 7123456789, queue_id: 420, side: 'blue',
+    ally: [
+      { player_id: ids.includes('p2') ? 'p2' : null, champion_id: 'Malphite', role: null, locked: true },
+      { player_id: null, champion_id: 'Vi', role: null, locked: true },
+      { player_id: ids.includes('p1') ? 'p1' : null, champion_id: 'Ahri', role: null, locked: true },
+      { player_id: ids.includes('p3') ? 'p3' : null, champion_id: 'Caitlyn', role: null, locked: true },
+      { player_id: null, champion_id: 'Lulu', role: null, locked: true },
+    ],
+    enemy: ['Zed', 'Darius', 'Leona', 'Sejuani', 'Jinx'].map((c) => ({ champion_id: c, role: null, locked: true })),
+    ally_bans: ['Teemo', 'Draven', 'Sett'], enemy_bans: ['Thresh', 'Kaisa'],
+    enemy_accounts: [
+      acc('OmbreDuMid#EUW', 'Zed', 'PLATINUM', 612_000, true),
+      acc('Hache Rouge#1337', 'Darius', 'GOLD', 88_000),
+      acc('Aube#SUN', 'Leona', 'GOLD', 140_500),
+      acc('Glace#FRJ', 'Sejuani', 'SILVER', 23_000),
+      acc('Gâchette#ZAU', 'Jinx', 'GOLD', 54_000),
+    ],
+  };
+}
+
+export function mockCatalog(): ChampionCatalog {
+  return {
+    get: (id) => CHAMPIONS.find((c) => c.id === id),
+    byKey: (key) => CHAMPIONS.find((c) => c.key === Number(key)),
+    all: () => CHAMPIONS,
+  };
+}
+
+/** Plausible advice for the demo (the real one comes from the engine's recommendDraft). */
+export function mockDraftAdvice(players: PlayerInput[], input: DraftInput): DraftAdvice {
+  const used = new Set<string>([
+    ...input.bans,
+    ...input.enemy.map((s) => s.champion_id).filter((c): c is string => !!c),
+  ]);
+  const lockedAlly = new Set(input.ally.filter((s) => s.locked && s.champion_id).map((s) => s.champion_id as string));
+  const enemyIds = input.enemy.map((s) => s.champion_id).filter((c): c is string => !!c);
+  const takenRoles = new Set(input.ally.filter((s) => s.role && s.locked).map((s) => s.role as Role));
+  const advice: PlayerPickAdvice[] = [];
+  for (const slot of input.ally) {
+    const p = players.find((x) => x.player_id === slot.player_id);
+    if (!p) continue;
+    if (slot.locked && slot.champion_id) {
+      advice.push({ player_id: p.player_id, role: slot.role ?? null, locked_champion_id: slot.champion_id, picks: [] });
+      continue;
+    }
+    const role: Role = slot.role ?? p.preferences.roles.find((r) => !takenRoles.has(r)) ?? ROLES.find((r) => !takenRoles.has(r)) ?? 'MID';
+    takenRoles.add(role);
+    const own = p.pool.filter((e) => !used.has(e.champion_id) && !lockedAlly.has(e.champion_id) && champById(e.champion_id)?.roles.includes(role));
+    const extra = CHAMPIONS.filter((c) => c.roles.includes(role) && !used.has(c.id) && !lockedAlly.has(c.id) && !own.some((e) => e.champion_id === c.id))
+      .map((c) => ({ champion_id: c.id, comfort: 0.12, desire: 0.4, sources: [] }));
+    const picks = [...own, ...extra].slice(0, 4).map((e, i) => {
+      const reasons: string[] = [];
+      if (e.comfort >= 0.6) reasons.push(`Champion maîtrisé (${Math.round(e.comfort * 190)}k points)`);
+      else if (e.comfort < 0.2) reasons.push('Pick méta solide sur ce patch, peu joué par toi');
+      if (enemyIds.includes('Zed') && ['Malphite', 'Lulu', 'Annie', 'Orianna'].includes(e.champion_id)) reasons.push('Bon contre Zed (duel favorable sur ce patch)');
+      if (champById(e.champion_id)?.traits.frontline) reasons.push('Complète la frontline');
+      if (champById(e.champion_id)?.damage_type === 'AP') reasons.push('Apporte des dégâts magiques à une équipe surtout physique');
+      if (!reasons.length) reasons.push('Bonne synergie avec vos champions verrouillés');
+      return { champion_id: e.champion_id, score: Math.max(35, Math.round(58 + e.comfort * 36 - i * 6)), comfort: e.comfort, reasons: reasons.slice(0, 3) };
+    });
+    advice.push({ player_id: p.player_id, role, locked_champion_id: null, picks });
+  }
+  const banPool = ['Zed', 'Darius', 'Jinx', 'Sejuani', 'Leona', 'Veigar', 'Kaisa', 'Thresh'];
+  const allUsed = new Set([...used, ...lockedAlly, ...input.ally.map((s) => s.champion_id).filter((c): c is string => !!c)]);
+  const bans = banPool.filter((c) => !allUsed.has(c)).slice(0, 3).map((c, i) => ({
+    champion_id: c,
+    why: [
+      `${champName(c)} est très présent en haut elo ce patch (52 % de victoires)`,
+      `Contre les champions principaux de Lucas`,
+      `Punit le manque de mobilité de votre bot lane`,
+    ][i],
+  }));
+  const enemy = enemyIds.length
+    ? {
+        identity: 'Composition de pick et de duel : ils veulent attraper un carry isolé puis se battre en 1 contre 1.',
+        themes: ['pick', 'early'],
+        strengths: ['Très fort en début de partie', 'Engage fiable avec Leona', 'Beaucoup de menace en duel'],
+        weaknesses: ['Peu de dégâts magiques : l’armure est rentable', 'Peu de contrôle de zone en combat d’équipe', 'Faible en fin de partie'],
+        win_conditions: ['Prendre l’avantage avant 15 minutes', 'Attraper un carry isolé avant les objectifs'],
+        threats: enemyIds.slice(0, 3).map((c, i) => ({
+          champion_id: c,
+          danger: 3 - i,
+          why: i === 0 ? `${champName(c)} peut éliminer un carry en un combo.` : `${champName(c)} gagne la plupart de ses duels.`,
+          how_to_handle: i === 0 ? 'Acheter un Sablier de Zhonya et rester groupé.' : 'Ne pas l’affronter seul, jouer en surnombre.',
+        })),
+        damage_profile: { AD: 0.75, AP: 0.25 },
+      }
+    : null;
+  return { players: advice, bans, enemy };
+}
+
 function notFound(what: string): never {
   throw new ApiError(`${what} introuvable.`, 404);
 }
@@ -426,6 +595,18 @@ export async function mockRequest(method: string, path: string, body?: unknown):
     case 'DELETE /compositions/saved/:id':
       saved = saved.filter((s) => s.id !== c);
       return undefined;
+
+    case 'GET /drafts/:id': return drafts.has(b) ? clone(drafts.get(b)!) : null;
+    case 'PUT /drafts/:id': {
+      const doc = { ...clone(body as DraftState), id: b };
+      drafts.set(b, doc);
+      return clone(doc);
+    }
+    case 'POST /live-draft': return mockLive((body as { players: string[] }).players);
+    case 'POST /draft/:id': {
+      if (b !== 'detect') break;
+      return mockDetect((body as { friends: { player_id: string }[] }).friends);
+    }
   }
   throw new ApiError(`Route mock inconnue : ${method} ${path}`, 404);
 }

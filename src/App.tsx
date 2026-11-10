@@ -6,6 +6,7 @@ import { PlayerPage } from './pages/PlayerPage';
 import { CompositionsPage } from './pages/CompositionsPage';
 import { MatchupPage } from './pages/MatchupPage';
 import { SavedPage } from './pages/SavedPage';
+import { DraftPage } from './pages/DraftPage';
 import { EmptyState } from './components/ui';
 import { PasswordGate } from './components/PasswordGate';
 
@@ -71,6 +72,7 @@ export function App() {
           <Route path="/compositions" element={<CompositionsPage />} />
           <Route path="/matchup" element={<MatchupPage />} />
           <Route path="/saved" element={<SavedPage />} />
+          <Route path="/draft/:kind/:id" element={<DraftPage />} />
           <Route
             path="*"
             element={<EmptyState title="Page introuvable" action={<Link className="btn btn--primary" to="/">Retour à l’équipe</Link>} />}

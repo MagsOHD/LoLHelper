@@ -166,6 +166,13 @@ expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), "{\"a\":\"\xC3\x28\"}"), 
 $big = '{"x":"' . str_repeat('a', 262144) . '"}';
 expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), $big), 413, 'oversized body -> 413');
 expect(req('POST', api($A, 'r=store/teams/x1'), auth(), '{}'), 405, 'POST doc -> 405');
+expect(req('PUT', api($A, 'r=store/drafts/team-abc'), auth(), '{"phase":"pick","ally":[]}'), 200, 'PUT draft');
+$r = req('GET', api($A, 'r=store/drafts/team-abc'), auth());
+expect($r, 200, 'GET single doc -> 200');
+check(($r['json']['id'] ?? null) === 'team-abc' && ($r['json']['phase'] ?? null) === 'pick', 'GET single doc returns the stored doc');
+expect(req('GET', api($A, 'r=store/drafts/team-missing'), auth()), 404, 'GET missing doc -> 404');
+expect(req('GET', api($A, 'r=store/drafts/team-abc')), 401, 'GET single doc needs the password');
+expect(req('DELETE', api($A, 'r=store/drafts/team-abc'), auth()), 204, 'cleanup draft');
 expect(req('PUT', api($A, 'r=store/teams'), auth(), '{}'), 405, 'PUT collection -> 405');
 expect(req('DELETE', api($A, 'r=store/teams'), auth()), 405, 'DELETE collection -> 405');
 check(isset(req('POST', api($A, 'r=store/teams/x1'), auth(), '{}')['headers']['allow']), '405 has Allow header');

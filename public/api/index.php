@@ -89,7 +89,7 @@ function handle_request(string $apiDir): void
         if (count($parts) === 3 && !DocumentStore::isValidId($parts[2])) {
             throw new HttpError(400, 'Identifiant invalide (1 à 64 caractères A-Z, a-z, 0-9 ou -).');
         }
-        require_method(count($parts) === 2 ? ['GET'] : ['PUT', 'DELETE']);
+        require_method(count($parts) === 2 ? ['GET'] : ['GET', 'PUT', 'DELETE']);
         $dataDir = resolve_data_dir($config, $apiDir);
         if ($dataDir === null) {
             throw new HttpError(500, 'Stockage indisponible sur le serveur.');
@@ -100,6 +100,14 @@ function handle_request(string $apiDir): void
             return;
         }
         $id = $parts[2];
+        if ($method === 'GET') {
+            $doc = $store->get($collection, $id);
+            if ($doc === null) {
+                throw new HttpError(404, 'Document introuvable.');
+            }
+            send_json(200, $doc);
+            return;
+        }
         if ($method === 'PUT') {
             $doc = read_json_object();
             send_json(200, $store->put($collection, $id, $doc));

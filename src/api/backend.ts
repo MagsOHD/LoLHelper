@@ -119,11 +119,37 @@ export async function backendRequest<T>(
 
 // ---- document store -------------------------------------------------------------------------
 
-export type Collection = 'players' | 'teams' | 'saved';
+export type Collection = 'players' | 'teams' | 'saved' | 'drafts';
+
+/** Set once the server answered 405 to GET store/<collection>/<id> (single-document read not deployed). */
+let singleGetUnsupported = false;
+
+/** Tests only. */
+export function resetStoreForTests(): void {
+  singleGetUnsupported = false;
+}
 
 export const store = {
   list<T>(collection: Collection): Promise<T[]> {
     return backendRequest<T[]>('GET', `store/${collection}`).then((d) => (Array.isArray(d) ? d : []));
+  },
+  /**
+   * One document, null when it does not exist. Uses GET store/<c>/<id> when the server supports it,
+   * else (405) falls back to listing the collection — remembered for the rest of the session.
+   */
+  async get<T extends { id: string }>(collection: Collection, id: string): Promise<T | null> {
+    if (!singleGetUnsupported) {
+      try {
+        const doc = await backendRequest<T | null>('GET', `store/${collection}/${id}`);
+        return doc && typeof doc === 'object' ? doc : null;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        if (!(err instanceof ApiError) || err.status !== 405) throw err;
+        singleGetUnsupported = true;
+      }
+    }
+    const docs = await store.list<T>(collection);
+    return docs.find((d) => d && d.id === id) ?? null;
   },
   put<T extends { id: string }>(collection: Collection, doc: T): Promise<T> {
     return backendRequest<T>('PUT', `store/${collection}/${doc.id}`, { body: doc });
