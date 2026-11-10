@@ -129,7 +129,34 @@ utilisent le même dossier de données.
 | Pas de ligne « Méta » en bas de page après une journée | Tâche planifiée absente ou désactivée, ou clé Riot manquante/expirée (voir les journaux de la tâche dans l'espace OVH) |
 | Les journaux indiquent « clé invalide » | Clé de développement expirée : passez à une Personal API Key |
 
-## 8. Mettre à jour et sauvegarder
+## 8. Draft en direct et programme compagnon
+
+Le bouton **Draft** d'un joueur ou d'une équipe (page Équipe) ouvre la draft en direct :
+picks et bans saisis par n'importe quel ami sont partagés, et l'appli conseille 3 à 5 champions
+à chaque ami qui n'a pas encore pické, des bans, et lit les forces et faiblesses de l'équipe adverse.
+Rien à configurer côté OVH : ça fonctionne dès l'envoi du site (étape 4).
+
+Pour remplir la draft automatiquement, chaque ami peut lancer sur son PC Windows le
+**programme compagnon** (lecture seule du client League, rien à installer) :
+
+1. Sur la page Draft, section « Programme compagnon (Windows) », téléchargez
+   `Lancer-LoLHelper-Draft.bat` et `lolhelper-draft.ps1` dans un même dossier
+   (ils sont aussi dans le dépôt, dossier `companion/`, avec un mode d'emploi détaillé).
+2. Double-cliquez sur `Lancer-LoLHelper-Draft.bat`. Au premier lancement, indiquez l'adresse du
+   site (`https://votre-domaine/lolhelper`) et le mot de passe partagé.
+3. Laissez la fenêtre ouverte pendant vos parties : pendant la sélection des champions, la page
+   Draft se remplit toute seule (badge « Client »).
+
+Le compte League du PC doit correspondre à un joueur déjà ajouté sur le site (même Riot ID)
+et synchronisé avec la clé Riot (un joueur créé en mode manuel, sans clé, n'est pas reconnu).
+Le programme n'envoie que les champions et les rôles ; l'identité des adversaires n'est jamais
+lue ni envoyée (Riot la masque pendant la draft). Une fois la partie lancée, le bouton
+« Détecter la partie » de la page Draft récupère l'équipe adverse via l'API Riot officielle.
+
+Le mot de passe du site ne doit pas contenir d'accents ni de caractères spéciaux hors ASCII
+(limite des en-têtes HTTP utilisés par le programme compagnon).
+
+## 9. Mettre à jour et sauvegarder
 
 - **Mise à jour** : `npm run build`, puis renvoyez le contenu de `dist/` dans
   `www/lolhelper/` en écrasant les anciens fichiers (FileZilla demande : *Écraser*).

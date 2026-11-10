@@ -24,6 +24,10 @@ PHP garde la clé Riot et stocke les données partagées.
 - **Historique et méta** : la forme récente de chacun (20 dernières parties), les duels de lane
   déjà joués, les champions qui ont bien marché quand vous jouiez ensemble, et la méta du patch
   (parties Challenger/Grandmaster collectées automatiquement) influencent les compos et les matchups.
+- **Draft en direct** : depuis un joueur ou une équipe, saisie partagée des picks et bans,
+  3 à 5 champions conseillés par ami, bans conseillés et lecture des forces/faiblesses adverses.
+  Remplissage automatique avec le programme compagnon Windows (`companion/`), détection de la
+  partie lancée via l'API Riot.
 - **Plan de jeu**, **Matchup** et **compositions sauvegardées**.
 - Accès protégé par un mot de passe partagé, utilisable sur téléphone.
 
@@ -56,6 +60,7 @@ npm install
 npm test                    # moteur (comparé aux résultats de référence) + couche de données
 npm run typecheck
 bash php-tests/run.sh       # API PHP (avec un faux serveur Riot)
+bash companion/tests/run.sh # programme compagnon (nécessite PowerShell 7, pwsh)
 ```
 
 ## Organisation
@@ -66,6 +71,7 @@ bash php-tests/run.sh       # API PHP (avec un faux serveur Riot)
   navigateur avec respect des limites de requêtes, Data Dragon).
 - `src/pages/`, `src/components/` : interface React.
 - `public/api/` : API PHP (stockage JSON + relais Riot), copiée telle quelle dans `dist/`.
+- `companion/` : programme compagnon Windows (PowerShell) pour la draft en direct, avec ses tests.
 
 Les données de jeu (rôles, traits, conseils) sont maintenues à la main dans
 `champions_meta.json` : un nouveau champion reçoit des valeurs par défaut tirées de
