@@ -343,3 +343,97 @@ export interface SavedComposition extends SaveCompositionBody {
   id: string;
   created_at: string;
 }
+
+// ---- Live draft ----
+
+export type DraftSource = 'manual' | 'companion' | 'spectator';
+export type DraftPhase = 'planning' | 'ban' | 'pick' | 'finalization' | 'in_game' | 'ended';
+
+/** One ally slot: a friend (player_id) or an unknown teammate (null). `locked` false = hover/intent. */
+export interface DraftAllySlot {
+  player_id?: string | null;
+  champion_id?: string | null;
+  role?: Role | null;
+  locked: boolean;
+}
+
+export interface DraftEnemySlot {
+  champion_id?: string | null;
+  role?: Role | null;
+  locked: boolean;
+}
+
+/** Known only once the game has started (spectator API): enemy accounts are hidden during ranked draft. */
+export interface DraftEnemyAccount {
+  puuid: string;
+  riot_id?: string | null;
+  champion_id: string;
+  role?: Role | null;
+  rank?: Rank | null;
+  /** Mastery on the champion they play (null when unknown). */
+  champion_mastery?: MasteryEntry | null;
+  /** Their top masteries, used to spot one-tricks / comfort picks. */
+  masteries?: MasteryEntry[];
+}
+
+/** Shared draft document (PHP store collection "drafts", id "team-<teamId>" or "player-<playerId>"). */
+export interface DraftState {
+  id: string;
+  team_id?: string | null;
+  player_ids: string[];
+  source: DraftSource;
+  phase: DraftPhase;
+  side?: 'blue' | 'red' | null;
+  ally_bans: string[];
+  enemy_bans: string[];
+  ally: DraftAllySlot[]; // up to 5
+  enemy: DraftEnemySlot[]; // up to 5
+  enemy_accounts?: DraftEnemyAccount[];
+  game_id?: number | null;
+  updated_at: string;
+}
+
+/** What the engine needs from a draft (roles may be missing: the engine guesses them). */
+export interface DraftInput {
+  ally: DraftAllySlot[];
+  enemy: DraftEnemySlot[];
+  bans: string[]; // both sides
+  enemy_accounts?: DraftEnemyAccount[];
+}
+
+export interface PickRecommendation {
+  champion_id: string;
+  score: number; // 0..100
+  comfort: number; // 0..1
+  reasons: string[]; // short French sentences
+}
+
+export interface PlayerPickAdvice {
+  player_id: string;
+  role: Role | null;
+  /** Already locked champion (no recommendations needed) */
+  locked_champion_id?: string | null;
+  picks: PickRecommendation[]; // 3..5, best first
+}
+
+export interface BanAdvice {
+  champion_id: string;
+  why: string;
+}
+
+/** Enemy team read from a partial draft: strengths, weaknesses, threats. */
+export interface EnemyDraftAnalysis {
+  identity: string;
+  themes: string[];
+  strengths: string[];
+  weaknesses: string[];
+  win_conditions: string[];
+  threats: ThreatInfo[];
+  damage_profile: Partial<Record<DamageType, number>>;
+}
+
+export interface DraftAdvice {
+  players: PlayerPickAdvice[];
+  bans: BanAdvice[];
+  enemy: EnemyDraftAnalysis | null; // null when no enemy pick yet
+}

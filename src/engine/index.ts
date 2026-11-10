@@ -3,6 +3,8 @@
 import type {
   ArchetypeInfo,
   CompositionSuggestion,
+  DraftAdvice,
+  DraftInput,
   EngineContext,
   GamePlan,
   GenerationOptions,
@@ -114,4 +116,18 @@ export function buildMatchupPlan(
   context: EngineContext = {},
 ): MatchupPlan {
   return elideAll(buildMatchupPlanRaw(ally, enemy, asCatalog(catalog), context));
+}
+
+/**
+ * CONTRACT (live draft): per-player pick advice for friends who have not locked yet, ban advice and
+ * an analysis of the enemy team from the picks known so far. Implemented by the engine agent.
+ */
+export function recommendDraft(
+  players: PlayerInput[],
+  draft: DraftInput,
+  catalog: ChampionCatalog,
+  context: EngineContext = {},
+): DraftAdvice {
+  void [players, draft, catalog, context];
+  return { players: [], bans: [], enemy: null };
 }
