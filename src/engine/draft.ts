@@ -1378,10 +1378,14 @@ export function recommendDraftRaw(
   });
 
   const predictions: EnemyRolePrediction[] = [];
+  // Without collected meta, a role's prediction is only the curated role list (near-uniform, alphabetical
+  // ties): show it only when a known enemy player's pool backs it.
+  const metaBacked = metaUsable(context.meta);
   if (live) {
     for (const r of openEnemy) {
       const list = preds.get(r) ?? [];
       if (!list.length) continue;
+      if (!metaBacked && !list.some((c) => c.player_puuid)) continue;
       predictions.push({
         role: r,
         candidates: list.slice(0, PRED_SHOW).map((c) => ({

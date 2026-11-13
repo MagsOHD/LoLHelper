@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, errorMessage, MOCK_MODE } from '../api/client';
-import { draftDocId, emptyDraft, usedChampions, MAX_BANS, type DraftKind } from '../api/draft';
-import { useDraftAdvice, useDraftEngine, useDraftSession } from '../api/draftHooks';
+import { activeEnemyProfiles, draftDocId, emptyDraft, scoutedProfiles, usedChampions, MAX_BANS, type DraftKind } from '../api/draft';
+import { useDraftAdvice, useDraftEngine, useDraftSession, useEnemyProfiles } from '../api/draftHooks';
 import type { DraftSnapshot } from '../api/draftSession';
 import { useMeta, usePlayers, useTeams } from '../api/hooks';
 import { mergeDetectedGame, NO_ACTIVE_GAME, type DetectFriend } from '../api/spectator';
@@ -10,6 +10,7 @@ import type { DraftAllySlot, DraftEnemySlot, DraftPhase, DraftState, Player } fr
 import { CompanionHelp } from '../components/draft/CompanionHelp';
 import { BanAdviceCard, EnemyAnalysisCard, PickAdviceCard } from '../components/draft/DraftAdvice';
 import { DraftBoard } from '../components/draft/DraftBoard';
+import { EnemyPlayersCard, PickOrderCard, PredictionsCard, RiotProgress, ScoutingPanel } from '../components/draft/EnemyIntel';
 import { InGamePanel } from '../components/draft/InGamePanel';
 import { EmptyState, ErrorMessage, Skeleton, Spinner } from '../components/ui';
 
@@ -58,6 +59,10 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
   draftRef.current = draft;
 
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  // Enemy profiles: same server as the draft's friends (Riot IDs can be looked up elsewhere when scouting).
+  const canFetchProfiles = MOCK_MODE || Boolean(meta.data?.riot_configured);
+  const platform = initial.player_ids.map((id) => byId.get(id)?.platform).find(Boolean) ?? meta.data?.platform ?? 'euw1';
+  const enemyProfiles = useEnemyProfiles(session, draft, platform, canFetchProfiles);
   // Friends selectable in a slot: the draft's friends, plus anyone already placed (companion match).
   const friends = useMemo(() => {
     const ids = new Set([...initial.player_ids, ...(draft?.ally.map((s) => s.player_id).filter((x): x is string => !!x) ?? [])]);
@@ -108,9 +113,9 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
 
   const reset = () => {
     if (!session || !draft) return;
-    if (!window.confirm('Réinitialiser la draft pour toute l’équipe ?')) return;
+    if (!window.confirm('Réinitialiser la draft pour toute l’équipe ? (les adversaires repérés sont conservés)')) return;
     const fresh = emptyDraft(draft.id, initial.player_ids, initial.team_id ?? null);
-    session.replace(fresh);
+    session.replace({ ...fresh, enemy_profiles: scoutedProfiles(draft) });
     setDetect({ busy: false, msg: null, error: null });
   };
 
@@ -166,6 +171,8 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
     .sort((a, b) => draft.ally.findIndex((s) => s.player_id === a.player_id) - draft.ally.findIndex((s) => s.player_id === b.player_id));
   const toPick = friendAdvice.filter((a) => !a.locked_champion_id);
   const bansOpen = draft.ally_bans.length < MAX_BANS && (draft.phase === 'planning' || draft.phase === 'ban' || !draft.ally.some((s) => s.locked));
+  const active = activeEnemyProfiles(draft);
+  const scouted = scoutedProfiles(draft);
 
   return (
     <div className="page draft-page">
@@ -190,6 +197,7 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
         <span className="chip chip--muted">{PHASE_LABEL[draft.phase]}</span>
         {draft.side && <span className={`chip chip--muted side side--${draft.side}`}>Côté {draft.side === 'blue' ? 'bleu' : 'rouge'}</span>}
         <SaveState snap={snap} />
+        <RiotProgress statuses={enemyProfiles.statuses} />
       </div>
       {snap.loadError && <ErrorMessage error={`Draft partagée indisponible (${snap.loadError}) : la saisie reste possible sur cet appareil.`} />}
       {detect.error && <ErrorMessage error={detect.error} />}
@@ -198,23 +206,36 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
         <p className="hint">Les cases marquées <span className="dslot__client">Client</span> (numéros adverses cerclés) sont remplies par le programme compagnon : une modification à la main y sera remplacée à sa prochaine mise à jour.</p>
       )}
 
-      {inGame && <InGamePanel draft={draft} />}
+      {inGame && <InGamePanel draft={draft} profiles={active} statuses={enemyProfiles.statuses} />}
 
       <div className={`draft-layout ${inGame ? 'draft-layout--ingame' : ''}`}>
-        <DraftBoard
-          ally={draft.ally}
-          enemy={draft.enemy}
-          allyBans={draft.ally_bans}
-          enemyBans={draft.enemy_bans}
-          friends={friends}
-          exclude={exclude}
-          coverage={snap.liveFresh ? snap.coverage : null}
-          h={h}
-          onAlly={setAlly}
-          onAllyPlayer={setAllyPlayer}
-          onEnemy={setEnemy}
-          onBans={setBans}
-        />
+        <div className="draft-main">
+          <DraftBoard
+            ally={draft.ally}
+            enemy={draft.enemy}
+            allyBans={draft.ally_bans}
+            enemyBans={draft.enemy_bans}
+            friends={friends}
+            exclude={exclude}
+            coverage={snap.liveFresh ? snap.coverage : null}
+            h={h}
+            onAlly={setAlly}
+            onAllyPlayer={setAllyPlayer}
+            onEnemy={setEnemy}
+            onBans={setBans}
+          />
+          {!inGame && <ScoutingPanel
+            profiles={scouted}
+            statuses={enemyProfiles.statuses}
+            insights={advice?.enemy_players ?? []}
+            platforms={meta.data?.platforms ?? [platform]}
+            defaultPlatform={platform}
+            enabled={canFetchProfiles}
+            onScout={enemyProfiles.scout}
+            onRemove={enemyProfiles.removeScouted}
+            onRetry={enemyProfiles.retry}
+          />}
+        </div>
 
         <section className="draft-advice" aria-labelledby="draft-advice-title">
           <h2 id="draft-advice-title">Conseils</h2>
@@ -223,6 +244,7 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
           {adviceError && <ErrorMessage error={adviceError} />}
           {advice && (
             <>
+              {!inGame && <PickOrderCard items={advice.pick_order ?? []} />}
               {!inGame && (friendAdvice.length === 0 ? (
                 <EmptyState title="Aucun ami à conseiller" icon="✦">
                   Attribue une case à un ami (menu « Coéquipier ») pour recevoir des propositions de champions.
@@ -241,6 +263,8 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
                 </div>
               ))}
               {!inGame && bansOpen && <BanAdviceCard bans={advice.bans} canBan={draft.ally_bans.length < MAX_BANS} onBan={(cid) => setBans('ally', [...draft.ally_bans, cid])} />}
+              {!inGame && <PredictionsCard predictions={advice.predictions ?? []} profiles={active} />}
+              {!inGame && <EnemyPlayersCard insights={advice.enemy_players ?? []} profiles={active} />}
               <EnemyAnalysisCard analysis={advice.enemy} />
             </>
           )}

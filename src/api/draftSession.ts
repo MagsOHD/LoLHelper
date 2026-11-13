@@ -186,15 +186,20 @@ export class DraftSession {
     this.held.delete(path);
   }
 
-  /** Local manual edit of the given paths. */
-  edit(paths: DraftPath[], fn: (d: DraftState) => DraftState): void {
+  /**
+   * Local edit of the given paths. A manual draft edit switches the source to "manual"; `data: true`
+   * marks data added alongside the draft (enemy profiles) which leaves source and phase alone.
+   */
+  edit(paths: DraftPath[], fn: (d: DraftState) => DraftState, options: { data?: boolean } = {}): void {
     const prev = this.snap.draft;
     let next = fn(prev);
     if (next === prev) return;
     const seq = ++this.editSeq;
     for (const p of paths) this.dirty.set(p, seq);
-    if (!this.snap.liveFresh && next.source !== 'spectator') next = { ...next, source: 'manual' };
-    if (next.source === 'manual') next = { ...next, phase: inferPhase(next) };
+    if (!options.data) {
+      if (!this.snap.liveFresh && next.source !== 'spectator') next = { ...next, source: 'manual' };
+      if (next.source === 'manual') next = { ...next, phase: inferPhase(next) };
+    }
     this.set({ draft: { ...next, updated_at: nowIso(this.now()) } });
     this.scheduleSave(this.o.saveDelayMs);
   }
@@ -202,7 +207,7 @@ export class DraftSession {
   /** Whole-document replacement (reset, detected game): saved right away. */
   replace(next: DraftState): void {
     const seq = ++this.editSeq;
-    for (const p of ['ally_bans', 'enemy_bans', ...[0, 1, 2, 3, 4].flatMap((i) => [`ally.${i}`, `enemy.${i}`])]) this.dirty.set(p, seq);
+    for (const p of ['ally_bans', 'enemy_bans', 'enemy_profiles', ...[0, 1, 2, 3, 4].flatMap((i) => [`ally.${i}`, `enemy.${i}`])]) this.dirty.set(p, seq);
     this.set({ draft: { ...next, updated_at: nowIso(this.now()) } });
     this.scheduleSave(0);
   }

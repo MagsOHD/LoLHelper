@@ -8,12 +8,18 @@ import type {
   DraftPhase,
   DraftSource,
   DraftState,
+  EnemyPlayerProfile,
+  EnemyProfileSource,
+  MasteryEntry,
+  PlaystyleStats,
   Player,
   PlayerInput,
+  Rank,
   Role,
 } from './types';
 import { ROLES } from './types';
 import { backendRequest, store } from './backend';
+import { compactRecent, PROFILE_MASTERY_COUNT } from './enemyProfile';
 
 export const DRAFT_SIZE = 5;
 export const MAX_BANS = 5;
@@ -33,6 +39,8 @@ export interface CompanionAllyCell {
 
 export interface CompanionEnemyCell {
   cell: number;
+  /** Only when the client itself shows the enemy (Clash, tournament, custom game); "" otherwise. */
+  puuid?: string;
   champion_key: number;
 }
 
@@ -79,6 +87,12 @@ const asArray = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const int = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : 0);
 const unique = <T>(xs: T[]): T[] => Array.from(new Set(xs));
 const isRole = (r: unknown): r is Role => typeof r === 'string' && (ROLES as string[]).includes(r);
+
+/** Riot puuids are 78 base64url characters; anything else (or "") = identity unknown. */
+const PUUID_RE = /^[A-Za-z0-9_-]{1,100}$/;
+export function validPuuid(v: unknown): string | null {
+  return typeof v === 'string' && PUUID_RE.test(v) ? v : null;
+}
 
 const POSITION_ROLE: Record<string, Role> = {
   top: 'TOP',
@@ -163,7 +177,13 @@ export function mapCompanionPayload(payload: CompanionPayload & { player_id?: st
     .sort((a, b) => int(a.cell) - int(b.cell)).slice(0, DRAFT_SIZE);
   const enemy: DraftEnemySlot[] = theirTeam.map((e) => {
     const id = champ(e.champion_key);
-    return { champion_id: id, role: null, locked: Boolean(id) && (hasPickActions ? completedPick(int(e.cell)) : true) };
+    const puuid = validPuuid(e.puuid);
+    return {
+      champion_id: id,
+      role: null,
+      locked: Boolean(id) && (hasPickActions ? completedPick(int(e.cell)) : true),
+      ...(puuid ? { puuid } : {}),
+    };
   });
 
   const bans = isObject(payload.bans) ? payload.bans : { mine: [], theirs: [] };
@@ -229,6 +249,7 @@ export function emptyDraft(id: string, playerIds: string[], teamId: string | nul
     ally: Array.from({ length: DRAFT_SIZE }, (_, i) => ({ ...emptyAlly(), player_id: ids[i] ?? null })),
     enemy: Array.from({ length: DRAFT_SIZE }, emptyEnemy),
     enemy_accounts: [],
+    enemy_profiles: [],
     game_id: null,
     updated_at: nowIso(now),
   };
@@ -248,11 +269,15 @@ export function normalizeDraft(raw: unknown, fallback: DraftState): DraftState {
     locked: isObject(s) && s.locked === true,
   }));
   while (ally.length < DRAFT_SIZE) ally.push(emptyAlly());
-  const enemy: DraftEnemySlot[] = asArray<Record<string, unknown>>(raw.enemy).slice(0, DRAFT_SIZE).map((s) => ({
-    champion_id: isObject(s) ? str(s.champion_id) : null,
-    role: isObject(s) && isRole(s.role) ? s.role : null,
-    locked: isObject(s) && s.locked === true,
-  }));
+  const enemy: DraftEnemySlot[] = asArray<Record<string, unknown>>(raw.enemy).slice(0, DRAFT_SIZE).map((s) => {
+    const puuid = isObject(s) ? validPuuid(s.puuid) : null;
+    return {
+      champion_id: isObject(s) ? str(s.champion_id) : null,
+      role: isObject(s) && isRole(s.role) ? s.role : null,
+      locked: isObject(s) && s.locked === true,
+      ...(puuid ? { puuid } : {}),
+    };
+  });
   while (enemy.length < DRAFT_SIZE) enemy.push(emptyEnemy());
   const bans = (v: unknown) => unique(asArray<unknown>(v).map(str).filter((c): c is string => !!c)).slice(0, MAX_BANS);
   return {
@@ -267,6 +292,7 @@ export function normalizeDraft(raw: unknown, fallback: DraftState): DraftState {
     ally,
     enemy,
     enemy_accounts: asArray(raw.enemy_accounts),
+    enemy_profiles: normalizeProfiles(raw.enemy_profiles),
     game_id: typeof raw.game_id === 'number' ? raw.game_id : null,
     updated_at: str(raw.updated_at) ?? fallback.updated_at,
   };
@@ -301,12 +327,16 @@ export function usedChampions(d: DraftState): string[] {
 }
 
 export function toDraftInput(d: DraftState): DraftInput {
+  const profiles = activeEnemyProfiles(d);
   return {
     ally: d.ally,
     enemy: d.enemy,
     bans: unique([...d.ally_bans, ...d.enemy_bans]),
     // Enemy accounts are only known (and only used) once the game has started.
     ...(d.phase === 'in_game' && d.enemy_accounts?.length ? { enemy_accounts: d.enemy_accounts } : {}),
+    ...(profiles.length ? { enemy_profiles: profiles } : {}),
+    side: d.side ?? null,
+    phase: d.phase,
   };
 }
 
@@ -328,7 +358,7 @@ export function playerToInput(p: Player): PlayerInput {
 
 // ---- field paths (protect what the local user is editing) ------------------------------------
 
-/** "ally.<i>", "enemy.<i>", "ally_bans", "enemy_bans". */
+/** "ally.<i>", "enemy.<i>", "ally_bans", "enemy_bans", "enemy_profiles". */
 export type DraftPath = string;
 
 export function copyPath(from: DraftState, to: DraftState, path: DraftPath): DraftState {
@@ -346,6 +376,7 @@ export function copyPath(from: DraftState, to: DraftState, path: DraftPath): Dra
     return { ...to, enemy };
   }
   if (field === 'ally_bans' || field === 'enemy_bans') return { ...to, [field]: [...from[field]] };
+  if (field === 'enemy_profiles') return { ...to, enemy_profiles: [...(from.enemy_profiles ?? [])] };
   return to;
 }
 
@@ -383,7 +414,8 @@ export function mergeCompanion(base: DraftState, live: LiveMapping, held: Iterab
   const enemy = base.enemy.map((b, i) => {
     const c = live.enemy[i];
     if (!c || heldSet.has(`enemy.${i}`)) return b;
-    return { champion_id: c.champion_id ?? null, role: c.champion_id && c.champion_id === b.champion_id ? b.role ?? null : null, locked: c.locked };
+    const role = c.champion_id && c.champion_id === b.champion_id ? b.role ?? null : null;
+    return { champion_id: c.champion_id ?? null, role, locked: c.locked, ...(c.puuid ? { puuid: c.puuid } : {}) };
   });
   return {
     ...base,
@@ -398,6 +430,177 @@ export function mergeCompanion(base: DraftState, live: LiveMapping, held: Iterab
     enemy_accounts: [],
     game_id: null,
   };
+}
+
+// ---- enemy profiles in the shared document -------------------------------------------------
+
+/** Scouting entries per draft (one enemy team). */
+export const MAX_SCOUTED = DRAFT_SIZE;
+/** Profiles kept in the document: 5 scouted + 5 from the client / the started game. */
+export const MAX_ENEMY_PROFILES = 2 * DRAFT_SIZE;
+const PROFILE_SOURCES: EnemyProfileSource[] = ['scouting', 'client', 'game'];
+const SOURCE_RANK: Record<EnemyProfileSource, number> = { scouting: 0, client: 1, game: 2 };
+const MAX_RIOT_ID = 64;
+
+const finite = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+const r2 = (x: number) => Math.round(x * 100) / 100;
+
+function normalizeRank(v: unknown): Rank | null {
+  if (!isObject(v) || typeof v.tier !== 'string' || !v.tier) return null;
+  return {
+    queue: str(v.queue) ?? 'RANKED_SOLO_5x5',
+    tier: v.tier,
+    division: typeof v.division === 'string' ? v.division : '',
+    lp: Math.trunc(finite(v.lp)),
+    wins: Math.trunc(finite(v.wins)),
+    losses: Math.trunc(finite(v.losses)),
+  };
+}
+
+function normalizeStyle(v: unknown): PlaystyleStats | null {
+  if (!isObject(v) || !(finite(v.games) > 0)) return null;
+  const f = (k: string) => r2(finite(v[k]));
+  return {
+    games: Math.trunc(finite(v.games)),
+    wins: Math.trunc(finite(v.wins)),
+    kills: f('kills'),
+    deaths: f('deaths'),
+    assists: f('assists'),
+    cs_per_min: f('cs_per_min'),
+    vision_per_min: f('vision_per_min'),
+    damage_per_min: f('damage_per_min'),
+    kill_participation: f('kill_participation'),
+    solo_kills: f('solo_kills'),
+    first_blood_rate: f('first_blood_rate'),
+    early_lead: typeof v.early_lead === 'number' && Number.isFinite(v.early_lead) ? r2(v.early_lead) : null,
+    turret_takedowns: f('turret_takedowns'),
+    avg_game_minutes: f('avg_game_minutes'),
+  };
+}
+
+/** Store value -> compact, well-formed profile (null when unusable). Caps: 20 masteries, 15 champions, no history lists. */
+export function normalizeProfile(raw: unknown): EnemyPlayerProfile | null {
+  if (!isObject(raw)) return null;
+  const puuid = validPuuid(raw.puuid);
+  if (!puuid) return null;
+  const masteries: MasteryEntry[] = asArray<unknown>(raw.masteries)
+    .filter(isObject)
+    .filter((m) => typeof m.champion_id === 'string' && m.champion_id)
+    .slice(0, PROFILE_MASTERY_COUNT)
+    .map((m) => ({
+      champion_id: m.champion_id as string,
+      level: Math.trunc(finite(m.level)),
+      points: Math.trunc(finite(m.points)),
+      ...(typeof m.last_play_time === 'number' ? { last_play_time: m.last_play_time } : {}),
+    }));
+  const recentRaw = isObject(raw.recent) ? raw.recent : {};
+  const recent = compactRecent({
+    games: finite(recentRaw.games),
+    roles: isObject(recentRaw.roles) ? Object.fromEntries(Object.entries(recentRaw.roles).filter(([k]) => isRole(k))) : {},
+    champions: asArray<unknown>(recentRaw.champions)
+      .filter(isObject)
+      .filter((c) => typeof c.champion_id === 'string' && c.champion_id)
+      .map((c) => ({
+        champion_id: c.champion_id as string,
+        games: finite(c.games),
+        wins: finite(c.wins),
+        kills: finite(c.kills),
+        deaths: finite(c.deaths),
+        assists: finite(c.assists),
+        role: isRole(c.role) ? c.role : null,
+        last_played: typeof c.last_played === 'number' ? c.last_played : null,
+      })),
+  });
+  const riot = str(raw.riot_id);
+  return {
+    puuid,
+    riot_id: riot ? riot.slice(0, MAX_RIOT_ID) : null,
+    source: PROFILE_SOURCES.includes(raw.source as EnemyProfileSource) ? (raw.source as EnemyProfileSource) : 'scouting',
+    summoner_level: typeof raw.summoner_level === 'number' && Number.isFinite(raw.summoner_level) ? Math.trunc(raw.summoner_level) : null,
+    rank: normalizeRank(raw.rank),
+    masteries,
+    recent,
+    style: normalizeStyle(raw.style),
+    champion_id: str(raw.champion_id),
+    role: isRole(raw.role) ? raw.role : null,
+    fetched_at: str(raw.fetched_at) ?? '',
+  };
+}
+
+/** Keeps the document small: at most MAX_ENEMY_PROFILES, scouting first, then the most recent. */
+export function capProfiles(list: EnemyPlayerProfile[]): EnemyPlayerProfile[] {
+  if (list.length <= MAX_ENEMY_PROFILES) return list;
+  const keep = new Set(
+    [...list]
+      .sort((a, b) => SOURCE_RANK[a.source] - SOURCE_RANK[b.source] || (a.fetched_at < b.fetched_at ? 1 : a.fetched_at > b.fetched_at ? -1 : 0))
+      .slice(0, MAX_ENEMY_PROFILES),
+  );
+  return list.filter((p) => keep.has(p));
+}
+
+export function normalizeProfiles(raw: unknown): EnemyPlayerProfile[] {
+  const seen = new Set<string>();
+  const out: EnemyPlayerProfile[] = [];
+  for (const r of asArray<unknown>(raw)) {
+    const p = normalizeProfile(r);
+    if (!p || seen.has(p.puuid)) continue;
+    seen.add(p.puuid);
+    out.push(p);
+  }
+  return capProfiles(out);
+}
+
+/**
+ * Adds or refreshes a profile (same puuid = same player). The strongest source is kept (a scouted
+ * player stays in the scouting list once the client or the game reveals him), as is a known Riot ID.
+ */
+export function upsertProfile(list: EnemyPlayerProfile[] | undefined, incoming: EnemyPlayerProfile): EnemyPlayerProfile[] {
+  const p = normalizeProfile(incoming);
+  if (!p) return list ?? [];
+  const cur = list ?? [];
+  const i = cur.findIndex((x) => x.puuid === p.puuid);
+  if (i < 0) return capProfiles([...cur, p]);
+  const old = cur[i];
+  const merged: EnemyPlayerProfile = {
+    ...p,
+    source: SOURCE_RANK[old.source] <= SOURCE_RANK[p.source] ? old.source : p.source,
+    riot_id: old.riot_id ?? p.riot_id ?? null,
+  };
+  return cur.map((x, j) => (j === i ? merged : x));
+}
+
+export function removeProfile(list: EnemyPlayerProfile[] | undefined, puuid: string): EnemyPlayerProfile[] {
+  return (list ?? []).filter((p) => p.puuid !== puuid);
+}
+
+export function scoutedProfiles(d: DraftState): EnemyPlayerProfile[] {
+  return (d.enemy_profiles ?? []).filter((p) => p.source === 'scouting');
+}
+
+/**
+ * Profiles relevant now, with their current champion/role: scouted players always; client-revealed
+ * players while their puuid is in an enemy slot; started-game players while that game is shown.
+ * Nothing is ever inferred from an anonymous slot.
+ */
+export function activeEnemyProfiles(d: DraftState): EnemyPlayerProfile[] {
+  const slots = new Map<string, DraftEnemySlot>();
+  for (const s of d.enemy) if (s.puuid) slots.set(s.puuid, s);
+  const inGame = d.phase === 'in_game';
+  const accounts = new Map((inGame ? d.enemy_accounts ?? [] : []).filter((a) => a.puuid).map((a) => [a.puuid, a]));
+  const out: EnemyPlayerProfile[] = [];
+  for (const p of d.enemy_profiles ?? []) {
+    const slot = slots.get(p.puuid);
+    const acc = accounts.get(p.puuid);
+    if (p.source === 'client' && !slot && !acc) continue;
+    if (p.source === 'game' && !acc) continue;
+    out.push({
+      ...p,
+      riot_id: p.riot_id ?? acc?.riot_id ?? null,
+      champion_id: acc?.champion_id || slot?.champion_id || (p.source === 'scouting' ? null : p.champion_id ?? null),
+      role: acc?.role ?? slot?.role ?? (p.source === 'scouting' ? null : p.role ?? null),
+    });
+  }
+  return out;
 }
 
 // ---- I/O -----------------------------------------------------------------------------------

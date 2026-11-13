@@ -9,6 +9,7 @@ import type {
   DraftAdvice,
   DraftInput,
   DraftState,
+  EnemyPlayerProfile,
   PlayerInput,
   ChampionInfo,
   CompositionSuggestion,
@@ -34,6 +35,7 @@ import { fetchLiveDraft, loadDraft, saveDraft, type LiveDraft } from './draft';
 import { getCatalog } from './ddragon';
 import { getMetaStats } from './meta';
 import { detectActiveGame, type DetectedGame, type DetectFriend, type DetectOptions } from './spectator';
+import { buildEnemyProfile, type ProfileProgress, type ProfileRequest } from './enemyProfile';
 
 export { ApiError, AUTH_REQUIRED_EVENT, getPassword, setPassword } from './backend';
 
@@ -120,6 +122,11 @@ export const api = {
       ? mock('POST', '/draft/detect', { friends })
       : getCatalog().then(({ catalog }) => detectActiveGame(friends, catalog, options)).then((r) => r?.game ?? null),
   draftEngine: (): Promise<DraftEngine> => (MOCK_MODE ? mockDraftEngine() : realDraftEngine()),
+  /** One enemy profile (Riot calls through the shared limiter); use EnemyProfileService for dedupe/cache. */
+  enemyProfile: (req: ProfileRequest, onProgress?: (p: ProfileProgress) => void): Promise<EnemyPlayerProfile> =>
+    MOCK_MODE
+      ? import('./mock').then((m) => m.mockEnemyProfile(req, onProgress))
+      : getCatalog().then(({ catalog }) => buildEnemyProfile(req, catalog, { onProgress })).then((r) => r.profile),
 };
 
 export function errorMessage(err: unknown): string {

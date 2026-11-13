@@ -167,9 +167,14 @@ describe('v2 is off without the new data', () => {
 describe('predictions of enemy picks', () => {
   const theo = (): PlayerInput => friend('Theo', ['MID'], MID_POOL);
 
-  it('curated roles without meta: open roles only, ≤ 5 candidates playing the role, never banned / picked', () => {
+  it('without collected meta, no role prediction is shown (curated roles alone are not evidence)', () => {
     const d = draft([ally('Theo'), ally(null, 'Jinx', true)], [foe('Zed', 'MID')], ['Malphite', 'LeeSin'], { phase: 'pick' });
-    const res = recommendDraft([theo()], d, catalog);
+    expect(recommendDraft([theo()], d, catalog).predictions).toEqual([]);
+  });
+
+  it('with meta: open roles only, ≤ 5 candidates playing the role, never banned / picked', () => {
+    const d = draft([ally('Theo'), ally(null, 'Jinx', true)], [foe('Zed', 'MID')], ['Malphite', 'LeeSin'], { phase: 'pick' });
+    const res = recommendDraft([theo()], d, catalog, { meta: neutralMeta() });
     expect(res.predictions.map((p) => p.role)).toEqual(['TOP', 'JUNGLE', 'BOTTOM', 'SUPPORT']);
     for (const p of res.predictions) {
       expect(p.candidates.length).toBeGreaterThan(0);
@@ -185,7 +190,6 @@ describe('predictions of enemy picks', () => {
         if (i) expect(p.candidates[i - 1].likelihood).toBeGreaterThanOrEqual(c.likelihood);
       }
     }
-    expect(pred(res, 'TOP')!.candidates[0].why).toMatch(/^Champion habituel en Top/);
   });
 
   it('meta pick rate in the role drives the candidates, cited in the reason', () => {
@@ -445,12 +449,12 @@ describe('enemy player insights', () => {
 
 describe('which enemy slot a known player is on', () => {
   const run = (profiles: EnemyPlayerProfile[], enemy: DraftEnemySlot[]) =>
-    recommendDraft([], draft([ally(null)], enemy, [], { phase: 'pick', enemy_profiles: profiles }), catalog);
+    recommendDraft([], draft([ally(null)], enemy, [], { phase: 'pick', enemy_profiles: profiles }), catalog, { meta: neutralMeta() });
 
   it('a locked champion clearly in exactly one pool links that player (and its role)', () => {
     const sup = profile('p-sup', 'SUPPORT', [['Sett', 3, 60_000], ['Thresh', 5, 90_000]]);
     const mid = profile('p-mid', 'MID', [['Ahri', 6, 100_000]]);
-    const plain = recommendDraft([], draft([ally(null)], [foe('Sett')], [], { phase: 'pick' }), catalog);
+    const plain = recommendDraft([], draft([ally(null)], [foe('Sett')], [], { phase: 'pick' }), catalog, { meta: neutralMeta() });
     expect(plain.predictions.map((p) => p.role)).not.toContain('TOP'); // Sett guessed top without information
     const res = run([sup, mid], [foe('Sett')]);
     expect(res.enemy_players.find((p) => p.puuid === 'p-sup')).toMatchObject({ champion_id: 'Sett', role: 'SUPPORT' });

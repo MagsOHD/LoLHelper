@@ -125,7 +125,8 @@ export async function detectActiveGame(
     role: null,
     locked: true,
   }));
-  const enemy: DraftEnemySlot[] = enemies.map((p) => ({ champion_id: champ(p.championId), role: null, locked: true }));
+  // The game has started: enemy accounts are public now (spectator), the slot keeps their puuid.
+  const enemy: DraftEnemySlot[] = enemies.map((p) => ({ champion_id: champ(p.championId), role: null, locked: true, ...(p.puuid ? { puuid: p.puuid } : {}) }));
   const bans = (mine: boolean) =>
     Array.from(new Set((raw!.bannedChampions ?? [])
       .filter((b) => (b.teamId === ourTeam) === mine)

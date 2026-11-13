@@ -335,6 +335,8 @@ export interface EnemyPick {
 export interface MatchupBody {
   ally: Pick[];
   enemy: EnemyPick[];
+  /** Known enemy players (live draft / started game): per-enemy insights and attention points. */
+  enemy_profiles?: EnemyPlayerProfile[];
 }
 
 export interface SaveCompositionBody {
