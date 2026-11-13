@@ -155,6 +155,8 @@ export interface EngineContext {
   meta?: MetaStats | null;
   /** Players of the ally team (history used by the matchup plan). */
   players?: PlayerInput[];
+  /** Known enemy players (scouting, client-revealed or started game): adds per-enemy insights and attention points. */
+  enemy_profiles?: EnemyPlayerProfile[];
 }
 
 export interface GenerationOptions {
@@ -247,6 +249,10 @@ export interface MatchupPlan {
   lane_matchups: LaneMatchup[];
   objectives: string[];
   suggested_bans: string[];
+  /** Per enemy player, when their accounts are known (context.enemy_profiles). */
+  enemy_players?: EnemyPlayerInsight[];
+  /** Phase-by-phase points of attention (early/mid/late) from enemy profiles and the matchup. */
+  attention?: PhaseAttention[];
 }
 
 // ---- API-level shapes ----
@@ -329,6 +335,8 @@ export interface EnemyPick {
 export interface MatchupBody {
   ally: Pick[];
   enemy: EnemyPick[];
+  /** Known enemy players (live draft / started game): per-enemy insights and attention points. */
+  enemy_profiles?: EnemyPlayerProfile[];
 }
 
 export interface SaveCompositionBody {
@@ -342,4 +350,183 @@ export interface SaveCompositionBody {
 export interface SavedComposition extends SaveCompositionBody {
   id: string;
   created_at: string;
+}
+
+// ---- Live draft ----
+
+export type DraftSource = 'manual' | 'companion' | 'spectator';
+export type DraftPhase = 'planning' | 'ban' | 'pick' | 'finalization' | 'in_game' | 'ended';
+
+/** One ally slot: a friend (player_id) or an unknown teammate (null). `locked` false = hover/intent. */
+export interface DraftAllySlot {
+  player_id?: string | null;
+  champion_id?: string | null;
+  role?: Role | null;
+  locked: boolean;
+}
+
+export interface DraftEnemySlot {
+  champion_id?: string | null;
+  role?: Role | null;
+  locked: boolean;
+  /** Only when the client itself shows the enemy (Clash, tournament, custom game) or once the game started. */
+  puuid?: string | null;
+}
+
+/** Known only once the game has started (spectator API): enemy accounts are hidden during ranked draft. */
+export interface DraftEnemyAccount {
+  puuid: string;
+  riot_id?: string | null;
+  champion_id: string;
+  role?: Role | null;
+  rank?: Rank | null;
+  /** Mastery on the champion they play (null when unknown). */
+  champion_mastery?: MasteryEntry | null;
+  /** Their top masteries, used to spot one-tricks / comfort picks. */
+  masteries?: MasteryEntry[];
+}
+
+/** Shared draft document (PHP store collection "drafts", id "team-<teamId>" or "player-<playerId>"). */
+export interface DraftState {
+  id: string;
+  team_id?: string | null;
+  player_ids: string[];
+  source: DraftSource;
+  phase: DraftPhase;
+  side?: 'blue' | 'red' | null;
+  ally_bans: string[];
+  enemy_bans: string[];
+  ally: DraftAllySlot[]; // up to 5
+  enemy: DraftEnemySlot[]; // up to 5
+  enemy_accounts?: DraftEnemyAccount[];
+  /** Enemy players known by Riot ID (scouting), revealed by the client, or from the started game. */
+  enemy_profiles?: EnemyPlayerProfile[];
+  game_id?: number | null;
+  updated_at: string;
+}
+
+/** What the engine needs from a draft (roles may be missing: the engine guesses them). */
+export interface DraftInput {
+  ally: DraftAllySlot[];
+  enemy: DraftEnemySlot[];
+  bans: string[]; // both sides
+  enemy_accounts?: DraftEnemyAccount[];
+  enemy_profiles?: EnemyPlayerProfile[];
+  /** Ally slots are in pick order (cells); with the side the engine knows the pick turns. */
+  side?: 'blue' | 'red' | null;
+  phase?: DraftPhase;
+}
+
+export interface PickRecommendation {
+  champion_id: string;
+  score: number; // 0..100
+  comfort: number; // 0..1
+  reasons: string[]; // short French sentences
+}
+
+export interface PlayerPickAdvice {
+  player_id: string;
+  role: Role | null;
+  /** Already locked champion (no recommendations needed) */
+  locked_champion_id?: string | null;
+  picks: PickRecommendation[]; // 3..5, best first
+}
+
+export interface BanAdvice {
+  champion_id: string;
+  why: string;
+}
+
+/** Enemy team read from a partial draft: strengths, weaknesses, threats. */
+export interface EnemyDraftAnalysis {
+  identity: string;
+  themes: string[];
+  strengths: string[];
+  weaknesses: string[];
+  win_conditions: string[];
+  threats: ThreatInfo[];
+  damage_profile: Partial<Record<DamageType, number>>;
+}
+
+export interface DraftAdvice {
+  players: PlayerPickAdvice[];
+  bans: BanAdvice[];
+  enemy: EnemyDraftAnalysis | null; // null when no enemy pick yet
+  /** Likely picks for enemy roles not shown yet. */
+  predictions: EnemyRolePrediction[];
+  /** Who should pick when (French sentences, e.g. "Theo (mid) devrait picker en dernier : échangez avec Sam."). */
+  pick_order: string[];
+  /** One entry per known enemy player (scouting / client / game). */
+  enemy_players: EnemyPlayerInsight[];
+}
+
+// ---- Enemy players: scouting, client-revealed (Clash/custom), started game ----
+
+/** Averages per game over the player's recent ranked/normal Summoner's Rift games. */
+export interface PlaystyleStats {
+  games: number;
+  wins: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  cs_per_min: number;
+  vision_per_min: number;
+  damage_per_min: number;
+  kill_participation: number; // 0..1
+  solo_kills: number; // per game
+  first_blood_rate: number; // 0..1 (first blood kill or assist)
+  /** Gold + XP lead at the end of the laning phase (match-v5 challenges), null when unavailable. */
+  early_lead?: number | null;
+  turret_takedowns: number; // per game
+  avg_game_minutes: number;
+}
+
+export type EnemyProfileSource = 'scouting' | 'client' | 'game';
+
+export interface EnemyPlayerProfile {
+  puuid: string;
+  riot_id?: string | null;
+  source: EnemyProfileSource;
+  summoner_level?: number | null;
+  rank?: Rank | null;
+  masteries: MasteryEntry[]; // top masteries
+  recent: RecentSummary; // roles, champions (games/wins/kda/last_played)
+  style?: PlaystyleStats | null;
+  /** Their current champion once known (locked in draft or in game). */
+  champion_id?: string | null;
+  role?: Role | null;
+  fetched_at: string;
+}
+
+export interface EnemyRoleCandidate {
+  champion_id: string;
+  likelihood: number; // 0..1, relative within the role
+  why: string; // French
+  /** Set when the prediction comes from a known enemy player's pool. */
+  player_puuid?: string | null;
+}
+
+/** Likely enemy picks for a role they have not shown yet. */
+export interface EnemyRolePrediction {
+  role: Role;
+  candidates: EnemyRoleCandidate[]; // best first, ≤ 5
+}
+
+export interface EnemyPlayerInsight {
+  puuid: string;
+  riot_id?: string | null;
+  role?: Role | null;
+  champion_id?: string | null;
+  level?: number | null;
+  rank?: Rank | null;
+  style_tags: string[]; // e.g. "Très agressif early", "Farm avant tout", "Vision faible"
+  threats: string[]; // e.g. "One-trick Zed (412k points)"
+  attention_points: string[]; // what to do about this player
+  likely_picks: string[]; // champion ids, when their champion is still unknown
+}
+
+export interface PhaseAttention {
+  phase: 'draft' | 'early' | 'mid' | 'late';
+  text: string; // French
+  enemy_puuid?: string | null;
 }

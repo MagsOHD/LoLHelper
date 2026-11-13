@@ -1,0 +1,12 @@
+{
+  "gameClient": {},
+  "gameData": {
+    "gameId": 7012349999,
+    "isCustomGame": false,
+    "queue": {
+      "id": 700,
+      "type": "CLASH"
+    }
+  },
+  "phase": "ChampSelect"
+}

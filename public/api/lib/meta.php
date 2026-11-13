@@ -13,11 +13,14 @@ if (!defined('LOLHELPER_API')) {
  *   summary.json        { platform, updated_at, patches: { "16.19": { games, updated_at } } }
  *   stats-<patch>.json  agrégats d'un patch (format servi par la route meta-stats)
  *   seen-<patch>.bin    identifiants de parties déjà comptées (entiers 64 bits big-endian triés)
- *   collect.lock        verrou du collecteur
+ *   collect.lock        verrou du collecteur (partagé par le cron et la route meta-collect)
+ *   last_run.json       résumé du dernier passage (cron ou site) : stop, requêtes, parties, durée, at, source
  */
 
 const META_PATCH_PATTERN = '/^[0-9]{1,3}\.[0-9]{1,3}$/D';
 const META_KEEP_PATCHES = 2;
+const META_LOCK_FILE = 'collect.lock';
+const META_LAST_RUN_FILE = 'last_run.json';
 
 /** teamPosition Riot -> rôle de l'appli (les autres valeurs sont ignorées). */
 const META_ROLE_MAP = [
@@ -104,6 +107,72 @@ function meta_read_summary(string $metaDir): array
 }
 
 /**
+ * Résumé des patchs sous forme de liste pour le site.
+ * @param array<string, array{games:int, updated_at:string}> $patches
+ * @return list<array{patch:string, games:int, updated_at:string}>
+ */
+function meta_patch_list(array $patches): array
+{
+    $out = [];
+    foreach ($patches as $p => $info) {
+        $out[] = ['patch' => (string) $p, 'games' => $info['games'], 'updated_at' => $info['updated_at']];
+    }
+    return $out;
+}
+
+/**
+ * Patch le plus récent et liste des patchs conservés d'un dossier de données (null = aucun).
+ * @return array{patch:?string, games:int, patches:list<array{patch:string, games:int, updated_at:string}>}
+ */
+function meta_dir_overview(?string $dataDir): array
+{
+    $patches = $dataDir !== null ? meta_read_summary(meta_dir($dataDir)) : [];
+    $latest = array_key_first($patches);
+    return [
+        'patch' => $latest !== null ? (string) $latest : null,
+        'games' => $latest !== null ? $patches[$latest]['games'] : 0,
+        'patches' => meta_patch_list($patches),
+    ];
+}
+
+/**
+ * Une collecte tient-elle le verrou ? Sonde par verrou partagé non bloquant, relâché aussitôt
+ * (le collecteur réessaie quelques fois si la sonde le gêne).
+ */
+function meta_lock_held(string $metaDir): bool
+{
+    $file = $metaDir . '/' . META_LOCK_FILE;
+    if (!is_file($file)) {
+        return false;
+    }
+    $h = @fopen($file, 'r');
+    if ($h === false) {
+        return false;
+    }
+    $free = flock($h, LOCK_SH | LOCK_NB);
+    if ($free) {
+        flock($h, LOCK_UN);
+    }
+    fclose($h);
+    return !$free;
+}
+
+/** Route GET r=meta-status (mot de passe déjà vérifié). */
+function handle_meta_status(array $config, string $apiDir): void
+{
+    $dataDir = resolve_data_dir($config, $apiDir);
+    $metaDir = $dataDir !== null ? meta_dir($dataDir) : null;
+    $lastRun = $metaDir !== null ? meta_read_json($metaDir . '/' . META_LAST_RUN_FILE) : null;
+    send_json(200, [
+        'collecting' => $metaDir !== null && meta_lock_held($metaDir),
+        'last_run' => $lastRun,
+        'patches' => meta_dir_overview($dataDir)['patches'],
+        'admin_enabled' => $config['admin_password'] !== '',
+        'meta_enabled' => $config['meta_enabled'],
+    ]);
+}
+
+/**
  * Patch servi : le plus récent s'il a au moins $minGames parties, sinon le précédent s'il en a
  * davantage, sinon le plus récent. null si rien n'est collecté.
  * @param array<string, array{games:int, updated_at:string}> $patches trié du plus récent au plus ancien
@@ -144,13 +213,31 @@ function meta_stats_info(?string $dataDir, int $minGames): ?array
     return ['patch' => $patch, 'games' => $patches[$patch]['games'], 'updated_at' => $patches[$patch]['updated_at']];
 }
 
-/** Route GET r=meta-stats (mot de passe déjà vérifié). */
+/**
+ * Route GET r=meta-stats[&patch=16.18] (mot de passe déjà vérifié).
+ * Sans patch : patch servi par meta_pick_patch ; avec : un des patchs conservés (sinon 404).
+ */
 function handle_meta_stats(array $config, string $apiDir): void
 {
     $headers = ['Cache-Control' => 'private, max-age=300'];
     $unavailable = ['available' => false, 'games' => 0];
+    $requested = null;
+    if (array_key_exists('patch', $_GET)) {
+        $requested = query_string('patch');
+        if ($requested === null || preg_match(META_PATCH_PATTERN, $requested) !== 1) {
+            throw new HttpError(400, 'Patch invalide (format attendu : 16.19).');
+        }
+    }
     $dataDir = resolve_data_dir($config, $apiDir);
-    $info = meta_stats_info($dataDir, $config['meta_min_games']);
+    if ($requested !== null) {
+        $patches = $dataDir !== null ? meta_read_summary(meta_dir($dataDir)) : [];
+        if (!isset($patches[$requested])) {
+            throw new HttpError(404, 'Patch non disponible : seuls les ' . META_KEEP_PATCHES . ' patchs les plus récents sont conservés.');
+        }
+        $info = ['patch' => $requested] + $patches[$requested];
+    } else {
+        $info = meta_stats_info($dataDir, $config['meta_min_games']);
+    }
     if ($dataDir === null || $info === null) {
         send_json(200, $unavailable, $headers);
         return;

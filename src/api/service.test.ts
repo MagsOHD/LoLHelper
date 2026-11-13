@@ -425,6 +425,18 @@ describe('history and meta context', () => {
     await api.matchup({ ally: [{ role: 'MID', champion_id: 'Ahri' }], enemy: [{ champion_id: 'Lux' }] });
     expect(lastCall(engine.current.buildMatchupPlan)[3]).toEqual({ meta: EXPECTED_META, players: [] });
   });
+
+  it('matchup passes the known enemy profiles (normalized, junk dropped)', async () => {
+    setup({ metaStats: RAW_META });
+    const prof = { puuid: 'enemy-1', source: 'game', masteries: [], recent: { games: 0, roles: {}, champions: [] }, fetched_at: 'T', champion_id: 'Lux', role: 'MID' };
+    await api.matchup({
+      ally: [{ role: 'MID', champion_id: 'Ahri' }],
+      enemy: [{ champion_id: 'Lux', role: 'MID' }],
+      enemy_profiles: [prof, { puuid: '' }] as never,
+    });
+    const context = lastCall(engine.current.buildMatchupPlan)[3] as { enemy_profiles: { puuid: string; champion_id: string }[] };
+    expect(context.enemy_profiles.map((p) => [p.puuid, p.champion_id])).toEqual([['enemy-1', 'Lux']]);
+  });
 });
 
 describe('password', () => {

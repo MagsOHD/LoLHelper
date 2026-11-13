@@ -77,8 +77,31 @@ if (preg_match('#^/lol/champion-mastery/v4/champion-masteries/by-puuid/([^/]+)/t
     return true;
 }
 
+// Spectator-v5 : préfixe du puuid -> erreur (missing 404, limited 429, badkey 401, boom 500).
+if (preg_match('#^/lol/spectator/v5/active-games/by-summoner/([^/]+)$#', $rest, $m)) {
+    $puuid = rawurldecode($m[1]);
+    $errors = [
+        'missing' => [404, [], '{"status":{"message":"Data not found","status_code":404}}'],
+        'limited' => [429, ['Retry-After' => '5'], '{"status":{"status_code":429}}'],
+        'badkey' => [401, [], '{"status":{"status_code":401}}'],
+        'boom' => [500, [], 'err'],
+    ];
+    foreach ($errors as $prefix => [$s, $h, $b]) {
+        if (str_starts_with($puuid, $prefix)) {
+            out($s, $b, $h);
+            return true;
+        }
+    }
+    $game = json_decode(file_get_contents("$fixtures/active_game.json"), true);
+    $game['_host'] = $host;
+    $game['participants'][0]['puuid'] = $puuid;
+    out(200, json_encode($game, JSON_UNESCAPED_UNICODE));
+    return true;
+}
+
 // ---- Collecteur méta : ligues apex + parties classées décrites dans fixtures/meta_matches.json.
-// FAKE_CTRL (fichier JSON écrit par les tests) : {"challenger":"b", "match_429":"<id>", "retry_after":"1"}.
+// FAKE_CTRL (fichier JSON écrit par les tests) :
+//   {"challenger":"b", "match_429":"<id>", "ids_429":"<puuid>", "retry_after":"1"}.
 $ctrlFile = getenv('FAKE_CTRL');
 $ctrl = (is_string($ctrlFile) && is_file($ctrlFile)) ? (json_decode((string) file_get_contents($ctrlFile), true) ?: []) : [];
 
@@ -97,6 +120,10 @@ if (preg_match('#^/lol/match/v5/matches/by-puuid/(meta-player-[^/]+)/ids$#', $re
         && ctype_digit($q['startTime'] ?? 'x') && abs((int) $q['startTime'] - $windowStart) < 120;
     if (!$okQuery) {
         out(400, '{"status":{"message":"bad ids query"}}');
+        return true;
+    }
+    if (($ctrl['ids_429'] ?? '') === $m[1]) {
+        out(429, '{}', ['Retry-After' => (string) ($ctrl['retry_after'] ?? '1')]);
         return true;
     }
     out(200, json_encode($meta['players'][$m[1]] ?? []));

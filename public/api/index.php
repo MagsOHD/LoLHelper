@@ -17,6 +17,7 @@ require $apiDir . '/lib/config.php';
 require $apiDir . '/lib/storage.php';
 require $apiDir . '/lib/riot.php';
 require $apiDir . '/lib/meta.php';
+require $apiDir . '/lib/live.php';
 
 send_common_headers();
 
@@ -73,6 +74,24 @@ function handle_request(string $apiDir): void
         return;
     }
 
+    if ($route === 'meta-status') {
+        require_method(['GET']);
+        handle_meta_status($config, $apiDir);
+        return;
+    }
+
+    if ($route === 'meta-collect') {
+        require_method(['POST']);
+        require_once $apiDir . '/lib/meta_collector.php';
+        handle_meta_collect($config, $apiDir);
+        return;
+    }
+
+    if ($route === 'live-draft') {
+        handle_live_draft($config, $apiDir);
+        return;
+    }
+
     $parts = explode('/', $route);
 
     if ($parts[0] === 'store' && (count($parts) === 2 || count($parts) === 3)) {
@@ -83,7 +102,7 @@ function handle_request(string $apiDir): void
         if (count($parts) === 3 && !DocumentStore::isValidId($parts[2])) {
             throw new HttpError(400, 'Identifiant invalide (1 à 64 caractères A-Z, a-z, 0-9 ou -).');
         }
-        require_method(count($parts) === 2 ? ['GET'] : ['PUT', 'DELETE']);
+        require_method(count($parts) === 2 ? ['GET'] : ['GET', 'PUT', 'DELETE']);
         $dataDir = resolve_data_dir($config, $apiDir);
         if ($dataDir === null) {
             throw new HttpError(500, 'Stockage indisponible sur le serveur.');
@@ -94,6 +113,14 @@ function handle_request(string $apiDir): void
             return;
         }
         $id = $parts[2];
+        if ($method === 'GET') {
+            $doc = $store->get($collection, $id);
+            if ($doc === null) {
+                throw new HttpError(404, 'Document introuvable.');
+            }
+            send_json(200, $doc);
+            return;
+        }
         if ($method === 'PUT') {
             $doc = read_json_object();
             send_json(200, $store->put($collection, $id, $doc));
@@ -107,7 +134,7 @@ function handle_request(string $apiDir): void
     }
 
     if ($parts[0] === 'riot' && count($parts) === 2
-        && in_array($parts[1], ['account', 'summoner', 'league', 'masteries', 'match-ids', 'match'], true)) {
+        && in_array($parts[1], ['account', 'summoner', 'league', 'masteries', 'match-ids', 'match', 'active-game'], true)) {
         require_method(['GET']);
         handle_riot($parts[1], $config, $apiDir);
         return;

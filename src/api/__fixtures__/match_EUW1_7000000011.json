@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "dataVersion": "2",
+    "matchId": "EUW1_7000000011",
+    "participants": [
+      "enemy-puuid-scouted-0001",
+      "other-EUW1_7000000011-0"
+    ]
+  },
+  "info": {
+    "endOfGameResult": "GameComplete",
+    "gameCreation": 1759700000000,
+    "gameDuration": 1100,
+    "gameEndTimestamp": 1759701100000,
+    "gameId": 7000000011,
+    "gameMode": "CLASSIC",
+    "mapId": 11,
+    "platformId": "EUW1",
+    "queueId": 450,
+    "participants": [
+      {
+        "puuid": "enemy-puuid-scouted-0001",
+        "riotIdGameName": "Joueur",
+        "riotIdTagline": "EUW",
+        "championName": "Lux",
+        "championId": 99,
+        "teamPosition": "",
+        "individualPosition": "",
+        "teamId": 100,
+        "win": true,
+        "kills": 20,
+        "deaths": 9,
+        "assists": 30,
+        "totalMinionsKilled": 20,
+        "neutralMinionsKilled": 0,
+        "visionScore": 0,
+        "totalDamageDealtToChampions": 40000,
+        "firstBloodKill": false,
+        "firstBloodAssist": false,
+        "turretTakedowns": 0
+      },
+      {
+        "puuid": "other-EUW1_7000000011-0",
+        "riotIdGameName": "Joueur",
+        "riotIdTagline": "EUW",
+        "championName": "Garen",
+        "championId": 86,
+        "teamPosition": "",
+        "individualPosition": "",
+        "teamId": 100,
+        "win": true,
+        "kills": 9,
+        "deaths": 4,
+        "assists": 5,
+        "totalMinionsKilled": 150,
+        "neutralMinionsKilled": 0,
+        "visionScore": 18,
+        "totalDamageDealtToChampions": 14000,
+        "firstBloodKill": false,
+        "firstBloodAssist": false,
+        "turretTakedowns": 0
+      }
+    ]
+  }
+}

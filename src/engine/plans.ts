@@ -38,6 +38,7 @@ import {
   WIN,
 } from './tables';
 import { detectThemes, lorePairs, type ThemeDef } from './themes';
+import { matchupEnemies } from './enemies';
 
 const ROLE_ORDER: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'BOTTOM', 'SUPPORT'];
 
@@ -780,9 +781,8 @@ function laneEdgeVs(
   return edge;
 }
 
-function suggestedBans(ours: Team, enemy: Team, catalog: Catalog, limit = 3): string[] {
-  if (!ours.n) return [];
-  const taken = new Set([...ours.champs.map((c) => c.id), ...enemy.champs.map((c) => c.id)]);
+/** Trait-based ban score of every free champion against our lineup, with its main reason (term key). */
+function banScores(ours: Team, taken: ReadonlySet<string>, catalog: Catalog): [number, string, string][] {
   const n = ours.n;
   const ourPeel = (ours.total('peel') + 0.5 * ours.total('frontline')) / n;
   const ourEngage = ours.avg('engage');
@@ -792,24 +792,73 @@ function suggestedBans(ours: Team, enemy: Team, catalog: Catalog, limit = 3): st
   const ourLate = ours.avg('late');
   const ourPeelAvg = ours.avg('peel');
   const hasSquishyCarry = ours.champs.some((c) => SQUISHY_CARRY_ARCHES.has(c.archetype));
-  const scored: [number, string][] = [];
+  const scored: [number, string, string][] = [];
   for (const c of catalog.allData()) {
     if (taken.has(c.id) || !c.roles.length) continue;
     let s = 0.0;
-    if (DIVE_ARCHES.has(c.archetype) && hasSquishyCarry) s += (c.t.mobility + c.t.pick) * (ourPeel < 1.5 ? 1.3 : 0.6);
-    if (c.t.poke >= 3) s += c.t.poke * (ourEngage < 1.4 ? 1.2 : 0.4);
-    if (c.t.pick >= 3) s += c.t.pick * (ourMob < 1.3 ? 1.0 : 0.4);
-    if (c.t.engage >= 3) s += c.t.engage * (ourPeelAvg < 1.2 ? 1.0 : 0.4);
-    if (c.t.splitpush >= 3) s += c.t.splitpush * (ourWc < 1.6 ? 1.0 : 0.3);
-    if (ourLate > ourEarly + 0.4) s += c.t.early * 0.8;
-    else if (ourEarly > ourLate + 0.4) s += c.t.late * 0.8;
+    let key = 'generic';
+    let top = 0.0;
+    const add = (v: number, k: string): void => {
+      s += v;
+      if (v > top) {
+        top = v;
+        key = k;
+      }
+    };
+    if (DIVE_ARCHES.has(c.archetype) && hasSquishyCarry) add((c.t.mobility + c.t.pick) * (ourPeel < 1.5 ? 1.3 : 0.6), 'dive');
+    if (c.t.poke >= 3) add(c.t.poke * (ourEngage < 1.4 ? 1.2 : 0.4), 'poke');
+    if (c.t.pick >= 3) add(c.t.pick * (ourMob < 1.3 ? 1.0 : 0.4), 'pick');
+    if (c.t.engage >= 3) add(c.t.engage * (ourPeelAvg < 1.2 ? 1.0 : 0.4), 'engage');
+    if (c.t.splitpush >= 3) add(c.t.splitpush * (ourWc < 1.6 ? 1.0 : 0.3), 'split');
+    if (ourLate > ourEarly + 0.4) add(c.t.early * 0.8, 'early');
+    else if (ourEarly > ourLate + 0.4) add(c.t.late * 0.8, 'late');
     let sumTraits = 0;
     for (const v of c.traits) sumTraits += v;
     s += sumTraits * 0.05;
-    scored.push([s, c.id]);
+    scored.push([s, c.id, key]);
   }
   scored.sort((a, b) => cmpNum(b[0], a[0]) || cmpStr(a[1], b[1]));
-  return scored.slice(0, limit).map(([, cid]) => cid);
+  return scored;
+}
+
+function suggestedBans(ours: Team, enemy: Team, catalog: Catalog, limit = 3): string[] {
+  if (!ours.n) return [];
+  const taken = new Set([...ours.champs.map((c) => c.id), ...enemy.champs.map((c) => c.id)]);
+  return banScores(ours, taken, catalog)
+    .slice(0, limit)
+    .map(([, cid]) => cid);
+}
+
+// --------------------------------------------------------------------------- live draft helpers
+
+/**
+ * Trait-based ban threat of every champion not in `taken` against our (possibly partial) lineup, best
+ * first: [score, champion id, main reason key: dive | poke | pick | engage | split | early | late | generic].
+ */
+export function banThreatScores(
+  ally: readonly Pick[],
+  taken: ReadonlySet<string>,
+  catalog: Catalog,
+): [number, string, string][] {
+  const ours = makeTeam(ally, catalog);
+  if (!ours.n) return [];
+  return banScores(ours, taken, catalog);
+}
+
+/** Damage profile (AD / AP / MIXED shares) of a lineup, as in the game plan. */
+export function damageProfileOf(picks: readonly Pick[], catalog: Catalog): Record<string, number> {
+  return damageProfile(makeTeam(picks, catalog));
+}
+
+/** Unelided threat sentences (why / how to handle) for one enemy champion against our lineup. */
+export function describeThreat(
+  ally: readonly Pick[],
+  championId: string,
+  catalog: Catalog,
+): { why: string; how_to_handle: string } {
+  const ours = makeTeam(ally, catalog);
+  const c = catalog.data(championId) ?? placeholderData(championId);
+  return { why: threatWhy(c, ours), how_to_handle: threatHandle(c, ours, catalog) };
 }
 
 function objectivesVs(ours: Team, enemy: Team, theirStrat: ThemeDef | null, theirFmt: Fmt): string[] {
@@ -849,13 +898,27 @@ function objectivesVs(ours: Team, enemy: Team, theirStrat: ThemeDef | null, thei
   return out;
 }
 
-/** Unelided matchup plan (the public wrapper applies French elision). */
+/**
+ * Unelided matchup plan (the public wrapper applies French elision). With `context.enemy_profiles`
+ * (non-empty) the plan also carries `enemy_players` and phase-by-phase `attention`.
+ */
 export function buildMatchupPlanRaw(
   ally: Pick[],
   enemy: Pick[],
   catalog: Catalog,
   context: EngineContext = {},
 ): MatchupPlan {
+  const plan = matchupPlanBase(ally, enemy, catalog, context ?? {});
+  const profiles = context?.enemy_profiles;
+  if (profiles?.length) {
+    const known = matchupEnemies(ally ?? [], enemy ?? [], profiles, catalog);
+    plan.enemy_players = known.players;
+    plan.attention = known.attention;
+  }
+  return plan;
+}
+
+function matchupPlanBase(ally: Pick[], enemy: Pick[], catalog: Catalog, context: EngineContext): MatchupPlan {
   const meta = metaUsable(context.meta) ? context.meta : null;
   const playerByRole = new Map<Role, PlayerInput>();
   if (context.players?.length) {

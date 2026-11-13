@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "puuid": "aLocalPuuid-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_01",
+  "phase": "ban_pick",
+  "queue_id": 420,
+  "local_cell": 2,
+  "my_team": [
+    {
+      "cell": 0,
+      "puuid": "",
+      "champion_key": 86,
+      "intent_key": 0,
+      "position": "top"
+    },
+    {
+      "cell": 1,
+      "puuid": "",
+      "champion_key": 0,
+      "intent_key": 0,
+      "position": "jungle"
+    },
+    {
+      "cell": 2,
+      "puuid": "aLocalPuuid-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_01",
+      "champion_key": 0,
+      "intent_key": 103,
+      "position": "middle"
+    },
+    {
+      "cell": 3,
+      "puuid": "allyPuuid2-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_012",
+      "champion_key": 0,
+      "intent_key": 222,
+      "position": "bottom"
+    },
+    {
+      "cell": 4,
+      "puuid": "",
+      "champion_key": 0,
+      "intent_key": 0,
+      "position": "utility"
+    }
+  ],
+  "their_team": [
+    {
+      "cell": 5,
+      "puuid": "",
+      "champion_key": 122
+    },
+    {
+      "cell": 6,
+      "puuid": "",
+      "champion_key": 0
+    },
+    {
+      "cell": 7,
+      "puuid": "",
+      "champion_key": 0
+    },
+    {
+      "cell": 8,
+      "puuid": "",
+      "champion_key": 0
+    },
+    {
+      "cell": 9,
+      "puuid": "",
+      "champion_key": 0
+    }
+  ],
+  "bans": {
+    "mine": [
+      55,
+      0,
+      238,
+      157,
+      84
+    ],
+    "theirs": [
+      91,
+      7,
+      11,
+      64,
+      121
+    ]
+  },
+  "actions": [
+    {
+      "type": "ban",
+      "champion_key": 55,
+      "completed": true,
+      "ally": true,
+      "cell": 0,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 0,
+      "completed": true,
+      "ally": true,
+      "cell": 1,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 238,
+      "completed": true,
+      "ally": true,
+      "cell": 2,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 157,
+      "completed": true,
+      "ally": true,
+      "cell": 3,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 84,
+      "completed": true,
+      "ally": true,
+      "cell": 4,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 91,
+      "completed": true,
+      "ally": false,
+      "cell": 5,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 7,
+      "completed": true,
+      "ally": false,
+      "cell": 6,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 11,
+      "completed": true,
+      "ally": false,
+      "cell": 7,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 64,
+      "completed": true,
+      "ally": false,
+      "cell": 8,
+      "in_progress": false
+    },
+    {
+      "type": "ban",
+      "champion_key": 121,
+      "completed": true,
+      "ally": false,
+      "cell": 9,
+      "in_progress": false
+    },
+    {
+      "type": "pick",
+      "champion_key": 86,
+      "completed": true,
+      "ally": true,
+      "cell": 0,
+      "in_progress": false
+    },
+    {
+      "type": "pick",
+      "champion_key": 122,
+      "completed": true,
+      "ally": false,
+      "cell": 5,
+      "in_progress": false
+    },
+    {
+      "type": "pick",
+      "champion_key": 0,
+      "completed": false,
+      "ally": false,
+      "cell": 6,
+      "in_progress": true
+    },
+    {
+      "type": "pick",
+      "champion_key": 0,
+      "completed": false,
+      "ally": true,
+      "cell": 1,
+      "in_progress": false
+    },
+    {
+      "type": "pick",
+      "champion_key": 0,
+      "completed": false,
+      "ally": true,
+      "cell": 2,
+      "in_progress": false
+    }
+  ],
+  "timer_remaining_ms": 21001,
+  "sent_at": "2026-11-10T20:00:00Z"
+}

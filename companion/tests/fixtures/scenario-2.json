@@ -1,0 +1,6 @@
+[
+  {"for": 3, "gameflow": "Lobby"},
+  {"for": 8, "gameflow": "ChampSelect", "session": "session-banpick.json"},
+  {"for": 7, "gameflow": "Lobby"},
+  {"for": 600, "gameflow": "ChampSelect", "session": "session-revealed-banpick.json", "gameflow_session": "gameflow-session-clash.json"}
+]

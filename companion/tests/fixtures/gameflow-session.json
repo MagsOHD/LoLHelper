@@ -1,0 +1,12 @@
+{
+  "gameClient": {},
+  "gameData": {
+    "gameId": 7012345678,
+    "isCustomGame": false,
+    "queue": {
+      "id": 420,
+      "type": "RANKED_SOLO_5x5"
+    }
+  },
+  "phase": "ChampSelect"
+}

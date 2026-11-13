@@ -16,6 +16,7 @@ const RIOT_MSG_AUTH = 'Clé API Riot invalide ou expirée (une clé de développ
 const RIOT_MSG_RATE = 'Limite de requêtes Riot atteinte, réessaie dans quelques secondes.';
 const RIOT_MSG_DOWN = 'Serveur Riot indisponible.';
 const RIOT_MSG_NO_KEY = 'Clé API Riot non configurée.';
+const RIOT_MSG_NO_ACTIVE_GAME = 'Aucune partie en cours pour ce joueur.';
 
 /**
  * URL de base d'un hôte Riot (« europe », « euw1 »…).
@@ -143,8 +144,9 @@ function riot_http_get(string $apiKey, string $url): array
 
 /**
  * Appelle Riot et traduit le statut amont. Renvoie le corps JSON brut en cas de 200.
+ * $notFound : message renvoyé (404) quand Riot répond 404.
  */
-function riot_fetch(array $config, string $url): string
+function riot_fetch(array $config, string $url, string $notFound = RIOT_MSG_NOT_FOUND): string
 {
     $key = $config['riot_api_key'];
     if ($key === '') {
@@ -155,7 +157,7 @@ function riot_fetch(array $config, string $url): string
         return $body;
     }
     if ($status === 404) {
-        throw new HttpError(404, RIOT_MSG_NOT_FOUND);
+        throw new HttpError(404, $notFound);
     }
     if ($status === 401 || $status === 403) {
         throw new HttpError(502, RIOT_MSG_AUTH);
@@ -173,6 +175,7 @@ function riot_fetch(array $config, string $url): string
 /** Routes riot/* (GET uniquement, déjà vérifié). */
 function handle_riot(string $action, array $config, string $apiDir): void
 {
+    $notFound = RIOT_MSG_NOT_FOUND;
     switch ($action) {
         case 'account':
             $platform = riot_require_platform();
@@ -210,6 +213,13 @@ function handle_riot(string $action, array $config, string $apiDir): void
                 . rawurlencode($puuid) . '/ids?start=0&count=' . $count
                 . ($queue !== null ? '&queue=' . $queue : '');
             break;
+        case 'active-game':
+            // Spectator-v5 : hôte de la plateforme ; ne répond qu'une fois la partie lancée. Jamais mis en cache.
+            $platform = riot_require_platform();
+            $puuid = riot_require_puuid();
+            $url = riot_base_url($platform) . '/lol/spectator/v5/active-games/by-summoner/' . rawurlencode($puuid);
+            $notFound = RIOT_MSG_NO_ACTIVE_GAME;
+            break;
         case 'match':
             $platform = riot_require_platform();
             $matchId = riot_require_match_id();
@@ -218,7 +228,7 @@ function handle_riot(string $action, array $config, string $apiDir): void
         default:
             throw new HttpError(404, 'Route inconnue.');
     }
-    send_raw_json(200, riot_fetch($config, $url));
+    send_raw_json(200, riot_fetch($config, $url, $notFound));
 }
 
 function handle_riot_match(array $config, string $apiDir, string $platform, string $matchId): void

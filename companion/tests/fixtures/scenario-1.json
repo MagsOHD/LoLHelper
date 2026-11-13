@@ -1,0 +1,9 @@
+[
+  {"for": 3, "summoner": 404, "gameflow": "None"},
+  {"for": 4, "gameflow": "Lobby"},
+  {"for": 7, "gameflow": "ChampSelect", "session": "session-planning.json"},
+  {"for": 5, "gameflow": "ChampSelect", "session": "session-banpick.json"},
+  {"for": 4, "gameflow": "ChampSelect", "session": "session-finalization.json"},
+  {"for": 3, "gameflow": "ChampSelect", "session": "session-game-starting.json"},
+  {"for": 600, "gameflow": "InProgress"}
+]

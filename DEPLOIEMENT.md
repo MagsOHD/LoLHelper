@@ -94,11 +94,29 @@ c'est ce qui permet à l'appli de marcher dans un sous-dossier sans configuratio
 | `api/config.php` ne renvoie pas 403 | `.htaccess` non envoyés : refaites l'étape 4 avec les fichiers cachés affichés |
 | « Clé API Riot invalide ou expirée » | Clé expirée : mettez à jour `public/api/config.php`, recompilez, renvoyez `api/config.php` |
 
-## 7. Collecte de la méta (tâche planifiée)
+## 7. Collecte de la méta (bouton et/ou tâche planifiée)
 
 La méta (taux de victoire par champion et par rôle, bans, duels de lane) est calculée à partir
-de parties classées Challenger et Grandmaster de votre serveur, récupérées avec votre clé Riot.
-Il faut une clé Riot configurée (étape 1).
+de parties classées Challenger, Grandmaster et Master de votre serveur, récupérées avec votre clé Riot.
+Il faut une clé Riot configurée (étape 1). Les données sont communes à tous les joueurs du site :
+une seule collecte sert tout le monde, et elles restent sur le serveur (les deux derniers patchs).
+L'onglet **Méta** du site les affiche : tier list par rôle, taux de victoire/pick/ban, duels de lane.
+
+### Lancer la collecte depuis le site (bouton)
+
+1. Dans `api/config.php`, ajoutez un mot de passe administrateur, différent du mot de passe
+   partagé entre amis, long et difficile à deviner (le nombre d'essais n'est pas limité) :
+   ```php
+   'admin_password' => 'un-long-mot-de-passe-admin',
+   ```
+   puis renvoyez `api/config.php` par FTP.
+2. Onglet **Méta** → « Mettre à jour la méta » → mot de passe administrateur → **Lancer**.
+   Les passes (45 s chacune) s'enchaînent tant que l'onglet reste ouvert, jusqu'à « Arrêter » ou
+   jusqu'à ce que toutes les parties récentes soient collectées.
+
+### Ou automatiquement (tâche planifiée OVH)
+
+Pour que la méta se mette à jour toute seule, sans laisser d'onglet ouvert :
 
 Espace client OVH → *Web Cloud* → *Hébergements* → votre hébergement → onglet
 **Tâches planifiées - Cron** → **Ajouter une planification** :
@@ -111,14 +129,18 @@ Espace client OVH → *Web Cloud* → *Hébergements* → votre hébergement →
 | Fréquence | Toutes les heures |
 | Alerte e-mail | au choix (utile les premiers jours) |
 
-Chaque passage dure au plus 10 minutes et n'utilise qu'une partie du quota de la clé (0,5 requête
-par seconde), pour laisser de la place aux synchronisations de vos amis. Comptez environ 1 à 2
-jours pour atteindre quelques centaines de parties sur le patch en cours ; avant cela, l'appli
+Chaque passage dure au plus 25 minutes et n'utilise qu'une partie du quota de la clé (0,6 requête
+par seconde, soit environ 900 requêtes par passage, pour une limite de la clé à 100 requêtes par
+2 minutes), afin de laisser de la place aux synchronisations de vos amis. Comptez quelques heures
+pour atteindre quelques centaines de parties sur le patch en cours ; avant cela, l'appli
 fonctionne normalement sans méta. Le bas de page affiche ensuite
 « Méta : patch … · N parties haut elo ».
 
-Réglages optionnels dans `api/config.php` (voir `config.example.php`) : `meta_tiers`
-(ajouter `'MASTER'`), `meta_time_budget`, `meta_rate`, `meta_min_games`, `meta_enabled`.
+Réglages optionnels dans `api/config.php` (voir `config.example.php`) : `meta_tiers`,
+`meta_time_budget`, `meta_rate`, `meta_min_games`, `meta_enabled`. Sans ces lignes, les valeurs
+par défaut s'appliquent (Challenger + Grandmaster + Master, 25 min, 0,6 requête/s). Si votre
+`config.php` a été copié d'une ancienne version de `config.example.php`, il contient encore
+`0.5`, `600` et deux paliers : supprimez ces lignes ou mettez-les à jour.
 
 Si votre nom de domaine pointe directement sur `www/lolhelper/` (et non sur `www/`), renseignez
 `'data_dir'` avec un chemin absolu dans `config.php`, pour que le site et la tâche planifiée
@@ -129,7 +151,34 @@ utilisent le même dossier de données.
 | Pas de ligne « Méta » en bas de page après une journée | Tâche planifiée absente ou désactivée, ou clé Riot manquante/expirée (voir les journaux de la tâche dans l'espace OVH) |
 | Les journaux indiquent « clé invalide » | Clé de développement expirée : passez à une Personal API Key |
 
-## 8. Mettre à jour et sauvegarder
+## 8. Draft en direct et programme compagnon
+
+Le bouton **Draft** d'un joueur ou d'une équipe (page Équipe) ouvre la draft en direct :
+picks et bans saisis par n'importe quel ami sont partagés, et l'appli conseille 3 à 5 champions
+à chaque ami qui n'a pas encore pické, des bans, et lit les forces et faiblesses de l'équipe adverse.
+Rien à configurer côté OVH : ça fonctionne dès l'envoi du site (étape 4).
+
+Pour remplir la draft automatiquement, chaque ami peut lancer sur son PC Windows le
+**programme compagnon** (lecture seule du client League, rien à installer) :
+
+1. Sur la page Draft, section « Programme compagnon (Windows) », téléchargez
+   `Lancer-LoLHelper-Draft.bat` et `lolhelper-draft.ps1` dans un même dossier
+   (ils sont aussi dans le dépôt, dossier `companion/`, avec un mode d'emploi détaillé).
+2. Double-cliquez sur `Lancer-LoLHelper-Draft.bat`. Au premier lancement, indiquez l'adresse du
+   site (`https://votre-domaine/lolhelper`) et le mot de passe partagé.
+3. Laissez la fenêtre ouverte pendant vos parties : pendant la sélection des champions, la page
+   Draft se remplit toute seule (badge « Client »).
+
+Le compte League du PC doit correspondre à un joueur déjà ajouté sur le site (même Riot ID)
+et synchronisé avec la clé Riot (un joueur créé en mode manuel, sans clé, n'est pas reconnu).
+Le programme n'envoie que les champions et les rôles ; l'identité des adversaires n'est jamais
+lue ni envoyée (Riot la masque pendant la draft). Une fois la partie lancée, le bouton
+« Détecter la partie » de la page Draft récupère l'équipe adverse via l'API Riot officielle.
+
+Le mot de passe du site ne doit pas contenir d'accents ni de caractères spéciaux hors ASCII
+(limite des en-têtes HTTP utilisés par le programme compagnon).
+
+## 9. Mettre à jour et sauvegarder
 
 - **Mise à jour** : `npm run build`, puis renvoyez le contenu de `dist/` dans
   `www/lolhelper/` en écrasant les anciens fichiers (FileZilla demande : *Écraser*).

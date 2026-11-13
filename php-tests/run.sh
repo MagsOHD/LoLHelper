@@ -73,7 +73,8 @@ EOF
 
 start() { # port docroot [env...] [router]
   local port="$1" root="$2"; shift 2
-  env "$@" "$PHP" -d display_errors=0 -d log_errors=1 -d error_log="$T/php_errors.log" \
+  # opcache off : les tests réécrivent config.php entre deux requêtes (revalidate_freq le masquerait).
+  env "$@" "$PHP" -d display_errors=0 -d log_errors=1 -d error_log="$T/php_errors.log" -d opcache.enable=0 \
       -S "127.0.0.1:$port" -t "$root" ${ROUTER:-} >>"$T/server.log" 2>&1 &
   PIDS+=($!)
 }

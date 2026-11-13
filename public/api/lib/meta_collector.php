@@ -7,7 +7,8 @@ if (!defined('LOLHELPER_API')) {
 }
 
 /*
- * Collecteur méta haut elo (lancé par cron/collect-meta.php en ligne de commande).
+ * Collecteur méta haut elo : lancé par cron/collect-meta.php en ligne de commande, ou par la route
+ * POST r=meta-collect (passage court, mot de passe administrateur). Les deux partagent le même verrou.
  * Parcourt en boucle les joueurs Challenger/Grandmaster (liste rafraîchie toutes les 24 h),
  * récupère leurs parties classées solo des 3 derniers jours et agrège chaque partie une seule fois.
  */
@@ -24,10 +25,33 @@ const META_DEFAULT_RETRY_AFTER = 60;
 /** Arrêt propre d'une collecte (budget, clé refusée, 429…). */
 final class MetaStop extends Exception
 {
-    public function __construct(string $reason, public readonly int $exitCode = 0)
-    {
+    /**
+     * @param string $reason message français (ligne de journal)
+     * @param string $stop code d'arrêt renvoyé au site : budget, riot_limit, riot_key, riot_down, no_seeds
+     * @param int|null $retryAfter secondes de pause demandées par Riot (riot_limit)
+     */
+    public function __construct(
+        string $reason,
+        public readonly int $exitCode = 0,
+        public readonly string $stop = 'error',
+        public readonly ?int $retryAfter = null
+    ) {
         parent::__construct($reason);
     }
+}
+
+/** Verrou exclusif non bloquant, quelques essais rapprochés (une sonde de meta-status le tient un instant). */
+function meta_try_lock($handle): bool
+{
+    for ($i = 0; $i < 4; $i++) {
+        if ($i > 0) {
+            usleep(50000);
+        }
+        if (flock($handle, LOCK_EX | LOCK_NB)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -328,48 +352,101 @@ final class MetaCollector
         $this->region = PLATFORM_REGIONS[$this->platform];
     }
 
-    /** Lance une collecte ; renvoie le code de sortie du script. */
+    /** Lance une collecte (cron) ; renvoie le code de sortie du script. */
     public function run(): int
+    {
+        return $this->runPass('cron')['exit'];
+    }
+
+    /**
+     * Un passage de collecte borné par meta_time_budget. Écrit last_run.json (sauf si occupé).
+     * summary : {status: ok|busy|error, stop, message, requests, new_matches, patch, games, patches,
+     *            duration_s[, retry_after]} ; {status: busy} si une autre collecte tient le verrou.
+     * @param string $source « cron » ou « web » (enregistré dans last_run.json)
+     * @return array{exit:int, summary:array<string,mixed>}
+     */
+    public function runPass(string $source): array
     {
         if (!ensure_writable_dir($this->metaDir)) {
             error_log('lolhelper meta: dossier non inscriptible : ' . $this->metaDir);
-            return 1;
+            return ['exit' => 1, 'summary' => ['status' => 'error', 'stop' => 'storage', 'message' => 'dossier de données non inscriptible']];
         }
-        $lock = @fopen($this->metaDir . '/collect.lock', 'c');
+        $lock = @fopen($this->metaDir . '/' . META_LOCK_FILE, 'c');
         if ($lock === false) {
             error_log('lolhelper meta: verrou impossible');
-            return 1;
+            return ['exit' => 1, 'summary' => ['status' => 'error', 'stop' => 'storage', 'message' => 'verrou impossible']];
         }
-        if (!flock($lock, LOCK_EX | LOCK_NB)) {
+        if (!meta_try_lock($lock)) {
             fclose($lock);
             error_log('lolhelper meta: collecte déjà en cours, rien à faire');
-            return 0;
+            return ['exit' => 0, 'summary' => ['status' => 'busy']];
         }
         $reason = 'tour complet';
+        $stop = 'tour complet';
+        $retryAfter = null;
+        $status = 'ok';
         $exit = 0;
+        $failure = null;
         try {
             $this->loadState();
             $blocked = (int) ($this->state['blocked_until'] ?? 0);
             if ($blocked > time()) {
                 $reason = 'pause demandée par Riot (429) jusqu\'à ' . gmdate('H:i:s', $blocked) . ' UTC';
+                $stop = 'riot_limit';
+                $retryAfter = $blocked - time();
             } else {
                 $this->collect();
             }
-        } catch (MetaStop $stop) {
-            $reason = $stop->getMessage();
-            $exit = $stop->exitCode;
+        } catch (MetaStop $e) {
+            $reason = $e->getMessage();
+            $exit = $e->exitCode;
+            $stop = $e->stop;
+            $retryAfter = $e->retryAfter;
+        } catch (Throwable $e) {
+            $failure = $e; // relancée après sauvegarde et libération du verrou
+            $status = 'error';
+            $stop = 'error';
+            $reason = 'erreur inattendue';
         } finally {
             try {
                 $this->checkpoint();
             } catch (Throwable $e) {
                 error_log('lolhelper meta: sauvegarde impossible : ' . $e->getMessage());
                 $exit = 1;
+                $status = 'error';
+                $stop = 'save_error';
+                $reason = 'sauvegarde impossible';
+            }
+            $latest = $this->patches[0] ?? '-';
+            $games = isset($this->buckets[$latest]) ? $this->buckets[$latest]['stats']['games'] : 0;
+            $duration = microtime(true) - $this->start;
+            $summary = [
+                'status' => $status,
+                'stop' => $stop,
+                'message' => $reason,
+                'requests' => $this->requests,
+                'new_matches' => $this->newMatches,
+                'patch' => $latest === '-' ? null : $latest,
+                'games' => $games,
+                'patches' => meta_patch_list(meta_read_summary($this->metaDir)),
+                'duration_s' => round($duration, 1),
+            ];
+            if ($stop === 'riot_limit') {
+                $summary['retry_after'] = max(1, (int) $retryAfter);
+            }
+            try {
+                write_atomic($this->metaDir . '/' . META_LAST_RUN_FILE, json_encode_safe(
+                    $summary + ['at' => gmdate('Y-m-d\TH:i:s\Z'), 'source' => $source]
+                ));
+            } catch (Throwable $e) {
+                error_log('lolhelper meta: last_run.json non écrit : ' . $e->getMessage());
             }
             flock($lock, LOCK_UN);
             fclose($lock);
         }
-        $latest = $this->patches[0] ?? '-';
-        $games = isset($this->buckets[$latest]) ? $this->buckets[$latest]['stats']['games'] : 0;
+        if ($failure !== null) {
+            throw $failure;
+        }
         error_log(sprintf(
             'lolhelper meta: %s, %d requêtes, %d nouvelles parties, patch %s (%d parties), %.1f s, arrêt : %s',
             $this->platform,
@@ -377,10 +454,10 @@ final class MetaCollector
             $this->newMatches,
             $latest,
             $games,
-            microtime(true) - $this->start,
+            $duration,
             $reason
         ));
-        return $exit;
+        return ['exit' => $exit, 'summary' => $summary];
     }
 
     private function collect(): void
@@ -394,7 +471,7 @@ final class MetaCollector
         }
         $count = count($seeds);
         if ($count === 0) {
-            throw new MetaStop('aucun joueur de départ');
+            throw new MetaStop('aucun joueur de départ', stop: 'no_seeds');
         }
         $windowStart = time() - META_MATCH_WINDOW;
         for ($visited = 0; $visited < $count; $visited++) {
@@ -440,7 +517,7 @@ final class MetaCollector
             if ($this->state['seeds']) {
                 return;
             }
-            throw new MetaStop('aucun joueur de départ (ligues indisponibles)');
+            throw new MetaStop('aucun joueur de départ (ligues indisponibles)', stop: 'no_seeds');
         }
         $this->state['seeds'] = array_keys($seeds);
         $this->state['seed_tiers'] = $tiers;
@@ -565,7 +642,7 @@ final class MetaCollector
         $now = microtime(true);
         $wait = $rate > 0 ? $this->lastRequest + 1.0 / $rate - $now : 0.0;
         if ($now + max(0.0, $wait) - $this->start >= $budget) {
-            throw new MetaStop('budget de temps atteint');
+            throw new MetaStop('budget de temps atteint', stop: 'budget');
         }
         if ($wait > 0) {
             usleep((int) ($wait * 1e6));
@@ -575,17 +652,17 @@ final class MetaCollector
         [$status, $body, $retryAfter] = riot_http_get($this->config['riot_api_key'], $url);
 
         if ($status === 401 || $status === 403) {
-            throw new MetaStop("clé API Riot refusée (HTTP $status) : renouvelle-la dans config.php", 1);
+            throw new MetaStop("clé API Riot refusée (HTTP $status) : renouvelle-la dans config.php", 1, 'riot_key');
         }
         if ($status === 429) {
             $seconds = ($retryAfter !== null && preg_match('/^[0-9]{1,5}$/D', $retryAfter) === 1)
                 ? max(1, min(3600, (int) $retryAfter)) : META_DEFAULT_RETRY_AFTER;
             $this->state['blocked_until'] = time() + $seconds;
-            throw new MetaStop("limite Riot atteinte (429), pause de $seconds s");
+            throw new MetaStop("limite Riot atteinte (429), pause de $seconds s", 0, 'riot_limit', $seconds);
         }
         if ($status === 0 || $status >= 500) {
             if (++$this->networkErrors >= META_MAX_NETWORK_ERRORS) {
-                throw new MetaStop('serveur Riot indisponible');
+                throw new MetaStop('serveur Riot indisponible', stop: 'riot_down');
             }
             return [$status, null];
         }
@@ -678,4 +755,51 @@ final class MetaCollector
         $this->state['last_run_at'] = time();
         write_atomic($this->metaDir . '/state.json', json_encode_safe($this->state));
     }
+}
+
+/**
+ * Route POST r=meta-collect (mot de passe partagé déjà vérifié) : un passage court du collecteur,
+ * déclenché depuis le site. En-tête X-Admin-Password = admin_password de config.php.
+ * Même verrou que le cron : si une collecte tourne déjà, répond 200 {"status": "busy"}.
+ */
+function handle_meta_collect(array $config, string $apiDir): void
+{
+    $start = microtime(true);
+    if ($config['admin_password'] === '') {
+        throw new HttpError(403, 'Collecte manuelle désactivée : définissez admin_password dans config.php.');
+    }
+    if (!hash_equals($config['admin_password'], request_header('X-Admin-Password') ?? '')) {
+        throw new HttpError(401, 'Mot de passe administrateur incorrect.');
+    }
+    $dataDir = resolve_data_dir($config, $apiDir);
+    if (!$config['meta_enabled']) {
+        send_json(200, [
+            'status' => 'ok',
+            'stop' => 'disabled',
+            'message' => 'collecte désactivée (meta_enabled = false)',
+            'requests' => 0,
+            'new_matches' => 0,
+        ] + meta_dir_overview($dataDir) + ['duration_s' => 0.0]);
+        return;
+    }
+    if ($config['riot_api_key'] === '') {
+        throw new HttpError(400, RIOT_MSG_NO_KEY);
+    }
+    if ($dataDir === null) {
+        throw new HttpError(500, 'Stockage indisponible sur le serveur.');
+    }
+
+    $budget = $config['meta_web_budget'];
+    ignore_user_abort(true); // un onglet fermé ne coupe pas la sauvegarde
+    if (function_exists('set_time_limit')) {
+        @set_time_limit($budget + 30);
+    }
+    $collector = new MetaCollector(array_replace($config, ['meta_time_budget' => $budget]), meta_dir($dataDir), $start);
+    $summary = $collector->runPass('web')['summary'];
+    if ($summary['status'] === 'error') {
+        throw new HttpError(500, $summary['stop'] === 'save_error'
+            ? 'Sauvegarde des statistiques méta impossible sur le serveur.'
+            : 'Stockage indisponible sur le serveur.');
+    }
+    send_json(200, $summary);
 }

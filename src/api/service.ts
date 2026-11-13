@@ -46,6 +46,7 @@ import { ApiError, backendRequest, store } from './backend';
 import { getCatalog, profileIconUrl } from './ddragon';
 import { getMetaStats, resetMetaForTests } from './meta';
 import { emptyRecent, emptyRoles, fetchPlayerData, getAccount, type RiotFields } from './riot';
+import { normalizeProfiles } from './draft';
 
 // ---- helpers ---------------------------------------------------------------------------------
 
@@ -101,6 +102,11 @@ function phpMeta(): Promise<PhpMeta> {
     });
   }
   return phpMetaPromise;
+}
+
+/** Forget the cached r=meta answer (its meta_stats summary changes after a collection). */
+export function resetPhpMeta(): void {
+  phpMetaPromise = null;
 }
 
 /** Tests only. */
@@ -553,7 +559,8 @@ async function matchup(body: MatchupBody): Promise<MatchupPlan> {
   const enemy = assignEnemyRoles(enemyIn, catalog);
   validatePicks(catalog, enemy, "L'équipe adverse");
   const [meta, players] = await Promise.all([getMetaStats(), allyPlayers(ally, catalog)]);
-  return buildMatchupPlan(ally, enemy, catalog, { meta, players });
+  const enemy_profiles = normalizeProfiles(body?.enemy_profiles);
+  return buildMatchupPlan(ally, enemy, catalog, { meta, players, ...(enemy_profiles.length ? { enemy_profiles } : {}) });
 }
 
 /** PlayerInput of the ally picks' known players (pick order, unknown/deleted ids ignored). */

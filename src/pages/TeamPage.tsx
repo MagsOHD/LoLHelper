@@ -110,6 +110,7 @@ function PlayerCard({ player }: { player: Player }) {
       </div>
       {(sync.isError || del.isError) && <ErrorMessage error={sync.error ?? del.error} />}
       <div className="player-card__actions">
+        <Link to={`/draft/player/${player.id}`} className="btn btn--primary btn--sm" aria-label={`Draft en direct pour ${riotId(player)}`}>Draft</Link>
         <Link to={`/players/${player.id}`} className="btn btn--ghost btn--sm">Profil</Link>
         {canSync && (
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => sync.mutate(player.id)} disabled={sync.isPending}>
@@ -235,7 +236,8 @@ function TeamsSection({ players }: { players: Player[] }) {
                 {t.player_ids.length === 0 && <span className="muted small">Aucun joueur</span>}
               </div>
               <div className="player-card__actions">
-                <Link to={`/compositions?team=${t.id}`} className="btn btn--primary btn--sm">Composer</Link>
+                <Link to={`/draft/team/${t.id}`} className="btn btn--primary btn--sm" aria-label={`Draft en direct pour l’équipe ${t.name}`}>Draft</Link>
+                <Link to={`/compositions?team=${t.id}`} className="btn btn--ghost btn--sm">Composer</Link>
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(t)}>Modifier</button>
                 <button
                   type="button"

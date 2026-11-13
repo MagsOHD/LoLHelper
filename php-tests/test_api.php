@@ -166,6 +166,13 @@ expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), "{\"a\":\"\xC3\x28\"}"), 
 $big = '{"x":"' . str_repeat('a', 262144) . '"}';
 expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), $big), 413, 'oversized body -> 413');
 expect(req('POST', api($A, 'r=store/teams/x1'), auth(), '{}'), 405, 'POST doc -> 405');
+expect(req('PUT', api($A, 'r=store/drafts/team-abc'), auth(), '{"phase":"pick","ally":[]}'), 200, 'PUT draft');
+$r = req('GET', api($A, 'r=store/drafts/team-abc'), auth());
+expect($r, 200, 'GET single doc -> 200');
+check(($r['json']['id'] ?? null) === 'team-abc' && ($r['json']['phase'] ?? null) === 'pick', 'GET single doc returns the stored doc');
+expect(req('GET', api($A, 'r=store/drafts/team-missing'), auth()), 404, 'GET missing doc -> 404');
+expect(req('GET', api($A, 'r=store/drafts/team-abc')), 401, 'GET single doc needs the password');
+expect(req('DELETE', api($A, 'r=store/drafts/team-abc'), auth()), 204, 'cleanup draft');
 expect(req('PUT', api($A, 'r=store/teams'), auth(), '{}'), 405, 'PUT collection -> 405');
 expect(req('DELETE', api($A, 'r=store/teams'), auth()), 405, 'DELETE collection -> 405');
 check(isset(req('POST', api($A, 'r=store/teams/x1'), auth(), '{}')['headers']['allow']), '405 has Allow header');
@@ -199,6 +206,8 @@ check($r['status'] === 204, 'preflight 204 (no password needed)', "got {$r['stat
 check(($r['headers']['access-control-allow-origin'] ?? '') === ORIGIN, 'preflight ACAO');
 check(str_contains($r['headers']['access-control-allow-methods'] ?? '', 'DELETE'), 'preflight methods');
 check(str_contains($r['headers']['access-control-allow-headers'] ?? '', 'X-App-Password'), 'preflight headers');
+check(str_contains($r['headers']['access-control-allow-methods'] ?? '', 'POST')
+    && str_contains($r['headers']['access-control-allow-headers'] ?? '', 'X-Admin-Password'), 'preflight allows POST + X-Admin-Password (meta-collect)');
 $r = req('OPTIONS', api($A, 'r=store/players'), ['Origin' => 'https://evil.example']);
 check($r['status'] === 204 && !isset($r['headers']['access-control-allow-origin']), 'preflight other origin: no CORS headers');
 $r = req('GET', api($A, 'r=meta'), ['Origin' => ORIGIN]);
@@ -311,8 +320,291 @@ expect(req('GET', api($B, 'r=riot/summoner&platform=euw1&puuid=' . PUUID)), 400,
 expect(req('GET', api($B, 'r=riot/account&platform=euw1&gameName=x&tagLine=EUW')), 400, 'no key account', $noKey);
 expect(req('GET', api($B, 'r=riot/match&platform=euw1&id=EUW1_7000000001')), 400, 'no key match', $noKey);
 
+// ---------------------------------------------------------------- drafts collection
+$r = req('GET', api($A, 'r=store/drafts'), auth());
+expect($r, 200, 'drafts empty');
+check($r['json'] === [], 'drafts empty -> []');
+expect(req('GET', api($A, 'r=store/drafts')), 401, 'drafts without password', $MSG_401);
+$draft = '{"source":"manual","allies":[{"player_id":"p-1","champion":"Ahri","locked":false}],"enemies":[],"bans":{"allies":[],"enemies":[]}}';
+$r = req('PUT', api($A, 'r=store/drafts/team-t-2'), auth(), $draft);
+expect($r, 200, 'PUT draft');
+check($r['json']['id'] === 'team-t-2' && $r['json']['allies'][0]['champion'] === 'Ahri', 'draft stored', $r['body']);
+$r = req('PUT', api($A, 'r=store/drafts/team-t-2'), auth(), '{"source":"manual","allies":[],"enemies":[]}');
+expect($r, 200, 'PUT draft upsert');
+$r = req('GET', api($A, 'r=store/drafts'), auth());
+check(count($r['json']) === 1 && $r['json'][0]['allies'] === [], 'draft upserted', $r['body']);
+expect(req('PUT', api($A, 'r=store/drafts/bad_id'), auth(), '{}'), 400, 'draft invalid id');
+$r = req('DELETE', api($A, 'r=store/drafts/team-t-2'), auth());
+check($r['status'] === 204, 'DELETE draft -> 204');
+check(req('GET', api($A, 'r=store/drafts'), auth())['json'] === [], 'drafts empty after delete');
+check(is_file("$T/a/data/drafts.json"), 'drafts stored in data_dir');
+
+// ---------------------------------------------------------------- live draft (companion)
+const PUUID2 = 'Qa1Wb2Ec3Rd4Tf5Yg6Uh7Ij8Ok9Pl0Am1Sn2Do3Fp4Gq5Hr6Js7Kt8Lu9Mv0Nw1Bx2Vy3Cz4Xa5Zb6';
+const MSG_LIVE_INVALID = 'Données du compagnon invalides : ';
+$liveFile = "$T/a/data/live.json";
+
+function companion(array $over = []): array
+{
+    return array_replace([
+        'version' => 1,
+        'puuid' => PUUID,
+        'phase' => 'ban_pick',
+        'queue_id' => 420,
+        'local_cell' => 2,
+        'my_team' => [
+            ['cell' => 0, 'puuid' => '', 'champion_key' => 0, 'intent_key' => 0, 'position' => 'top'],
+            ['cell' => 1, 'puuid' => PUUID2, 'champion_key' => 64, 'intent_key' => 0, 'position' => 'jungle'],
+            ['cell' => 2, 'puuid' => PUUID, 'champion_key' => 0, 'intent_key' => 103, 'position' => 'middle'],
+            ['cell' => 3, 'puuid' => '', 'champion_key' => 2000, 'intent_key' => 0, 'position' => 'bottom'],
+            ['cell' => 4, 'puuid' => '', 'champion_key' => 0, 'intent_key' => 0, 'position' => ''],
+        ],
+        'their_team' => [
+            ['cell' => 5, 'puuid' => '', 'champion_key' => 238],
+            ['cell' => 6, 'puuid' => '', 'champion_key' => 0],
+        ],
+        'bans' => ['mine' => [55, 0], 'theirs' => [238]],
+        'actions' => [
+            ['type' => 'ban', 'champion_key' => 55, 'completed' => true, 'ally' => true, 'cell' => 0, 'in_progress' => false],
+            ['type' => 'pick', 'champion_key' => 103, 'completed' => false, 'ally' => true, 'cell' => 2, 'in_progress' => true],
+        ],
+        'timer_remaining_ms' => 21000,
+        'sent_at' => '2026-11-10T20:00:00Z',
+    ], $over);
+}
+
+function push(string $base, array $payload, ?array $headers = null): array
+{
+    return req('PUT', api($base, 'r=live-draft'), $headers ?? auth(['Content-Type' => 'application/json']), json_encode($payload));
+}
+
+/** Modifie live.json sous le verrou de la collection. */
+function live_file_edit(string $file, callable $fn): void
+{
+    $lock = fopen(dirname($file) . '/live.lock', 'c');
+    flock($lock, LOCK_EX);
+    $docs = json_decode((string) file_get_contents($file), true);
+    file_put_contents($file, json_encode($fn($docs), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    flock($lock, LOCK_UN);
+    fclose($lock);
+}
+
+function iso_ago(int $seconds): string
+{
+    return gmdate('Y-m-d\TH:i:s', time() - $seconds) . '.000Z';
+}
+
+function set_received(string $file, string $docId, string $at): void
+{
+    live_file_edit($file, function (array $docs) use ($docId, $at): array {
+        foreach ($docs as &$d) {
+            if ($d['id'] === $docId) {
+                $d['received_at'] = $at;
+            }
+        }
+        return $docs;
+    });
+}
+
+// internal collection never reachable through store/…
+foreach (['GET' => 'r=store/live', 'PUT' => 'r=store/live/live-p-1', 'DELETE' => 'r=store/live/live-p-1'] as $m => $q) {
+    expect(req($m, api($A, $q), auth(), $m === 'PUT' ? '{}' : null), 404, "store/live $m -> 404", 'Collection inconnue.');
+}
+expect(req('GET', api($A, 'r=store/live/x'), auth()), 404, 'store/live GET doc -> 404');
+
+expect(push($A, companion(), []), 401, 'live PUT without password', $MSG_401);
+expect(push($A, companion(), ['X-App-Password' => 'nope']), 401, 'live PUT wrong password', $MSG_401);
+expect(req('GET', api($A, 'r=live-draft&players=p-1')), 401, 'live GET without password', $MSG_401);
+expect(req('POST', api($A, 'r=live-draft'), auth(), '{}'), 405, 'live POST -> 405');
+expect(req('DELETE', api($A, 'r=live-draft'), auth()), 405, 'live DELETE -> 405');
+
+$MSG_UNKNOWN = "Ce compte Riot n'est pas dans la liste des joueurs du site.";
+expect(push($A, companion()), 404, 'live unknown puuid (no players)', $MSG_UNKNOWN);
+expect(req('PUT', api($A, 'r=store/players/p-1'), auth(), json_encode(['game_name' => 'Un', 'puuid' => PUUID])), 200, 'player p-1');
+expect(req('PUT', api($A, 'r=store/players/p-2'), auth(), json_encode(['game_name' => 'Deux', 'puuid' => PUUID2])), 200, 'player p-2');
+expect(req('PUT', api($A, 'r=store/players/p-3'), auth(), json_encode(['game_name' => 'Trois', 'puuid' => null])), 200, 'player p-3');
+expect(push($A, companion(['puuid' => strrev(PUUID)])), 404, 'live unknown puuid', $MSG_UNKNOWN);
+check(!is_file($liveFile) || !str_contains((string) file_get_contents($liveFile), strrev(PUUID)), 'unknown puuid not stored');
+
+@unlink($FAKE_LOG);
+// Clash / personnalisée : le client révèle le puuid adverse -> conservé ; pseudo et autres champs ignorés.
+$extra = companion([
+    'their_team' => [
+        ['cell' => 5, 'champion_key' => 238, 'puuid' => PUUID2, 'summonerName' => 'Ennemi', 'gameName' => 'Spy', 'summonerId' => 990005],
+        ['cell' => 6, 'champion_key' => 0, 'puuid' => '', 'obfuscatedPuuid' => strrev(PUUID2)],
+        ['cell' => 7, 'champion_key' => 64],
+        ['cell' => 8, 'champion_key' => 0, 'puuid' => null],
+    ],
+    'evil' => str_repeat('x', 1000),
+]);
+$r = push($A, $extra);
+expect($r, 200, 'live PUT valid');
+check($r['json'] === ['ok' => true, 'player_id' => 'p-1'], 'live PUT response', $r['body']);
+check(fake_log() === [], 'live PUT makes no Riot call');
+check(is_file($liveFile) && glob("$T/a/data/*.tmp-*") === [], 'live stored in data_dir, no temp files');
+$stored = (string) @file_get_contents($liveFile);
+check(!str_contains($stored, 'Ennemi') && !str_contains($stored, 'Spy') && !str_contains($stored, 'evil')
+    && !str_contains($stored, '990005') && !str_contains($stored, strrev(PUUID2)), 'unknown fields dropped (only revealed enemy puuid kept)', $stored);
+
+$r = req('GET', api($A, 'r=live-draft&players=p-1'), auth());
+expect($r, 200, 'live GET');
+$live = $r['json']['live'] ?? null;
+check(is_array($live) && $live['player_id'] === 'p-1' && $live['phase'] === 'ban_pick' && $live['puuid'] === PUUID, 'live GET doc', $r['body']);
+check(is_array($live) && !array_key_exists('id', $live), 'live GET hides internal id');
+check(preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/', $live['received_at'] ?? '') === 1
+    && abs(strtotime($live['received_at']) - time()) < 30, 'received_at = server time ISO', $live['received_at'] ?? '');
+check(($live['their_team'] ?? null) === [
+    ['cell' => 5, 'puuid' => PUUID2, 'champion_key' => 238],
+    ['cell' => 6, 'puuid' => '', 'champion_key' => 0],
+    ['cell' => 7, 'puuid' => '', 'champion_key' => 64],
+    ['cell' => 8, 'puuid' => '', 'champion_key' => 0],
+], 'their_team canonical (revealed puuid kept, absent/null -> "")', json_encode($live['their_team'] ?? null));
+check(($live['my_team'][3]['champion_key'] ?? null) === 2000 && ($live['my_team'][4]['position'] ?? null) === '', 'my_team kept');
+check(($live['bans'] ?? null) === ['mine' => [55, 0], 'theirs' => [238]] && count($live['actions'] ?? []) === 2, 'bans/actions kept');
+check(($live['timer_remaining_ms'] ?? null) === 21000 && ($live['sent_at'] ?? null) === '2026-11-10T20:00:00Z' && ($live['queue_id'] ?? null) === 420, 'scalars kept');
+
+// strict validation
+$team6 = array_fill(0, 6, ['cell' => 0, 'champion_key' => 0]);
+$action = ['type' => 'pick', 'champion_key' => 1, 'completed' => false, 'ally' => true, 'cell' => 0, 'in_progress' => false];
+$slot = fn (array $o) => [array_replace(['cell' => 0, 'puuid' => '', 'champion_key' => 0, 'intent_key' => 0, 'position' => 'top'], $o)];
+$bad = [
+    'version 2' => companion(['version' => 2]),
+    'version string' => companion(['version' => '1']),
+    'puuid short' => companion(['puuid' => 'abc']),
+    'puuid traversal' => companion(['puuid' => '../' . substr(PUUID, 3)]),
+    'puuid int' => companion(['puuid' => 12]),
+    'phase unknown' => companion(['phase' => 'ChampSelect']),
+    'queue_id string' => companion(['queue_id' => '420']),
+    'local_cell 10' => companion(['local_cell' => 10]),
+    'my_team object' => companion(['my_team' => ['a' => 1]]),
+    'my_team 6' => companion(['my_team' => $team6]),
+    'my_team item string' => companion(['my_team' => ['x']]),
+    'my_team cell missing' => companion(['my_team' => [['champion_key' => 1]]]),
+    'champion_key 2001' => companion(['my_team' => $slot(['champion_key' => 2001])]),
+    'champion_key -1' => companion(['my_team' => $slot(['champion_key' => -1])]),
+    'champion_key float' => companion(['my_team' => $slot(['champion_key' => 103.5])]),
+    'champion_key string' => companion(['my_team' => $slot(['champion_key' => '103'])]),
+    'intent_key 9999' => companion(['my_team' => $slot(['intent_key' => 9999])]),
+    'position mid' => companion(['my_team' => $slot(['position' => 'mid'])]),
+    'ally puuid bad' => companion(['my_team' => $slot(['puuid' => 'x/y'])]),
+    'their_team 6' => companion(['their_team' => $team6]),
+    'their_team key bool' => companion(['their_team' => [['cell' => 5, 'champion_key' => true]]]),
+    'enemy puuid short' => companion(['their_team' => [['cell' => 5, 'puuid' => 'SECRET-ENEMY-PUUID-5', 'champion_key' => 0]]]),
+    'enemy puuid traversal' => companion(['their_team' => [['cell' => 5, 'puuid' => '../' . substr(PUUID2, 3), 'champion_key' => 0]]]),
+    'enemy puuid int' => companion(['their_team' => [['cell' => 5, 'puuid' => 990005, 'champion_key' => 0]]]),
+    'enemy puuid object' => companion(['their_team' => [['cell' => 5, 'puuid' => ['x' => 1], 'champion_key' => 0]]]),
+    'bans list' => companion(['bans' => [1, 2]]),
+    'bans mine 6' => companion(['bans' => ['mine' => [1, 2, 3, 4, 5, 6], 'theirs' => []]]),
+    'bans theirs bad key' => companion(['bans' => ['mine' => [], 'theirs' => [3000]]]),
+    'actions 31' => companion(['actions' => array_fill(0, 31, $action)]),
+    'action type' => companion(['actions' => [array_replace($action, ['type' => 'swap'])]]),
+    'action completed string' => companion(['actions' => [array_replace($action, ['completed' => 'true'])]]),
+    'action ally missing' => companion(['actions' => [array_diff_key($action, ['ally' => 1])]]),
+    'timer string' => companion(['timer_remaining_ms' => '21000']),
+    'timer huge' => companion(['timer_remaining_ms' => 1e12]),
+    'sent_at format' => companion(['sent_at' => 'hier soir']),
+    'sent_at long' => companion(['sent_at' => '2026-11-10T20:00:00.' . str_repeat('1', 100) . 'Z']),
+];
+$missing = companion();
+unset($missing['phase']);
+$bad['phase missing'] = $missing;
+foreach ($bad as $label => $p) {
+    $r = push($A, $p);
+    expect($r, 400, "live invalid: $label");
+    check(str_starts_with($r['json']['detail'] ?? '', MSG_LIVE_INVALID), "live invalid: $label detail", $r['body']);
+}
+expect(req('PUT', api($A, 'r=live-draft'), auth(), '[1]'), 400, 'live array body');
+expect(req('PUT', api($A, 'r=live-draft'), auth(), '{oops'), 400, 'live invalid JSON');
+expect(req('PUT', api($A, 'r=live-draft'), auth(), '{"version":1,"puuid":"' . PUUID . '","phase":"none","x":"' . str_repeat('a', 262144) . '"}'), 413, 'live oversized body');
+$r = req('GET', api($A, 'r=live-draft&players=p-1'), auth());
+check(($r['json']['live']['phase'] ?? '') === 'ban_pick', 'invalid pushes did not overwrite');
+
+// players filter / freshness window (15 min, server time)
+expect(req('GET', api($A, 'r=live-draft'), auth()), 400, 'live GET no players');
+expect(req('GET', api($A, 'r=live-draft&players='), auth()), 400, 'live GET empty players');
+expect(req('GET', api($A, 'r=live-draft&players=a,b,c,d,e,f'), auth()), 400, 'live GET 6 players');
+expect(req('GET', api($A, 'r=live-draft&players=p-1,bad_id'), auth()), 400, 'live GET bad id');
+expect(req('GET', api($A, 'r=live-draft&players=p-1,'), auth()), 400, 'live GET trailing comma');
+expect(req('GET', api($A, 'r=live-draft&players[]=p-1'), auth()), 400, 'live GET array param');
+$r = req('GET', api($A, 'r=live-draft&players=a,b,c,d,p-1'), auth());
+check(($r['json']['live']['player_id'] ?? '') === 'p-1', 'live GET 5 ids ok');
+$r = req('GET', api($A, 'r=live-draft&players=p-2,p-3'), auth());
+expect($r, 200, 'live GET other players');
+check($r['json'] === ['live' => null], 'live GET none for other players', $r['body']);
+
+// minimal payload, phase "none" accepted (defaults filled)
+$r = push($A, ['version' => 1, 'puuid' => PUUID2, 'phase' => 'none', 'queue_id' => null, 'bans' => null]);
+expect($r, 200, 'live PUT minimal phase none');
+check(($r['json']['player_id'] ?? '') === 'p-2', 'minimal -> p-2');
+$r = req('GET', api($A, 'r=live-draft&players=p-2'), auth());
+$l2 = $r['json']['live'] ?? [];
+check(($l2['phase'] ?? '') === 'none' && $l2['my_team'] === [] && $l2['bans'] === ['mine' => [], 'theirs' => []]
+    && $l2['queue_id'] === null && $l2['timer_remaining_ms'] === null, 'minimal defaults', $r['body']);
+check(str_contains($r['body'], '"bans":{"mine":[],"theirs":[]}') && str_contains($r['body'], '"my_team":[]'), 'empty lists/objects JSON shape', $r['body']);
+$r = push($A, companion(['puuid' => PUUID2, 'timer_remaining_ms' => -150.4, 'local_cell' => -1]));
+check($r['status'] === 200, 'negative timer / local_cell -1 accepted', $r['body']);
+$l2 = req('GET', api($A, 'r=live-draft&players=p-2'), auth())['json']['live'] ?? [];
+check(($l2['timer_remaining_ms'] ?? null) === 0, 'negative timer clamped to 0');
+check(($l2['their_team'] ?? null) === [['cell' => 5, 'puuid' => '', 'champion_key' => 238], ['cell' => 6, 'puuid' => '', 'champion_key' => 0]],
+    'ranked: enemy puuid "" stored as ""', json_encode($l2['their_team'] ?? null));
+
+set_received($liveFile, 'live-p-1', iso_ago(60));
+set_received($liveFile, 'live-p-2', iso_ago(120));
+$r = req('GET', api($A, 'r=live-draft&players=p-2,p-1'), auth());
+check(($r['json']['live']['player_id'] ?? '') === 'p-1', 'most recent of several', $r['body']);
+set_received($liveFile, 'live-p-1', iso_ago(16 * 60));
+$r = req('GET', api($A, 'r=live-draft&players=p-1'), auth());
+check($r['json'] === ['live' => null], 'stale (16 min) -> null', $r['body']);
+$r = req('GET', api($A, 'r=live-draft&players=p-1,p-2'), auth());
+check(($r['json']['live']['player_id'] ?? '') === 'p-2', 'stale ignored, fresh one returned');
+set_received($liveFile, 'live-p-2', iso_ago(14 * 60));
+$r = req('GET', api($A, 'r=live-draft&players=p-1,p-2'), auth());
+check(($r['json']['live']['player_id'] ?? '') === 'p-2', '14 min still fresh');
+set_received($liveFile, 'live-p-2', gmdate('Y-m-d\TH:i:s', time() + 3600) . '.000Z');
+check(req('GET', api($A, 'r=live-draft&players=p-2'), auth())['json'] === ['live' => null], 'future received_at ignored');
+expect(push($A, companion()), 200, 'live re-push refreshes');
+$r = req('GET', api($A, 'r=live-draft&players=p-1'), auth());
+check(($r['json']['live']['phase'] ?? '') === 'ban_pick', 're-push fresh again');
+expect(push($A, companion(['phase' => 'none', 'my_team' => [], 'their_team' => [], 'actions' => []])), 200, 'live push phase none');
+$r = req('GET', api($A, 'r=live-draft&players=p-1'), auth());
+check(($r['json']['live']['phase'] ?? '') === 'none', 'phase none stored and returned');
+$docs = json_decode((string) file_get_contents($liveFile), true);
+check(array_column($docs, 'id') === ['live-p-1', 'live-p-2'], 'one live doc per player', json_encode(array_column($docs, 'id')));
+
+// no password configured (B): open, default data dir
+expect(req('PUT', api($B, 'r=store/players/b-1'), [], json_encode(['puuid' => PUUID])), 200, 'B player');
+expect(push($B, companion(), []), 200, 'B live PUT open');
+check(is_file("$T/b/lolhelper-data/live.json"), 'B live in default data dir');
+
+// ---------------------------------------------------------------- spectator (riot/active-game)
+@unlink($FAKE_LOG);
+$r = req('GET', api($A, 'r=riot/active-game&platform=euw1&puuid=' . PUUID), auth());
+expect($r, 200, 'active-game 200');
+check(($r['json']['gameId'] ?? 0) === 7123456789 && ($r['json']['participants'][0]['puuid'] ?? '') === PUUID, 'active-game body passthrough', $r['body']);
+check(($r['json']['_host'] ?? '') === 'euw1', 'active-game uses platform host');
+check(in_array('/euw1/lol/spectator/v5/active-games/by-summoner/' . PUUID, fake_log(), true), 'active-game upstream path', implode(' | ', fake_log()));
+check(($r['headers']['cache-control'] ?? '') === 'no-store' && !isset($r['headers']['x-cache']), 'active-game not cacheable');
+req('GET', api($A, 'r=riot/active-game&platform=euw1&puuid=' . PUUID), auth());
+check(count(fake_log()) === 2, 'active-game not cached (2 upstream calls)');
+check(!is_dir("$T/a/data/active-games") && glob("$T/a/data/*game*") === [], 'nothing written to disk');
+$r = req('GET', api($A, 'r=riot/active-game&platform=kr&puuid=' . PUUID), auth());
+check(($r['json']['_host'] ?? '') === 'kr', 'active-game kr host');
+$spec = fn (string $prefix) => req('GET', api($A, 'r=riot/active-game&platform=euw1&puuid=' . $prefix . substr(PUUID, strlen($prefix))), auth());
+expect($spec('missing'), 404, 'active-game 404', 'Aucune partie en cours pour ce joueur.');
+$r = $spec('limited');
+expect($r, 429, 'active-game 429', 'Limite de requêtes Riot atteinte, réessaie dans quelques secondes.');
+check(($r['headers']['retry-after'] ?? '') === '5', 'active-game Retry-After copied');
+expect($spec('badkey'), 502, 'active-game 401 -> 502', $msgAuth);
+expect($spec('boom'), 502, 'active-game 500 -> 502', 'Serveur Riot indisponible.');
+expect(req('GET', api($A, 'r=riot/active-game&platform=euw1&puuid=' . PUUID)), 401, 'active-game without password', $MSG_401);
+expect(req('GET', api($A, 'r=riot/active-game&platform=euw1&puuid=short'), auth()), 400, 'active-game bad puuid', 'PUUID invalide.');
+expect(req('GET', api($A, 'r=riot/active-game&platform=europe&puuid=' . PUUID), auth()), 400, 'active-game bad platform');
+expect(req('GET', api($B, 'r=riot/active-game&platform=euw1&puuid=' . PUUID)), 400, 'active-game no key', $noKey);
+expect(req('GET', api($C, 'r=riot/active-game&platform=euw1&puuid=' . PUUID)), 502, 'active-game network error');
+expect(req('PUT', api($A, 'r=riot/active-game&platform=euw1&puuid=' . PUUID), auth(), '{}'), 405, 'active-game PUT -> 405');
+
 // ---------------------------------------------------------------- direct file access
-foreach (['lib/http.php', 'lib/storage.php', 'lib/riot.php', 'lib/config.php'] as $f) {
+foreach (['lib/http.php', 'lib/storage.php', 'lib/riot.php', 'lib/config.php', 'lib/live.php'] as $f) {
     $r = req('GET', "$A/api/$f");
     check($r['status'] === 403 && !str_contains($r['body'], '<?php') && $r['body'] === '', "direct /api/$f -> 403, no source", "got {$r['status']} " . substr($r['body'], 0, 80));
 }
