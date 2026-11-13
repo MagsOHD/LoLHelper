@@ -115,6 +115,8 @@ function write_config(string $site, array $extra): void
         'meta_rate' => 0,
         'meta_time_budget' => 60,
         'meta_min_games' => 3,
+        // Pinned: the fake Riot server only knows challenger/grandmaster seed lists.
+        'meta_tiers' => ['CHALLENGER', 'GRANDMASTER'],
     ];
     file_put_contents("$site/api/config.php", '<?php return ' . var_export(array_merge($base, $extra), true) . ';');
 }

@@ -97,7 +97,7 @@ c'est ce qui permet à l'appli de marcher dans un sous-dossier sans configuratio
 ## 7. Collecte de la méta (tâche planifiée)
 
 La méta (taux de victoire par champion et par rôle, bans, duels de lane) est calculée à partir
-de parties classées Challenger et Grandmaster de votre serveur, récupérées avec votre clé Riot.
+de parties classées Challenger, Grandmaster et Master de votre serveur, récupérées avec votre clé Riot.
 Il faut une clé Riot configurée (étape 1).
 
 Espace client OVH → *Web Cloud* → *Hébergements* → votre hébergement → onglet
@@ -111,14 +111,18 @@ Espace client OVH → *Web Cloud* → *Hébergements* → votre hébergement →
 | Fréquence | Toutes les heures |
 | Alerte e-mail | au choix (utile les premiers jours) |
 
-Chaque passage dure au plus 10 minutes et n'utilise qu'une partie du quota de la clé (0,5 requête
-par seconde), pour laisser de la place aux synchronisations de vos amis. Comptez environ 1 à 2
-jours pour atteindre quelques centaines de parties sur le patch en cours ; avant cela, l'appli
+Chaque passage dure au plus 25 minutes et n'utilise qu'une partie du quota de la clé (0,6 requête
+par seconde, soit environ 900 requêtes par passage, pour une limite de la clé à 100 requêtes par
+2 minutes), afin de laisser de la place aux synchronisations de vos amis. Comptez quelques heures
+pour atteindre quelques centaines de parties sur le patch en cours ; avant cela, l'appli
 fonctionne normalement sans méta. Le bas de page affiche ensuite
 « Méta : patch … · N parties haut elo ».
 
-Réglages optionnels dans `api/config.php` (voir `config.example.php`) : `meta_tiers`
-(ajouter `'MASTER'`), `meta_time_budget`, `meta_rate`, `meta_min_games`, `meta_enabled`.
+Réglages optionnels dans `api/config.php` (voir `config.example.php`) : `meta_tiers`,
+`meta_time_budget`, `meta_rate`, `meta_min_games`, `meta_enabled`. Sans ces lignes, les valeurs
+par défaut s'appliquent (Challenger + Grandmaster + Master, 25 min, 0,6 requête/s). Si votre
+`config.php` a été copié d'une ancienne version de `config.example.php`, il contient encore
+`0.5`, `600` et deux paliers : supprimez ces lignes ou mettez-les à jour.
 
 Si votre nom de domaine pointe directement sur `www/lolhelper/` (et non sur `www/`), renseignez
 `'data_dir'` avec un chemin absolu dans `config.php`, pour que le site et la tâche planifiée

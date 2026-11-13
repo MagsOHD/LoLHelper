@@ -64,7 +64,7 @@ function load_config(string $apiDir): array
 
     // Collecteur méta (cron) : valeurs bornées, défauts si absentes ou invalides.
     $metaEnabled = $raw['meta_enabled'] ?? true;
-    $tiers = $raw['meta_tiers'] ?? ['CHALLENGER', 'GRANDMASTER'];
+    $tiers = $raw['meta_tiers'] ?? ['CHALLENGER', 'GRANDMASTER', 'MASTER'];
     $cleanTiers = [];
     if (is_array($tiers)) {
         foreach ($tiers as $t) {
@@ -73,8 +73,8 @@ function load_config(string $apiDir): array
             }
         }
     }
-    $budget = $raw['meta_time_budget'] ?? 600;
-    $rate = $raw['meta_rate'] ?? 0.5;
+    $budget = $raw['meta_time_budget'] ?? 1500;
+    $rate = $raw['meta_rate'] ?? 0.6;
     $minGames = $raw['meta_min_games'] ?? 300;
 
     return [
@@ -84,9 +84,9 @@ function load_config(string $apiDir): array
         'cors_origins' => $cleanOrigins,
         'data_dir' => (is_string($dataDir) && $dataDir !== '') ? rtrim($dataDir, '/\\') : null,
         'meta_enabled' => is_bool($metaEnabled) ? $metaEnabled : true,
-        'meta_tiers' => $cleanTiers ?: ['CHALLENGER', 'GRANDMASTER'],
-        'meta_time_budget' => (is_int($budget) || is_float($budget)) ? max(1, min(3300, (int) $budget)) : 600,
-        'meta_rate' => (is_int($rate) || is_float($rate)) ? max(0.0, min(20.0, (float) $rate)) : 0.5,
+        'meta_tiers' => $cleanTiers ?: ['CHALLENGER', 'GRANDMASTER', 'MASTER'],
+        'meta_time_budget' => (is_int($budget) || is_float($budget)) ? max(1, min(3300, (int) $budget)) : 1500,
+        'meta_rate' => (is_int($rate) || is_float($rate)) ? max(0.0, min(20.0, (float) $rate)) : 0.6,
         'meta_min_games' => is_int($minGames) ? max(0, $minGames) : 300,
     ];
 }
