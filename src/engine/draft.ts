@@ -24,15 +24,17 @@ import type {
   DraftAdvice,
   DraftEnemyAccount,
   DraftInput,
+  DraftPhase,
   EngineContext,
   EnemyDraftAnalysis,
+  EnemyPlayerInsight,
+  EnemyRolePrediction,
   MasteryEntry,
   MetaStats,
   Pick,
   PickRecommendation,
   PlayerInput,
   PlayerPickAdvice,
-  Rank,
   Role,
   ThreatInfo,
 } from '../api/types';
@@ -74,7 +76,23 @@ import {
   metaUsable,
   smoothedRate,
 } from './meta';
+import {
+  assignOpenRoles,
+  enemyInsight,
+  enemyViews,
+  HIGH_TIERS,
+  linkedRole,
+  linkProfiles,
+  LOW_MASTERY_POINTS,
+  ONE_TRICK_POINTS,
+  oneTrickOf,
+  otEvidence,
+  rankText,
+  type EnemySlotIn,
+  type EnemyView,
+} from './enemies';
 import { banThreatScores, buildMatchupPlanRaw, damageProfileOf, describeThreat } from './plans';
+import { blindEval, predictRoles, PRED_SHOW, type BlindEval, type PredCand } from './predict';
 import { cmpNum, cmpStr, pyRound } from './pycompat';
 import { COUNTER_FR, FAMOUS_COMBOS, ROLE_LABELS, TRAIT_FR } from './tables';
 import { allThemes } from './themes';
@@ -120,23 +138,42 @@ const BAN_COUNTER_FULL = 0.15;
 const BAN_CLOSED_FACTOR = 0.2;
 const BAN_LIMIT = 3;
 
-/** Enemy accounts (game started): mastery points on their champion. */
-export const ONE_TRICK_POINTS = 200_000;
+/** Enemy accounts (game started): mastery points on their champion (ONE_TRICK_POINTS: see enemies.ts). */
+export { ONE_TRICK_POINTS };
 const HIGH_MASTERY_POINTS = 50_000;
-const LOW_MASTERY_POINTS = 10_000;
-const HIGH_TIERS: ReadonlySet<string> = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
-const TIER_FR: Record<string, string> = {
-  IRON: 'Fer',
-  BRONZE: 'Bronze',
-  SILVER: 'Argent',
-  GOLD: 'Or',
-  PLATINUM: 'Platine',
-  EMERALD: 'Émeraude',
-  DIAMOND: 'Diamant',
-  MASTER: 'Maître',
-  GRANDMASTER: 'Grand Maître',
-  CHALLENGER: 'Challenger',
-};
+
+// Draft v2 (enemy information during the draft). Only active when the draft carries `side`, `phase` or
+// `enemy_profiles`: without them every output is exactly the v1 one.
+/**
+ * Blind pick (enemy laner of the role not shown): added to the score
+ *   DRAFT_W_BLIND × expected duel value vs the likely candidates (−1..1, likelihood-weighted)
+ * + DRAFT_W_BLIND_WORST × worst duel value among candidates of relative likelihood ≥ 8 % (≤ 0)
+ * + DRAFT_W_FLEX when the champion has several catalog roles (hides the role).
+ * A 60 % expected duel over thousands of games ≈ +0.06; a 40 % worst case ≈ −0.04.
+ */
+export const DRAFT_W_BLIND = 0.06;
+export const DRAFT_W_BLIND_WORST = 0.04;
+export const DRAFT_W_FLEX = 0.015;
+/** Counter pick (enemy laner shown): the direct lane bonus (DRAFT_W_LANE term) is multiplied by this. */
+export const DRAFT_COUNTER_BOOST = 1.5;
+/** Ban advice: weight of a known enemy player's one-trick champion (their champion still unknown). */
+const BAN_W_SCOUT = 0.6;
+/**
+ * Pick order: how much a role suffers from being counter-picked (late = better). A role whose enemy laner
+ * is already shown gets 0.1; a friend with a single comfortable champion −0.6 (secure it before the second
+ * ban phase), a top recommendation present in ≥ 15 % of the meta games (picks + bans) −0.4, a top
+ * recommendation with a bad blind matchup (worst ≤ −0.4) +0.3. Swaps are suggested from a 0.3 gap.
+ */
+const ROLE_COUNTER_SENS: Record<Role, number> = { TOP: 1.0, MID: 0.9, SUPPORT: 0.5, BOTTOM: 0.4, JUNGLE: 0.2 };
+const ORDER_SHOWN = 0.1;
+const ORDER_NARROW = 0.6;
+const ORDER_CONTESTED = 0.4;
+const ORDER_CONTESTED_PRESENCE = 0.15;
+const ORDER_RISK = 0.3;
+const ORDER_SWAP_MIN = 0.3;
+const ROLE_SHORT: Record<Role, string> = { TOP: 'top', JUNGLE: 'jungle', MID: 'mid', BOTTOM: 'ADC', SUPPORT: 'support' };
+/** Standard draft turns (1..10): B1, R1 R2, B2 B3, R3, R4, B4 B5, R5. */
+const TURNS: Record<'blue' | 'red', readonly number[]> = { blue: [1, 4, 5, 8, 9], red: [2, 3, 6, 7, 10] };
 
 const PLAYSTYLES = allThemes().filter((t) => !t.thematic);
 /** Average champion (every trait at 1) used as the reference for "good answer" reasons. */
@@ -167,6 +204,8 @@ interface AllySlot {
 interface EnemyPickIn {
   champion_id: string;
   role: Role | null;
+  /** index of the enemy slot it comes from */
+  slot?: number;
 }
 
 function allySlots(players: PlayerInput[], draft: DraftInput, catalog: Catalog): AllySlot[] {
@@ -189,21 +228,40 @@ function allySlots(players: PlayerInput[], draft: DraftInput, catalog: Catalog):
   });
 }
 
-function enemyPicks(draft: DraftInput, catalog: Catalog): EnemyPickIn[] {
+/**
+ * Known enemy picks with their roles (explicit, else guessed). `override` (slot index → role, from a known
+ * player linked to that slot) is used as an explicit role when no slot claims that role explicitly.
+ */
+function enemyPicks(draft: DraftInput, catalog: Catalog, override?: ReadonlyMap<number, Role>): EnemyPickIn[] {
   const out: EnemyPickIn[] = [];
   const seen = new Set<string>();
   const usedRoles = new Set<Role>();
-  for (const s of (draft.enemy ?? []).slice(0, 5)) {
+  const slots = (draft.enemy ?? []).slice(0, 5);
+  const explicit = new Set<Role>();
+  if (override?.size) {
+    for (const s of slots) if (s?.champion_id && s.role && ROLE_ORDER.includes(s.role)) explicit.add(s.role);
+  }
+  slots.forEach((s, idx) => {
     const cid = s?.champion_id ? catalog.resolve(s.champion_id) : null;
-    if (!cid || seen.has(cid)) continue;
+    if (!cid || seen.has(cid)) return;
     seen.add(cid);
     let role = s.role && ROLE_ORDER.includes(s.role) ? s.role : null;
+    if (!role && override?.has(idx) && !explicit.has(override.get(idx)!)) role = override.get(idx)!;
     if (role && usedRoles.has(role)) role = null;
     if (role) usedRoles.add(role);
-    out.push({ champion_id: cid, role });
-  }
+    out.push({ champion_id: cid, role, slot: idx });
+  });
   const guessed = guessEnemyRoles(out, catalog);
-  return out.map((e, i) => ({ champion_id: e.champion_id, role: guessed[i] }));
+  return out.map((e, i) => ({ champion_id: e.champion_id, role: guessed[i], slot: e.slot }));
+}
+
+function enemySlotsIn(draft: DraftInput, catalog: Catalog): EnemySlotIn[] {
+  return (draft.enemy ?? []).slice(0, 5).map((s, idx) => ({
+    idx,
+    champ: s?.champion_id ? catalog.resolve(s.champion_id) : null,
+    role: s?.role && ROLE_ORDER.includes(s.role) ? s.role : null,
+    puuid: typeof s?.puuid === 'string' && s.puuid ? s.puuid : null,
+  }));
 }
 
 // --------------------------------------------------------------------------- roles
@@ -292,6 +350,35 @@ interface Scored {
   score: number;
   discovery: boolean;
   hover: boolean;
+  /** v2, enemy laner not shown: blind evaluation vs the likely candidates */
+  blind?: BlindEval | null;
+}
+
+/** Draft v2 data used by the pick advice (null = v1 behaviour). */
+interface DraftV2 {
+  /** likely candidates per enemy role not shown yet */
+  preds: ReadonlyMap<Role, PredCand[]>;
+  /** enemy roles already shown (their laner is known) */
+  shown: ReadonlySet<Role>;
+}
+
+/**
+ * v2 adjustment of a candidate's score: counter pick (enemy laner shown) → the direct lane bonus is
+ * multiplied by DRAFT_COUNTER_BOOST; blind pick → expected / worst duel vs the likely candidates + flex bonus.
+ */
+function v2Adjust(ctx: Ctx, pl: Player, c: Cand, v2: DraftV2): [number, BlindEval | null] {
+  if (v2.shown.has(c.role)) {
+    if (!(c.laneW > 0)) return [0, null];
+    const lane = DRAFT_W_LANE * (2 * c.laneVal - 1) * Math.min(1, c.laneW / LANE_CONF_FULL);
+    return [(DRAFT_COUNTER_BOOST - 1) * lane, null];
+  }
+  const preds = v2.preds.get(c.role);
+  if (!preds?.length) return [0, null];
+  const resolve = (id: string): string | null => ctx.catalog.resolve(id);
+  const hist = pl.inp.lane_history.length ? (opp: string) => laneHistory(pl.inp, c.champ.id, opp, resolve) : null;
+  const b = blindEval(ctx.meta, c.role, c.champ.id, preds, hist);
+  const flex = c.champ.roles.length >= 2 ? DRAFT_W_FLEX : 0;
+  return [DRAFT_W_BLIND * b.expected + DRAFT_W_BLIND_WORST * Math.min(0, b.worst) + flex, b];
 }
 
 function laneShift(picks: readonly Cand[]): number {
@@ -401,6 +488,25 @@ function pickReasons(ctx: Ctx, s: Scored, fixed: readonly Cand[], friends: Reado
           : 'Peu joué : une option si tes champions sont pris',
     );
   }
+  if (s.blind) {
+    const b = s.blind;
+    if (b.worst <= -0.4 && b.worstOpp) {
+      const opp = ctx.catalog.name(b.worstOpp);
+      if (!b.worstFromHistory && b.worstDuel && b.worstDuel[0] >= REASON_DUEL_MIN) {
+        lane.push(`Risqué en blind : perd contre ${opp} (${pyRound((100 * b.worstDuel[1]) / b.worstDuel[0])} % sur ce patch)`);
+      } else if (b.worstFromHistory) {
+        lane.push(`Risqué en blind : tu perds souvent contre ${opp}`);
+      } else {
+        lane.push(`Risqué en blind : duel difficile contre ${opp}`);
+      }
+    } else if (b.coverage >= 0.5 && b.expected >= 0.2 && b.beats.length) {
+      const names = b.beats.slice(0, 2).map((x) => ctx.catalog.name(x));
+      lane.push(`Bon blind pick : favorable contre ${names.join(' et ')}`);
+    } else if (b.coverage >= 0.5 && b.worst >= -0.1) {
+      lane.push('Sûr en blind : aucun duel difficile parmi les champions probables');
+    }
+    if (d.roles.length >= 2) lane.push(`Pick flexible (${d.roles.slice(0, 3).map((r) => ROLE_LABELS[r]).join('/')}) : cache votre rôle`);
+  }
   out.push(...lane);
   // team answer to the enemy lineup, compared with an average champion in this slot
   if (ctx.enemy.length) {
@@ -490,9 +596,17 @@ function pickAdvice(
   blocked: ReadonlySet<string>,
   hover: string | null,
   friends: ReadonlySet<number>,
-): PickRecommendation[] {
+  v2: DraftV2 | null = null,
+): { picks: PickRecommendation[]; top: Scored | null } {
   const allowed: readonly Role[] = role ? [role] : ROLE_ORDER.filter((r) => !takenRoles.has(r));
-  if (!allowed.length) return [];
+  if (!allowed.length) return { picks: [], top: null };
+  const adj = new Map<Cand, [number, BlindEval | null]>();
+  const adjOf = (c: Cand): [number, BlindEval | null] => {
+    if (!v2) return [0, null];
+    let v = adj.get(c);
+    if (!v) adj.set(c, (v = v2Adjust(ctx, pl, c, v2)));
+    return v;
+  };
   const ok = (cid: string): boolean => !ctx.excluded.has(cid) && !blocked.has(cid);
   const cands: Cand[] = pl.base.filter((c) => allowed.includes(c.role) && ok(c.champ.id));
   const have = new Set(cands.map((c) => `${c.champ.id}\u0001${c.role}`));
@@ -525,7 +639,7 @@ function pickAdvice(
         extra.push(makeCand(ctx, pl, r, d, pl.pool.get(d.id) ?? null));
       }
       const pre = (c: Cand): number =>
-        W_META * c.meta + DRAFT_W_LANE * (2 * c.laneVal - 1) * Math.min(1, c.laneW / LANE_CONF_FULL);
+        W_META * c.meta + DRAFT_W_LANE * (2 * c.laneVal - 1) * Math.min(1, c.laneW / LANE_CONF_FULL) + adjOf(c)[0];
       extra.sort((a, b) => cmpNum(pre(b), pre(a)) || cmpStr(a.champ.id, b.champ.id));
       for (const c of extra.slice(0, DISCOVERY_EXTRAS)) {
         have.add(`${c.champ.id}\u0001${r}`);
@@ -536,12 +650,14 @@ function pickAdvice(
   // score, best role per champion
   const bestByChamp = new Map<string, Scored>();
   for (const c of cands) {
+    const [extra, blind] = adjOf(c);
     const s: Scored = {
       cand: c,
-      score: scoreDraftPick(ctx, c, fixed),
+      score: scoreDraftPick(ctx, c, fixed) + extra,
       hover: c.champ.id === hover,
       discovery: c.comfort < DRAFT_KNOWN_COMFORT && !pl.wanted.has(c.champ.id) && c.champ.id !== hover,
     };
+    if (blind) s.blind = blind;
     const cur = bestByChamp.get(c.champ.id);
     if (!cur || s.score > cur.score + 1e-12 || (Math.abs(s.score - cur.score) <= 1e-12 && cmpStr(c.role, cur.cand.role) < 0)) {
       bestByChamp.set(c.champ.id, s);
@@ -578,12 +694,16 @@ function pickAdvice(
     chosen.sort((a, b) => cmpNum(b.score, a.score) || cmpStr(a.cand.champ.id, b.cand.champ.id));
   }
   if (tail) chosen.push(tail);
-  return chosen.slice(0, MAX_PICKS).map((s) => ({
-    champion_id: s.cand.champ.id,
-    score: pyRound(clamp01(s.score) * 100, 1),
-    comfort: pyRound(s.cand.comfort, 3),
-    reasons: pickReasons(ctx, s, fixed, friends),
-  }));
+  const shown = chosen.slice(0, MAX_PICKS);
+  return {
+    picks: shown.map((s) => ({
+      champion_id: s.cand.champ.id,
+      score: pyRound(clamp01(s.score) * 100, 1),
+      comfort: pyRound(s.cand.comfort, 3),
+      reasons: pickReasons(ctx, s, fixed, friends),
+    })),
+    top: shown[0] ?? null,
+  };
 }
 
 // --------------------------------------------------------------------------- bans
@@ -618,6 +738,7 @@ function banAdvice(
   ourLineup: readonly Pick[],
   taken: ReadonlySet<string>,
   enemyOpen: ReadonlySet<Role>,
+  scout: ReadonlyMap<string, string> | null = null,
 ): BanAdvice[] {
   const catalog = ctx.catalog;
   const meta = ctx.meta;
@@ -688,7 +809,13 @@ function banAdvice(
       [BAN_W_META * metaC, metaWhy],
       [BAN_W_TRAIT * traitC, tr ? BAN_TRAIT_WHY[tr[1]] ?? BAN_TRAIT_WHY.generic : ''],
     ];
-    const total = open * (parts[0][0] + parts[1][0] + parts[2][0]);
+    let total = open * (parts[0][0] + parts[1][0] + parts[2][0]);
+    const sc = scout?.get(c.id);
+    if (sc) {
+      // a known enemy player's one-trick: their role is still open by construction
+      parts.push([BAN_W_SCOUT, sc]);
+      total += BAN_W_SCOUT;
+    }
     if (!(total > 0)) continue;
     let why = '';
     let top = 0;
@@ -816,14 +943,6 @@ function mainMastery(acc: DraftEnemyAccount, catalog: Catalog): MasteryEntry | n
   return best;
 }
 
-function rankText(r: Rank | null | undefined): string | null {
-  if (!r || !r.tier) return null;
-  const tier = r.tier.toUpperCase();
-  const label = TIER_FR[tier] ?? r.tier;
-  if (HIGH_TIERS.has(tier)) return `${label} (${r.lp} LP)`;
-  return r.division ? `${label} ${r.division}` : label;
-}
-
 /** Threat / strength / weakness adjustments from the enemy accounts (known once the game has started). */
 function applyAccounts(
   out: EnemyDraftAnalysis,
@@ -942,7 +1061,142 @@ function enemyAnalysis(
   return out;
 }
 
+// --------------------------------------------------------------------------- pick order
+
+interface OrderInfo {
+  L: number;
+  narrow: string | null;
+  contested: [string, number] | null;
+}
+
+/**
+ * Who should pick when (v2, side known, before the end of the picks). Ally slots are in pick order; with
+ * the standard turns (B1, R1 R2, B2 B3, R3, R4, B4 B5, R5) every slot knows how many enemy picks come after
+ * it. Each open slot gets a counter-sensitivity L (ROLE_COUNTER_SENS and adjustments, see constants); the
+ * ideal order sorts open slots by L (most sensitive last), swaps are suggested when the gap is ≥ 0.3.
+ */
+function pickOrderAdvice(
+  side: 'blue' | 'red' | null | undefined,
+  phase: DraftPhase | null,
+  slots: readonly AllySlot[],
+  roles: readonly (Role | null)[],
+  ctx: Ctx,
+  members: readonly AllySlot[],
+  tops: ReadonlyMap<number, Scored | null>,
+  shown: ReadonlySet<Role>,
+  unavailable: ReadonlySet<string>,
+): string[] {
+  if (side !== 'blue' && side !== 'red') return [];
+  if (phase === 'finalization' || phase === 'in_game' || phase === 'ended') return [];
+  const turns = TURNS[side];
+  const enemyTurns = TURNS[side === 'blue' ? 'red' : 'blue'];
+  const label = (i: number): string => `${side === 'blue' ? 'B' : 'R'}${i + 1}`;
+  const after = (i: number): number => enemyTurns.filter((t) => t > turns[i]).length;
+  const afterTxt = (i: number): string => {
+    const n = after(i);
+    return n === 0 ? 'aucun pick adverse après' : n === 1 ? "plus qu'un pick adverse après" : `encore ${n} picks adverses après`;
+  };
+  const open = slots.filter((s) => !s.locked && s.idx < 5);
+  if (!open.some((s) => s.friend)) return [];
+  const memberIdx = new Map(members.map((s, i) => [s.idx, i] as const));
+  const info = new Map<number, OrderInfo>();
+  for (const s of open) {
+    const role = roles[s.idx];
+    let L = role ? (shown.has(role) ? ORDER_SHOWN : ROLE_COUNTER_SENS[role]) : 0.5;
+    let narrow: string | null = null;
+    let contested: [string, number] | null = null;
+    const mi = memberIdx.get(s.idx);
+    if (s.friend && role && mi !== undefined) {
+      const pl = ctx.players[mi];
+      const comfy = [...pl.pool.entries()]
+        .filter(([cid, e]) => e.comfort >= 0.4 && !unavailable.has(cid) && !pl.avoided.has(cid) && !!ctx.catalog.data(cid)?.roles.includes(role))
+        .sort((a, b) => cmpNum(b[1].comfort, a[1].comfort) || cmpStr(a[0], b[0]));
+      if (comfy.length === 1 && comfy[0][1].comfort >= 0.5) {
+        narrow = comfy[0][0];
+        L -= ORDER_NARROW;
+      }
+      const top = tops.get(s.idx);
+      if (top && ctx.meta && top.cand.comfort >= DRAFT_KNOWN_COMFORT) {
+        const id = top.cand.champ.id;
+        const g = Math.max(0, ctx.meta.champions[id]?.[top.cand.role]?.[0] ?? 0);
+        const b = Math.max(0, Number(ctx.meta.bans?.[id] ?? 0));
+        const pres = (g + b) / Math.max(1, ctx.meta.games);
+        if (pres >= ORDER_CONTESTED_PRESENCE) {
+          contested = [id, pres];
+          L -= ORDER_CONTESTED;
+        }
+      }
+      if (top?.blind && top.blind.worst <= -0.4) L += ORDER_RISK;
+    }
+    info.set(s.idx, { L, narrow, contested });
+  }
+  const Lof = (s: AllySlot): number => info.get(s.idx)!.L;
+  const who = (s: AllySlot, pos: number): string => {
+    const r = roles[s.idx];
+    const rl = r ? ` (${ROLE_SHORT[r]})` : '';
+    return s.friend ? `${s.friend.name || s.friend.player_id}${rl}` : `le coéquipier en ${label(pos)}${rl}`;
+  };
+  const cap = (t: string): string => `${t[0].toUpperCase()}${t.slice(1)}`;
+  const positions = open.map((s) => s.idx);
+  const cur = [...open];
+  const out: string[] = [];
+  let swaps = 0;
+  // selection sort with a threshold: the latest open turn goes to the most counter-sensitive slot
+  // (a slot not worth moving keeps its turn and is not moved later on)
+  const settled = new Set<AllySlot>();
+  for (let k = positions.length - 1; k > 0; k--) {
+    let j = k;
+    for (let x = 0; x < k; x++) if (!settled.has(cur[x]) && Lof(cur[x]) > Lof(cur[j]) + 1e-12) j = x;
+    const want = cur[j];
+    const occ = cur[k];
+    if (j === k) continue;
+    if (Lof(want) - Lof(occ) < ORDER_SWAP_MIN) {
+      settled.add(want);
+      continue;
+    }
+    if ((want.friend || occ.friend) && swaps < 2) {
+      out.push(
+        `${cap(who(want, positions[j]))} devrait picker en ${label(positions[k])} (${afterTxt(positions[k])}) : échangez avec ${who(occ, positions[k])}.`,
+      );
+      swaps += 1;
+    }
+    cur[j] = occ;
+    cur[k] = want;
+  }
+  const posOf = (s: AllySlot): number => positions[cur.indexOf(s)];
+  for (const s of cur) {
+    const inf = info.get(s.idx)!;
+    if (!s.friend) continue;
+    const p = posOf(s);
+    if (inf.narrow) {
+      out.push(
+        `${cap(who(s, p))} dépend de ${ctx.catalog.name(inf.narrow)} : à sécuriser tôt${p >= 3 ? ` (en ${label(p)}, son tour vient après la 2e phase de bans)` : ''}.`,
+      );
+    } else if (inf.contested) {
+      out.push(
+        `${ctx.catalog.name(inf.contested[0])} est très disputé sur ce patch (${pyRound(100 * inf.contested[1])} % de présence) : ${who(s, p)} devrait le prendre tôt.`,
+      );
+    }
+  }
+  if (!swaps) {
+    const best = cur.filter((s) => s.friend).sort((a, b) => cmpNum(Lof(b), Lof(a)) || a.idx - b.idx)[0];
+    if (best && Lof(best) >= 0.8) {
+      const p = posOf(best);
+      if (after(p) <= 1) out.push(`Bon ordre : ${who(best, p)} picke en ${label(p)} (${afterTxt(p)}) et pourra contrer son vis-à-vis.`);
+    }
+  }
+  return out.slice(0, 4);
+}
+
 // --------------------------------------------------------------------------- entry point
+
+const DONE_PHASES: ReadonlySet<DraftPhase> = new Set(['in_game', 'ended']);
+const BAN_PHASES: ReadonlySet<DraftPhase> = new Set(['planning', 'ban', 'pick']);
+
+/** Draft v2 (enemy information) is on when the draft carries a side, a phase or enemy profiles. */
+function isV2(d: DraftInput): boolean {
+  return d.side === 'blue' || d.side === 'red' || !!d.phase || !!d.enemy_profiles?.length;
+}
 
 /** Unelided draft advice (the public wrapper applies French elision). */
 export function recommendDraftRaw(
@@ -952,8 +1206,24 @@ export function recommendDraftRaw(
   context: EngineContext = {},
 ): DraftAdvice {
   context = context ?? {};
-  const slots = allySlots(players ?? [], draft ?? { ally: [], enemy: [], bans: [] }, catalog);
-  const enemy = enemyPicks(draft ?? { ally: [], enemy: [], bans: [] }, catalog);
+  const d: DraftInput = draft ?? { ally: [], enemy: [], bans: [] };
+  const v2 = isV2(d);
+  const phase = d.phase ?? null;
+  const live = v2 && !(phase && DONE_PHASES.has(phase));
+  const slots = allySlots(players ?? [], d, catalog);
+  // known enemy players (identities only from enemy_profiles) and the enemy slot each one is on
+  const views = v2 ? enemyViews(d.enemy_profiles, catalog) : [];
+  const eslots = enemySlotsIn(d, catalog);
+  const links = views.length ? linkProfiles(views, eslots, catalog) : new Map<number, number>();
+  const override = new Map<number, Role>();
+  for (const [vi, si] of links) {
+    const es = eslots[si];
+    if (es.champ && !es.role) {
+      const r = linkedRole(views[vi], es.champ, catalog);
+      if (r) override.set(si, r);
+    }
+  }
+  const enemy = enemyPicks(d, catalog, override);
   const roles = assignDraftRoles(slots, catalog);
   const takenRoles = new Set<Role>();
   for (const r of roles) if (r) takenRoles.add(r);
@@ -978,7 +1248,7 @@ export function recommendDraftRaw(
     if (r) roleAssign[inputs[i].player_id] = r;
     if (s.locked && s.champ) lockedPicks[inputs[i].player_id] = s.champ;
   });
-  const bans = (draft?.bans ?? []).map((b) => catalog.resolve(b) ?? b);
+  const bans = (d.bans ?? []).map((b) => catalog.resolve(b) ?? b);
   const options = normOptions({
     role_assignments: roleAssign,
     locked_picks: lockedPicks,
@@ -1009,9 +1279,53 @@ export function recommendDraftRaw(
   // every champion already picked or hovered, both sides
   const taken = new Set<string>(ctx.excluded);
   for (const s of slots) if (s.champ) taken.add(s.champ);
+  // banned or locked by either team (hovers stay pickable by the enemy)
+  const unavailable = new Set<string>(ctx.excluded);
+  for (const c of fixed) unavailable.add(c.champ.id);
+
+  // v2: known players' champions / roles, likely picks for the enemy roles not shown yet
+  const shown = new Set<Role>();
+  for (const e of enemy) if (e.role) shown.add(e.role);
+  const openEnemy = ROLE_ORDER.filter((r) => !shown.has(r));
+  const viewChamp = new Map<number, { champ: string; role: Role | null }>();
+  for (const [vi, si] of links) {
+    const es = eslots[si];
+    if (es.champ) viewChamp.set(vi, { champ: es.champ, role: enemy.find((e) => e.slot === si)?.role ?? null });
+  }
+  const forced = new Map<number, Role>();
+  const free: EnemyView[] = [];
+  for (const v of views) {
+    if (viewChamp.has(v.idx)) continue;
+    const pc = v.prof.champion_id ? catalog.resolve(v.prof.champion_id) : null;
+    if (pc) {
+      viewChamp.set(v.idx, { champ: pc, role: v.explicitRole });
+      continue;
+    }
+    const si = links.get(v.idx);
+    const sr = si !== undefined ? eslots[si].role : null;
+    if (sr) forced.set(v.idx, sr);
+    free.push(v);
+  }
+  const assigned = live && free.length ? assignOpenRoles(free, openEnemy, forced) : new Map<number, Role>();
+  let preds = new Map<Role, PredCand[]>();
+  if (live) {
+    const byRole = new Map<Role, EnemyView>();
+    for (const [vi, r] of assigned) byRole.set(r, views[vi]);
+    preds = predictRoles({
+      catalog,
+      meta: ctx.meta,
+      roles: openEnemy,
+      excluded: unavailable,
+      ours: fixed.map((c) => ({ role: c.role, champ: c.champ })),
+      theirs: ctx.enemy,
+      players: byRole,
+    });
+  }
+  const v2data: DraftV2 | null = live ? { preds, shown } : null;
 
   const advice: PlayerPickAdvice[] = [];
   const likely: LikelyPick[] = [];
+  const tops = new Map<number, Scored | null>();
   members.forEach((s, i) => {
     if (!s.friend) return;
     const pl = ctx.players[i];
@@ -1024,15 +1338,16 @@ export function recommendDraftRaw(
     }
     const blocked = new Set<string>();
     for (const o of slots) if (o.idx !== s.idx && o.champ) blocked.add(o.champ);
-    const picks = pickAdvice(ctx, pl, role, takenRoles, fixed, blocked, s.champ, friendIdx);
-    advice.push({ player_id: s.friend.player_id, role, locked_champion_id: null, picks });
+    const res = pickAdvice(ctx, pl, role, takenRoles, fixed, blocked, s.champ, friendIdx, v2data);
+    tops.set(s.idx, res.top);
+    advice.push({ player_id: s.friend.player_id, role, locked_champion_id: null, picks: res.picks });
     const hover = s.champ ? catalog.data(s.champ) : undefined;
     const hoverRole = hover ? (role && hover.roles.includes(role) ? role : role ?? hover.roles[0] ?? null) : null;
     if (hover && hoverRole) likely.push({ pl, champ: hover, role: hoverRole, w: 1 });
     likely.push(...likelyPicks(ctx, pl, role, taken));
   });
 
-  // ban advice: against our locked picks plus each open friend's main champion
+  // ban advice: against our locked picks plus each open friend's main champion (+ known one-tricks)
   const enemyOpen = new Set<Role>(ROLE_ORDER);
   for (const e of enemy) if (e.role) enemyOpen.delete(e.role);
   const lineupForBans: Pick[] = [...fixedPicks];
@@ -1042,11 +1357,54 @@ export function recommendDraftRaw(
     seenPl.add(lp.pl);
     lineupForBans.push({ role: lp.role, champion_id: lp.champ.id });
   }
-  const bansOut = banAdvice(ctx, likely, lineupForBans, taken, enemyOpen);
+  const bansOpen = !phase || BAN_PHASES.has(phase);
+  let scout: Map<string, string> | null = null;
+  if (views.length && bansOpen) {
+    scout = new Map();
+    for (const v of views) {
+      if (viewChamp.has(v.idx)) continue;
+      const ot = oneTrickOf(v);
+      if (!ot || taken.has(ot.champion) || scout.has(ot.champion)) continue;
+      const r = assigned.get(v.idx) ?? v.mainRole;
+      if (r && !enemyOpen.has(r)) continue;
+      scout.set(ot.champion, `One-trick adverse${r ? ` (${ROLE_LABELS[r]})` : ''} : ${otEvidence(ot)}`);
+    }
+  }
+  const bansOut = banAdvice(ctx, likely, lineupForBans, taken, enemyOpen, scout);
 
-  const enemyOut = enemyAnalysis(enemy, fixedPicks, draft?.enemy_accounts ?? [], catalog, {
+  const enemyOut = enemyAnalysis(enemy, fixedPicks, d.enemy_accounts ?? [], catalog, {
     meta: context.meta,
     players: players ?? [],
   });
-  return { players: advice, bans: bansOut, enemy: enemyOut, predictions: [], pick_order: [], enemy_players: [] };
+
+  const predictions: EnemyRolePrediction[] = [];
+  if (live) {
+    for (const r of openEnemy) {
+      const list = preds.get(r) ?? [];
+      if (!list.length) continue;
+      predictions.push({
+        role: r,
+        candidates: list.slice(0, PRED_SHOW).map((c) => ({
+          champion_id: c.champion_id,
+          likelihood: pyRound(c.likelihood, 3),
+          why: c.why,
+          ...(c.player_puuid ? { player_puuid: c.player_puuid } : {}),
+        })),
+      });
+    }
+  }
+  const enemyPlayers: EnemyPlayerInsight[] = views.map((v) => {
+    const vc = viewChamp.get(v.idx);
+    if (vc) return enemyInsight(v, { champion: vc.champ, role: vc.role, excluded: unavailable, bansOpen }, catalog);
+    const si = links.get(v.idx);
+    const role = assigned.get(v.idx) ?? (si !== undefined ? eslots[si].role : null) ?? null;
+    const fromPreds = role ? (preds.get(role) ?? []).filter((c) => c.player_puuid === v.puuid).slice(0, 3).map((c) => c.champion_id) : [];
+    return enemyInsight(
+      v,
+      { champion: null, role, excluded: unavailable, likely: fromPreds.length ? fromPreds : undefined, bansOpen },
+      catalog,
+    );
+  });
+  const pickOrder = live ? pickOrderAdvice(d.side, phase, slots, roles, ctx, members, tops, shown, unavailable) : [];
+  return { players: advice, bans: bansOut, enemy: enemyOut, predictions, pick_order: pickOrder, enemy_players: enemyPlayers };
 }

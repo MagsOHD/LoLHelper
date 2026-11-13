@@ -38,6 +38,7 @@ import {
   WIN,
 } from './tables';
 import { detectThemes, lorePairs, type ThemeDef } from './themes';
+import { matchupEnemies } from './enemies';
 
 const ROLE_ORDER: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'BOTTOM', 'SUPPORT'];
 
@@ -897,13 +898,27 @@ function objectivesVs(ours: Team, enemy: Team, theirStrat: ThemeDef | null, thei
   return out;
 }
 
-/** Unelided matchup plan (the public wrapper applies French elision). */
+/**
+ * Unelided matchup plan (the public wrapper applies French elision). With `context.enemy_profiles`
+ * (non-empty) the plan also carries `enemy_players` and phase-by-phase `attention`.
+ */
 export function buildMatchupPlanRaw(
   ally: Pick[],
   enemy: Pick[],
   catalog: Catalog,
   context: EngineContext = {},
 ): MatchupPlan {
+  const plan = matchupPlanBase(ally, enemy, catalog, context ?? {});
+  const profiles = context?.enemy_profiles;
+  if (profiles?.length) {
+    const known = matchupEnemies(ally ?? [], enemy ?? [], profiles, catalog);
+    plan.enemy_players = known.players;
+    plan.attention = known.attention;
+  }
+  return plan;
+}
+
+function matchupPlanBase(ally: Pick[], enemy: Pick[], catalog: Catalog, context: EngineContext): MatchupPlan {
   const meta = metaUsable(context.meta) ? context.meta : null;
   const playerByRole = new Map<Role, PlayerInput>();
   if (context.players?.length) {
