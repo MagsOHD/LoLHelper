@@ -438,8 +438,8 @@ export function mergeCompanion(base: DraftState, live: LiveMapping, held: Iterab
 export const MAX_SCOUTED = DRAFT_SIZE;
 /** Profiles kept in the document: 5 scouted + 5 from the client / the started game. */
 export const MAX_ENEMY_PROFILES = 2 * DRAFT_SIZE;
-const PROFILE_SOURCES: EnemyProfileSource[] = ['scouting', 'client', 'game'];
-const SOURCE_RANK: Record<EnemyProfileSource, number> = { scouting: 0, client: 1, game: 2 };
+const PROFILE_SOURCES: EnemyProfileSource[] = ['scouting', 'clash', 'client', 'game'];
+const SOURCE_RANK: Record<EnemyProfileSource, number> = { scouting: 0, clash: 1, client: 2, game: 3 };
 const MAX_RIOT_ID = 64;
 
 const finite = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);

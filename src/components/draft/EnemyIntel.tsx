@@ -21,9 +21,10 @@ import { BulletList, Chip, RoleBadge, Spinner } from '../ui';
 
 type ChampMap = Map<string, ChampionInfo>;
 
-const SOURCE_LABEL: Record<EnemyProfileSource, string> = { scouting: 'Repéré', client: 'Client', game: 'Partie' };
+const SOURCE_LABEL: Record<EnemyProfileSource, string> = { scouting: 'Repéré', clash: 'Clash', client: 'Client', game: 'Partie' };
 const SOURCE_TITLE: Record<EnemyProfileSource, string> = {
   scouting: 'Ajouté par Riot ID (repérage)',
+  clash: 'Membre de l’équipe Clash adverse (API Clash)',
   client: 'Révélé par le client (Clash, tournoi ou partie personnalisée)',
   game: 'Connu depuis le début de la partie',
 };
