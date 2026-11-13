@@ -52,7 +52,7 @@ export function InGamePanel({ draft, profiles, statuses }: { draft: DraftState; 
   const ally: Pick[] = allyFilled.map((s, i) => ({ role: roles[i] ?? 'MID', champion_id: s.champion_id as string, player_id: s.player_id ?? null }));
   const enemy = enemyFilled.map((s) => ({ champion_id: s.champion_id as string, ...(s.role ? { role: s.role } : {}) }));
   // Profiles arrive one by one: the plan is recomputed (previous one kept on screen meanwhile).
-  const key = JSON.stringify([ally, enemy, profiles.map((p) => [p.puuid, p.fetched_at, p.champion_id, p.role])]);
+  const key = JSON.stringify([ally, enemy, profiles.map((p) => [p.puuid, p.fetched_at, p.champion_id, p.role, p.clash_position ?? null])]);
   const plan = useQuery({
     queryKey: ['draft-matchup', key],
     queryFn: () => api.matchup({ ally, enemy, ...(profiles.length ? { enemy_profiles: profiles } : {}) }),

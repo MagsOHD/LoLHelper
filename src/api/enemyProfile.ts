@@ -3,7 +3,7 @@
 // RecentSummary + PlaystyleStats. Every Riot call goes through the shared client rate limiter
 // (riotGet); profiles are deduplicated while in flight and cached per puuid for the session.
 import type { ChampionCatalog } from '../engine';
-import type { EnemyPlayerProfile, EnemyProfileSource, MasteryEntry, PlaystyleStats, RecentSummary, Role } from './types';
+import type { ClashPosition, EnemyPlayerProfile, EnemyProfileSource, MasteryEntry, PlaystyleStats, RecentSummary, Role } from './types';
 import { ApiError } from './backend';
 import {
   aggregateRecent,
@@ -19,8 +19,9 @@ import {
   type RiotTransport,
 } from './riot';
 import { parseRiotId } from '../lib/format';
+import { extractTimelineStyle, pickTimelineGames, TIMELINE_COUNT } from './timeline';
 
-/** Match history depth: scouting is done ahead of time, client/game profiles must be quick. */
+/** Match history depth: scouting is done ahead of time, client/game/Clash-roster profiles must be quick. */
 export const SCOUT_MATCH_COUNT = 10;
 export const QUICK_MATCH_COUNT = 5;
 export const PROFILE_MASTERY_COUNT = 20;
@@ -35,9 +36,9 @@ export const MIN_GAME_MINUTES = 5;
 
 export const matchCountFor = (source: EnemyProfileSource): number => (source === 'scouting' ? SCOUT_MATCH_COUNT : QUICK_MATCH_COUNT);
 
-/** Upper bound of Riot calls for one profile. */
-export function profileCallBudget(matchCount: number, needsAccount: boolean): number {
-  return (needsAccount ? 1 : 0) + PROFILE_BASE_CALLS + matchCount;
+/** Upper bound of Riot calls for one profile: (account) + 4 + one per match + up to 3 timelines. */
+export function profileCallBudget(matchCount: number, needsAccount: boolean, timelines: number = TIMELINE_COUNT): number {
+  return (needsAccount ? 1 : 0) + PROFILE_BASE_CALLS + matchCount + Math.min(Math.max(0, timelines), matchCount);
 }
 
 // ---- playstyle aggregation (pure) --------------------------------------------------------------
@@ -205,6 +206,11 @@ export interface ProfileRequest {
   role?: Role | null;
   /** Defaults to matchCountFor(source). */
   match_count?: number;
+  /** Timelines analysed among the recent games (TIMELINE_COUNT; 0 = none). */
+  timeline_count?: number;
+  /** Known from a Clash roster: stored with the profile. */
+  clash_position?: ClashPosition | null;
+  clash_team?: EnemyPlayerProfile['clash_team'];
 }
 
 export interface ProfileProgress {
@@ -274,9 +280,10 @@ export interface BuiltProfile {
  */
 export async function buildEnemyProfile(req: ProfileRequest, catalog: CatalogLike, options: BuildOptions = {}): Promise<BuiltProfile> {
   const count = Math.max(0, Math.min(20, Math.trunc(req.match_count ?? matchCountFor(req.source))));
+  const timelineCount = Math.max(0, Math.min(TIMELINE_COUNT, Math.trunc(req.timeline_count ?? TIMELINE_COUNT)));
   let puuid = req.puuid || '';
   let riotId = req.riot_id?.trim() || null;
-  const budget = new CallBudget(profileCallBudget(count, !puuid), options.transport, options.onProgress);
+  const budget = new CallBudget(profileCallBudget(count, !puuid, timelineCount), options.transport, options.onProgress);
   budget.report();
   if (!puuid) {
     const id = riotId ? parseRiotId(riotId) : null;
@@ -303,10 +310,26 @@ export async function buildEnemyProfile(req: ProfileRequest, catalog: CatalogLik
     throw new ApiError(`Aucun compte League of Legends trouvé sur le serveur ${platform} pour ce joueur.`, 404);
   }
   const matchIds = (Array.isArray(ids) ? ids : []).filter((x): x is string => typeof x === 'string').slice(0, count);
-  budget.total = budget.calls + matchIds.length;
+  budget.total = budget.calls + matchIds.length + Math.min(timelineCount, matchIds.length);
   budget.report();
   const raws = await mapPool(matchIds, PROFILE_MATCH_CONCURRENCY, (id) => orNull(budget.get<RawMatch>('match', { platform, id })));
   const matches = raws.filter((m): m is RawMatch => !!m && typeof m === 'object');
+  // Timelines of up to 3 of these games (cached forever by the proxy). Optional: any failure
+  // (route not deployed, rate limit after the retries) only drops that game.
+  const timelineIds = pickTimelineGames(matches, puuid, timelineCount);
+  budget.total = budget.calls + timelineIds.length;
+  budget.report();
+  const timelines: Record<string, unknown> = {};
+  await mapPool(timelineIds, PROFILE_MATCH_CONCURRENCY, async (id) => {
+    try {
+      const t = await budget.get<unknown>('match-timeline', { platform, id });
+      if (t && typeof t === 'object') timelines[id] = t;
+    } catch {
+      /* optional */
+    }
+  });
+  const style = aggregatePlaystyle(matches, puuid);
+  const timeline = style ? extractTimelineStyle(timelines, matches, puuid) : null;
   const masteries: MasteryEntry[] = mapMasteries(Array.isArray(masteriesRaw) ? masteriesRaw : [], catalog, PROFILE_MASTERY_COUNT);
   const recent = compactRecent(aggregateRecent(matches.map(summarizeMatch), puuid, catalog));
   const now = options.now ? options.now() : Date.now();
@@ -318,9 +341,10 @@ export async function buildEnemyProfile(req: ProfileRequest, catalog: CatalogLik
     rank: pickRank(Array.isArray(entries) ? entries : []),
     masteries,
     recent,
-    style: aggregatePlaystyle(matches, puuid),
+    style: style && timeline ? { ...style, timeline } : style,
     champion_id: req.champion_id ?? null,
     role: req.role ?? null,
+    ...(req.clash_team !== undefined ? { clash_team: req.clash_team, clash_position: req.clash_team ? req.clash_position ?? null : null } : {}),
     fetched_at: new Date(now).toISOString(),
   };
   return { profile, calls: budget.calls };
@@ -477,13 +501,18 @@ export class EnemyProfileService {
 
 /** The cached profile seen through a new request (source, champion, role, display Riot ID). */
 function withRequest(p: EnemyPlayerProfile, req: ProfileRequest): EnemyPlayerProfile {
-  return {
+  const out: EnemyPlayerProfile = {
     ...p,
     source: req.source,
     riot_id: p.riot_id ?? req.riot_id ?? null,
     champion_id: req.champion_id ?? p.champion_id ?? null,
     role: req.role ?? p.role ?? null,
   };
+  if (req.clash_team) {
+    out.clash_team = req.clash_team;
+    out.clash_position = req.clash_position ?? null;
+  }
+  return out;
 }
 
 /** Aggregated progress of the builds in flight (for the "Appels Riot" bar). */

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, errorMessage, MOCK_MODE } from '../api/client';
-import { activeEnemyProfiles, draftDocId, emptyDraft, scoutedProfiles, usedChampions, MAX_BANS, type DraftKind } from '../api/draft';
+import { activeEnemyProfiles, clashProfiles, draftDocId, emptyDraft, keptOnReset, scoutedProfiles, usedChampions, MAX_BANS, type DraftKind } from '../api/draft';
+import { useOurClashTeam, useUpcomingClash } from '../api/clashHooks';
 import { useDraftAdvice, useDraftEngine, useDraftSession, useEnemyProfiles } from '../api/draftHooks';
 import type { DraftSnapshot } from '../api/draftSession';
 import { useMeta, usePlayers, useTeams } from '../api/hooks';
@@ -12,6 +13,7 @@ import { BanAdviceCard, EnemyAnalysisCard, PickAdviceCard } from '../components/
 import { DraftBoard } from '../components/draft/DraftBoard';
 import { EnemyPlayersCard, PickOrderCard, PredictionsCard, RiotProgress, ScoutingPanel } from '../components/draft/EnemyIntel';
 import { InGamePanel } from '../components/draft/InGamePanel';
+import { OurClashCard } from '../components/clash/ClashCards';
 import { EmptyState, ErrorMessage, Skeleton, Spinner } from '../components/ui';
 
 /** Automatic game detection while the draft is over but the game not detected yet. */
@@ -68,6 +70,8 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
     const ids = new Set([...initial.player_ids, ...(draft?.ally.map((s) => s.player_id).filter((x): x is string => !!x) ?? [])]);
     return players.filter((p) => ids.has(p.id));
   }, [players, initial.player_ids, draft?.ally]);
+  const clashTournaments = useUpcomingClash(platform, canFetchProfiles);
+  const ourClash = useOurClashTeam(session, draft, friends, platform, canFetchProfiles, Boolean(snap?.loaded), Boolean(snap?.liveFresh));
 
   const h = useMemo(() => ({
     hold: (p: string) => session?.hold(p),
@@ -115,7 +119,7 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
     if (!session || !draft) return;
     if (!window.confirm('Réinitialiser la draft pour toute l’équipe ? (les adversaires repérés sont conservés)')) return;
     const fresh = emptyDraft(draft.id, initial.player_ids, initial.team_id ?? null);
-    session.replace({ ...fresh, enemy_profiles: scoutedProfiles(draft) });
+    session.replace({ ...fresh, enemy_profiles: keptOnReset(draft) });
     setDetect({ busy: false, msg: null, error: null });
   };
 
@@ -224,8 +228,11 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
             onEnemy={setEnemy}
             onBans={setBans}
           />
+          {!inGame && <OurClashCard clash={ourClash} players={friends} tournaments={clashTournaments} enabled={canFetchProfiles} />}
           {!inGame && <ScoutingPanel
             profiles={scouted}
+            clash={clashProfiles(draft)}
+            clashNotes={enemyProfiles.clashNotes}
             statuses={enemyProfiles.statuses}
             insights={advice?.enemy_players ?? []}
             platforms={meta.data?.platforms ?? [platform]}

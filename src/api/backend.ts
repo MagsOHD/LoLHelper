@@ -84,6 +84,8 @@ export interface RequestOptions {
    * default). A function receives the French detail and decides (admin password routes).
    */
   authEvent?: boolean | ((detail: string | null) => boolean);
+  /** Called with the response headers of every HTTP answer (errors included), before parsing. */
+  onHeaders?: (headers: Headers, status: number) => void;
 }
 
 /** Calls the PHP API. Resolves with the parsed JSON body (undefined for 204), throws ApiError. */
@@ -105,6 +107,13 @@ export async function backendRequest<T>(method: Method, route: string, options: 
     res = await fetch(apiUrl(route, params), init);
   } catch {
     throw new ApiError('Impossible de joindre le serveur. Vérifie ta connexion internet.', 0);
+  }
+  if (options.onHeaders) {
+    try {
+      options.onHeaders(res.headers, res.status);
+    } catch {
+      /* header bookkeeping never breaks a request */
+    }
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();

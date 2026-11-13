@@ -5,8 +5,11 @@ import { useId, useState, type FormEvent } from 'react';
 import { useChampionMap } from '../../api/hooks';
 import { overallProgress, type ProfileStatus } from '../../api/enemyProfile';
 import { MAX_SCOUTED } from '../../api/draft';
+import { clashRole } from '../../api/clash';
+import { formatClock } from '../../api/timeline';
 import type {
   ChampionInfo,
+  ClashPosition,
   EnemyPlayerInsight,
   EnemyPlayerProfile,
   EnemyProfileSource,
@@ -30,6 +33,51 @@ const SOURCE_TITLE: Record<EnemyProfileSource, string> = {
 };
 
 const fr1 = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString('fr-FR')}`;
+const LANE_SHORT: Partial<Record<Role, string>> = { TOP: 'top', MID: 'mid', BOTTOM: 'bot' };
+const CLASH_POSITION_LABEL: Record<ClashPosition, string> = {
+  TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'ADC', UTILITY: 'Support', FILL: 'Remplaçant', UNSELECTED: 'Non choisi',
+};
+
+/** "[OMB] Les Ombres · Mid": the enemy's Clash team and declared position. */
+export function ClashBadge({ team, position }: { team: EnemyPlayerProfile['clash_team']; position?: ClashPosition | null }) {
+  if (!team) return null;
+  const pos = position ? CLASH_POSITION_LABEL[position] : null;
+  const known = !!clashRole(position);
+  return (
+    <span className="eclash" title={`Équipe Clash « ${team.name} »${pos ? ` — poste déclaré : ${pos}` : ''}`}>
+      <span className="sr-only">Équipe Clash </span>
+      {team.abbreviation && <span className="eclash__tag">{team.abbreviation}</span>}
+      <span className="eclash__name">{team.name}</span>
+      {pos && <span className={`eclash__pos ${known ? '' : 'eclash__pos--unknown'}`}><span className="sr-only">, poste déclaré : </span><span aria-hidden="true"> · </span>{pos}</span>}
+    </span>
+  );
+}
+
+/** Early-game facts from a few match timelines (gold/CS at 10, first gank/back, level 6, wards). */
+export function TimelineFacts({ p }: { p: EnemyPlayerProfile }) {
+  const t = p.style?.timeline;
+  if (!t || !t.games) return null;
+  const facts: { k: string; v: string; tone?: 'pos' | 'neg' }[] = [];
+  if (t.gold_diff_10 !== null) facts.push({ k: 'Or à 10 min', v: signed(t.gold_diff_10), tone: t.gold_diff_10 >= 300 ? 'neg' : t.gold_diff_10 <= -300 ? 'pos' : undefined });
+  if (t.cs_10 !== null) facts.push({ k: 'CS à 10 min', v: fr1(t.cs_10) });
+  facts.push({ k: 'Kills < 10 min', v: fr1(t.kills_before_10) });
+  facts.push({ k: 'Morts < 10 min', v: fr1(t.deaths_before_10) });
+  if (t.first_gank_minute !== null) facts.push({ k: '1er gank', v: `${formatClock(t.first_gank_minute)}${t.first_gank_lane && LANE_SHORT[t.first_gank_lane] ? ` ${LANE_SHORT[t.first_gank_lane]}` : ''}` });
+  if (t.first_back_minute !== null) facts.push({ k: '1er retour', v: formatClock(t.first_back_minute) });
+  if (t.level6_minute !== null) facts.push({ k: 'Niveau 6', v: formatClock(t.level6_minute) });
+  facts.push({ k: 'Balises/min', v: fr1(t.wards_per_min) });
+  return (
+    <div className="etl">
+      <p className="etl__title">Début de partie <span className="muted">· {t.games} partie{t.games > 1 ? 's' : ''} analysée{t.games > 1 ? 's' : ''}</span></p>
+      <dl className="estats estats--tl" aria-label={`Chronologie de ${t.games} parties récentes`}>
+        {facts.map((f) => (
+          <div key={f.k}><dt>{f.k}</dt><dd className={f.tone ? `etl__v--${f.tone}` : undefined}>{f.v}</dd></div>
+        ))}
+      </dl>
+    </div>
+  );
+}
 const pctTxt = (n: number) => `${Math.round(n * 100)} %`;
 const kPoints = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
 
@@ -56,11 +104,17 @@ function topChampions(p: EnemyPlayerProfile, n = 4): { id: string; detail: strin
 }
 
 /** "Riot ID", else "Leur jungler (Lee Sin)"-like label; never anything the sources did not give. */
-export function enemyLabel(p: { riot_id?: string | null; champion_id?: string | null; role?: Role | null }, champs: ChampMap): string {
+export function enemyLabel(
+  p: { riot_id?: string | null; champion_id?: string | null; role?: Role | null; clash_position?: ClashPosition | null; clash_team?: EnemyPlayerProfile['clash_team'] },
+  champs: ChampMap,
+): string {
   if (p.riot_id) return p.riot_id;
   const champ = p.champion_id ? champs.get(p.champion_id)?.name ?? p.champion_id : null;
   if (champ) return `Joueur de ${champ}`;
   if (p.role) return `Adversaire ${ROLE_LABEL[p.role].toLowerCase()}`;
+  const declared = p.clash_team ? clashRole(p.clash_position) : null;
+  if (declared) return `${p.clash_team?.abbreviation || 'Clash'} · ${ROLE_LABEL[declared]}`;
+  if (p.clash_team) return `Membre de ${p.clash_team.name}`;
   return 'Adversaire';
 }
 
@@ -88,7 +142,9 @@ export function EnemyProfileCard({ profile, insight, onRemove }: {
   const champs = useChampionMap();
   const label = enemyLabel({ ...profile, champion_id: insight?.champion_id ?? profile.champion_id }, champs);
   const champ = insight?.champion_id ?? profile.champion_id ?? null;
+  const declared = clashRole(profile.clash_position);
   const roles = mainRoles(profile);
+  if (!roles.length && declared) roles.push(declared);
   const tops = topChampions(profile);
   const headingId = useId();
   return (
@@ -124,16 +180,18 @@ export function EnemyProfileCard({ profile, insight, onRemove }: {
           ))}
         </ul>
       )}
+      {profile.clash_team && <div className="eprofile__row"><ClashBadge team={profile.clash_team} position={profile.clash_position} /></div>}
       {insight && insight.style_tags.length > 0 && (
         <div className="chips" aria-label="Style de jeu">{insight.style_tags.map((t) => <Chip key={t} tone="amber">{t}</Chip>)}</div>
       )}
       <StatLine p={profile} />
+      <TimelineFacts p={profile} />
     </article>
   );
 }
 
 function StatusRow({ s, onRetry, onRemove }: { s: ProfileStatus; onRetry: () => void; onRemove: () => void }) {
-  const label = s.riot_id ?? 'Adversaire';
+  const label = s.riot_id ?? (s.source === 'clash' ? 'Membre de leur équipe Clash' : 'Adversaire');
   const total = Math.max(s.total, s.calls, 1);
   return (
     <li className={`estatus estatus--${s.state}`}>
@@ -172,8 +230,11 @@ export function RiotProgress({ statuses }: { statuses: ProfileStatus[] }) {
 }
 
 /** "Repérage des adversaires": up to 5 Riot IDs, fetched in the background and shared with the team. */
-export function ScoutingPanel({ profiles, statuses, insights, platforms, defaultPlatform, enabled, onScout, onRemove, onRetry }: {
+export function ScoutingPanel({ profiles, clash = [], clashNotes = [], statuses, insights, platforms, defaultPlatform, enabled, onScout, onRemove, onRetry }: {
   profiles: EnemyPlayerProfile[];
+  /** Members added from an enemy Clash roster (source "clash"). */
+  clash?: EnemyPlayerProfile[];
+  clashNotes?: string[];
   statuses: ProfileStatus[];
   insights: EnemyPlayerInsight[];
   platforms: string[];
@@ -188,6 +249,7 @@ export function ScoutingPanel({ profiles, statuses, insights, platforms, default
   const [platform, setPlatform] = useState(defaultPlatform);
   const [error, setError] = useState<string | null>(null);
   const pending = statuses.filter((s) => s.source === 'scouting');
+  const clashPending = statuses.filter((s) => s.source === 'clash');
   const count = profiles.length + pending.filter((s) => s.state === 'loading').length;
   const full = count >= MAX_SCOUTED;
   const submit = (e: FormEvent) => {
@@ -206,7 +268,7 @@ export function ScoutingPanel({ profiles, statuses, insights, platforms, default
       </div>
       <p className="hint">
         Clash, tournoi ou adversaires connus : entrez leurs Riot ID pour adapter les conseils. Les profils sont partagés avec l’équipe.
-        En ranked, les adversaires restent anonymes : rien n’est cherché sur eux.
+        Un joueur inscrit au Clash fait repérer toute son équipe. En ranked, les adversaires restent anonymes : rien n’est cherché sur eux.
       </p>
       {enabled ? (
         <form className="scouting__form" onSubmit={submit} noValidate>
@@ -250,6 +312,24 @@ export function ScoutingPanel({ profiles, statuses, insights, platforms, default
             </li>
           ))}
         </ul>
+      )}
+      {(clash.length > 0 || clashPending.length > 0 || clashNotes.length > 0) && (
+        <div className="scouting__clash">
+          <h3 className="sub">Leur équipe Clash</h3>
+          <div aria-live="polite">{clashNotes.map((n) => <p key={n} className="hint">{n}</p>)}</div>
+          {(clashPending.length > 0 || clash.length > 0) && (
+            <ul className="scouting__list">
+              {clashPending.map((s) => (
+                <StatusRow key={s.key} s={s} onRetry={() => onRetry(s.key)} onRemove={() => onRemove(s.key)} />
+              ))}
+              {clash.map((p) => (
+                <li key={p.puuid}>
+                  <EnemyProfileCard profile={p} insight={byPuuid.get(p.puuid)} onRemove={() => onRemove(p.puuid)} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );
@@ -316,7 +396,7 @@ export function PredictionsCard({ predictions, profiles }: { predictions: EnemyR
 
 /** One known enemy player: style, threats, what to do, likely picks. */
 function InsightItem({ insight, profile, champs }: { insight: EnemyPlayerInsight; profile?: EnemyPlayerProfile; champs: ChampMap }) {
-  const label = enemyLabel(insight, champs);
+  const label = enemyLabel({ ...insight, clash_position: profile?.clash_position, clash_team: profile?.clash_team }, champs);
   const champ = insight.champion_id ?? null;
   return (
     <li className="einsight">
@@ -331,6 +411,7 @@ function InsightItem({ insight, profile, champs }: { insight: EnemyPlayerInsight
         {insight.role && <RoleBadge role={insight.role} compact />}
         {profile && <span className={`esource esource--${profile.source}`} title={SOURCE_TITLE[profile.source]}>{SOURCE_LABEL[profile.source]}</span>}
       </div>
+      {profile?.clash_team && <div className="eprofile__row"><ClashBadge team={profile.clash_team} position={profile.clash_position} /></div>}
       {insight.style_tags.length > 0 && (
         <div className="chips" aria-label="Style de jeu">{insight.style_tags.map((t) => <Chip key={t} tone="amber">{t}</Chip>)}</div>
       )}
