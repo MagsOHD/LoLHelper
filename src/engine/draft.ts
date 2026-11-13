@@ -1298,7 +1298,7 @@ export function recommendDraftRaw(
     if (viewChamp.has(v.idx)) continue;
     const pc = v.prof.champion_id ? catalog.resolve(v.prof.champion_id) : null;
     if (pc) {
-      viewChamp.set(v.idx, { champ: pc, role: v.explicitRole });
+      viewChamp.set(v.idx, { champ: pc, role: v.explicitRole ?? v.clashRole });
       continue;
     }
     const si = links.get(v.idx);

@@ -5,12 +5,14 @@
 // `EnemyPlayerProfile`s given by the caller. A draft slot puuid without a matching profile is ignored.
 // Every function is pure and deterministic; sentences are unelided (the public wrappers elide them).
 import type {
+  ClashPosition,
   EnemyPlayerInsight,
   EnemyPlayerProfile,
   PhaseAttention,
   PlaystyleStats,
   Rank,
   Role,
+  TimelineStyle,
 } from '../api/types';
 import type { Catalog } from './catalog';
 import { fmtPoints } from './generator';
@@ -90,6 +92,60 @@ export const STYLE = {
   leadAbs: 500,
 } as const;
 
+/**
+ * Timeline thresholds (averages over the match timelines analysed, at least TL_MIN_GAMES timelines):
+ *   early gank        jungler's first gank (kill / assist on an enemy laner) at or before 4:00
+ *   late gank         jungler's first gank at or after 6:00 (farming jungler)
+ *   lane lead         gold vs lane opponent at 10:00 ≥ +400 / ≤ −400 (only without an early_lead read)
+ *   farm at 10:00     ≥ 85 cs (lanes) / ≥ 75 (jungle); weak ≤ 55 (lanes); never for supports
+ *                     (only without a cs/min read)
+ *   early activity    kills + assists before 10:00 ≥ 2 per game
+ *   early deaths      deaths before 10:00 ≥ 1.5 per game; careful ≤ 0.25
+ *   first back        at or after 7:00 (late); at or before 3:30 (early, top / mid / ADC only)
+ *   level 6           at or before 6:15 (top), 6:45 (jungle), 6:00 (mid), 7:15 (ADC), 8:30 (support)
+ *   wards placed      ≤ 0.3/min (lanes), ≤ 0.35 (jungle), ≤ 0.7 (support); many ≥ 1.4 (support) /
+ *                     ≥ 0.7 (others) (only without a vision-score read)
+ * Times are cited as m:ss rounded to 5 seconds; the matchup plan's timings come 30 seconds before the fact.
+ */
+export const TL_MIN_GAMES = 2;
+export const TIMELINE = {
+  earlyGank: 4,
+  lateGank: 6,
+  gold10: 400,
+  cs10HighLane: 85,
+  cs10HighJungle: 75,
+  cs10LowLane: 55,
+  earlyKA: 2,
+  earlyDeathsHigh: 1.5,
+  earlyDeathsLow: 0.25,
+  lateBack: 7,
+  earlyBack: 3.5,
+  level6: { TOP: 6.25, JUNGLE: 6.75, MID: 6, BOTTOM: 7.25, SUPPORT: 8.5 } as Readonly<Record<Role, number>>,
+  wardsLowLane: 0.3,
+  wardsLowJungle: 0.35,
+  wardsLowSupport: 0.7,
+  wardsHighSupport: 1.4,
+  wardsHigh: 0.7,
+  /** the plan's "before …" timing: this many seconds before the usual minute */
+  leadSeconds: 30,
+} as const;
+
+/** Clash declared position → role (FILL / UNSELECTED / unknown: no role). */
+const CLASH_ROLE: Partial<Record<string, Role>> = {
+  TOP: 'TOP',
+  JUNGLE: 'JUNGLE',
+  MIDDLE: 'MID',
+  MID: 'MID',
+  BOTTOM: 'BOTTOM',
+  UTILITY: 'SUPPORT',
+  SUPPORT: 'SUPPORT',
+};
+export function clashRoleOf(pos: ClashPosition | string | null | undefined): Role | null {
+  return typeof pos === 'string' ? (CLASH_ROLE[pos.toUpperCase()] ?? null) : null;
+}
+/** Separator before the (verbatim, never elided) Clash team name in the Clash style tag. */
+export const CLASH_TEAM_SEP = ' · équipe ';
+
 /** Pool weight of a champion for a player: 65 % share of recent games (in that role), 35 % mastery vs their top. */
 const POOL_W_GAMES = 0.65;
 const POOL_W_POINTS = 0.35;
@@ -116,6 +172,17 @@ export function dec1(x: number): string {
 }
 
 const pct = (x: number): number => pyRound(100 * x);
+
+/** Minutes → "m:ss", rounded to 5 seconds (3.33 → "3:20"). */
+export function clock(minutes: number): string {
+  const s = Math.max(0, pyRound(minutes * 12) * 5);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+/** `clock` of TIMELINE.leadSeconds before `minutes` (never before 1:00). */
+function clockBefore(minutes: number): string {
+  return clock(Math.max(1, (pyRound(minutes * 12) * 5 - TIMELINE.leadSeconds) / 60));
+}
+const LANE_FR: Partial<Record<Role, string>> = { TOP: 'top', MID: 'mid', BOTTOM: 'bot' };
 const plural = (n: number, word: string): string => `${word}${n > 1 ? 's' : ''}`;
 
 export function rankText(r: Rank | null | undefined): string | null {
@@ -147,8 +214,12 @@ export interface EnemyView {
   roleShare: Record<Role, number>;
   /** explicit role of the profile (started game), else null */
   explicitRole: Role | null;
+  /** role from the declared Clash position (null for FILL / UNSELECTED / absent) */
+  clashRole: Role | null;
   mainRole: Role | null;
   style: PlaystyleStats | null;
+  /** timeline facts (≥ TL_MIN_GAMES timelines), else null */
+  timeline: TimelineStyle | null;
 }
 
 const validRole = (r: unknown): r is Role => typeof r === 'string' && (ROLE_ORDER as readonly string[]).includes(r);
@@ -224,7 +295,8 @@ export function enemyViews(profiles: readonly EnemyPlayerProfile[] | null | unde
     }
     if (tot > 0) for (const r of ROLE_ORDER) share[r] /= tot;
     const explicitRole = validRole(prof.role) ? prof.role : null;
-    let mainRole: Role | null = explicitRole;
+    const clashRole = clashRoleOf(prof.clash_position);
+    let mainRole: Role | null = explicitRole ?? clashRole;
     if (!mainRole) {
       let best = 0;
       for (const r of ROLE_ORDER) {
@@ -235,7 +307,22 @@ export function enemyViews(profiles: readonly EnemyPlayerProfile[] | null | unde
       }
     }
     const style = prof.style && num(prof.style.games) >= STYLE_MIN_GAMES ? prof.style : null;
-    out.push({ idx: out.length, prof, puuid: prof.puuid, pool, recentGames, maxPoints, roleShare: share, explicitRole, mainRole, style });
+    const tl = prof.style?.timeline;
+    const timeline = tl && typeof tl === 'object' && num(tl.games) >= TL_MIN_GAMES ? tl : null;
+    out.push({
+      idx: out.length,
+      prof,
+      puuid: prof.puuid,
+      pool,
+      recentGames,
+      maxPoints,
+      roleShare: share,
+      explicitRole,
+      clashRole,
+      mainRole,
+      style,
+      timeline,
+    });
   }
   return out;
 }
@@ -354,62 +441,174 @@ type StyleKey =
   | 'turrets'
   | 'damage'
   | 'leadHigh'
-  | 'leadLow';
+  | 'leadLow'
+  // timeline facts
+  | 'earlyGank'
+  | 'lateGank'
+  | 'earlyActive'
+  | 'earlyDeaths'
+  | 'safeEarly'
+  | 'fastSix'
+  | 'lateBack'
+  | 'earlyBack';
 
 interface StyleRead {
   key: StyleKey;
   tag: string;
   /** the number cited, ready to insert ("62 % de premiers sangs") */
   fact: string;
+  /** timeline facts: the usual minute (gank, back, level 6) */
+  at?: number;
+  /** early gank: the lane favoured */
+  lane?: Role | null;
+  /** the read comes from the match timelines */
+  tl?: boolean;
 }
 
-/** Style facts of a player, in priority order. `role` adapts the farm / vision / participation thresholds. */
-export function styleReads(style: PlaystyleStats | null, role: Role | null): StyleRead[] {
-  if (!style || num(style.games) < STYLE_MIN_GAMES) return [];
+const fin = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+const signed = (x: number): string => (x > 0 ? `+${pyRound(x)}` : `${pyRound(x)}`);
+/** French singular below 2 ("1,7 mort"), plural from 2. */
+const unit = (x: number, word: string): string => `${word}${x >= 2 ? 's' : ''}`;
+
+/**
+ * Style facts of a player, in priority order. `role` adapts the farm / vision / participation thresholds.
+ * `timeline` (≥ TL_MIN_GAMES timelines) adds the timeline facts; without it the reads are unchanged.
+ */
+export function styleReads(style: PlaystyleStats | null, role: Role | null, timeline: TimelineStyle | null = null): StyleRead[] {
+  const st = style && num(style.games) >= STYLE_MIN_GAMES ? style : null;
+  const tl = timeline && num(timeline.games) >= TL_MIN_GAMES ? timeline : null;
+  if (!st && !tl) return [];
   const out: StyleRead[] = [];
-  const k = num(style.kills);
-  const d = num(style.deaths);
-  const fb = num(style.first_blood_rate);
-  const solo = num(style.solo_kills);
-  const cs = num(style.cs_per_min);
-  const vis = num(style.vision_per_min);
-  const kp = num(style.kill_participation);
-  const tw = num(style.turret_takedowns);
-  const dmg = num(style.damage_per_min);
-  if (k + d >= STYLE.aggroKD) {
+  const k = num(st?.kills);
+  const d = num(st?.deaths);
+  const fb = num(st?.first_blood_rate);
+  const solo = num(st?.solo_kills);
+  const cs = num(st?.cs_per_min);
+  const vis = num(st?.vision_per_min);
+  const kp = num(st?.kill_participation);
+  const tw = num(st?.turret_takedowns);
+  const dmg = num(st?.damage_per_min);
+  if (st && k + d >= STYLE.aggroKD) {
     out.push({ key: 'aggro', tag: `Très agressif (${dec1(k + d)} kills + morts par partie)`, fact: `${dec1(k + d)} kills + morts par partie` });
   }
-  if (fb >= STYLE.firstBlood) {
+  if (st && fb >= STYLE.firstBlood) {
     out.push({ key: 'firstBlood', tag: `Cherche le premier sang (${pct(fb)} % des parties)`, fact: `${pct(fb)} % de premiers sangs` });
   }
-  if (solo >= STYLE.soloKills) {
+  if (tl && (role === 'JUNGLE' || !role) && fin(tl.first_gank_minute) && tl.first_gank_minute > 0) {
+    const g = tl.first_gank_minute;
+    const lane = validRole(tl.first_gank_lane) && LANE_FR[tl.first_gank_lane] ? tl.first_gank_lane : null;
+    const where = lane ? `, surtout ${LANE_FR[lane]}` : '';
+    if (g <= TIMELINE.earlyGank) {
+      out.push({
+        key: 'earlyGank',
+        tag: `Jungler qui gank tôt : premier gank vers ${clock(g)}${where} (sur ${num(tl.games)} parties)`,
+        fact: `premier gank vers ${clock(g)}${where}`,
+        at: g,
+        lane,
+        tl: true,
+      });
+    } else if (g >= TIMELINE.lateGank) {
+      out.push({
+        key: 'lateGank',
+        tag: `Jungler farmeur : premier gank vers ${clock(g)} seulement`,
+        fact: `premier gank vers ${clock(g)}`,
+        at: g,
+        lane,
+        tl: true,
+      });
+    }
+  }
+  if (st && solo >= STYLE.soloKills) {
     out.push({ key: 'solo', tag: `Gagne ses duels (${dec1(solo)} solo kills par partie)`, fact: `${dec1(solo)} solo kills par partie` });
   }
-  const lead = style.early_lead;
-  if (typeof lead === 'number' && Number.isFinite(lead)) {
+  const lead = st?.early_lead;
+  let leadRead = false;
+  if (st && typeof lead === 'number' && Number.isFinite(lead)) {
+    leadRead = true;
     if (Math.abs(lead) <= 1) {
       if (lead >= STYLE.leadRateHigh) {
         out.push({ key: 'leadHigh', tag: `Gagne souvent sa lane (en avance dans ${pct(lead)} % des parties)`, fact: `en avance en fin de lane dans ${pct(lead)} % des parties` });
       } else if (lead >= 0 && lead <= STYLE.leadRateLow) {
         out.push({ key: 'leadLow', tag: `Perd souvent sa lane (en avance dans ${pct(lead)} % des parties seulement)`, fact: `en avance en fin de lane dans ${pct(lead)} % des parties seulement` });
-      }
+      } else leadRead = false;
     } else if (lead >= STYLE.leadAbs) {
       out.push({ key: 'leadHigh', tag: `Prend l'avance en lane (+${pyRound(lead)} or et XP en moyenne)`, fact: `+${pyRound(lead)} or et XP en fin de lane` });
     } else if (lead <= -STYLE.leadAbs) {
       out.push({ key: 'leadLow', tag: `Perd souvent sa lane (${pyRound(lead)} or et XP en moyenne)`, fact: `${pyRound(lead)} or et XP en fin de lane` });
+    } else leadRead = false;
+  }
+  if (tl && !leadRead && fin(tl.gold_diff_10)) {
+    const gd = tl.gold_diff_10;
+    if (gd >= TIMELINE.gold10) {
+      out.push({ key: 'leadHigh', tag: `Prend l'avance en lane : ${signed(gd)} or à 10 min en moyenne`, fact: `${signed(gd)} or à 10 min`, tl: true });
+    } else if (gd <= -TIMELINE.gold10) {
+      out.push({ key: 'leadLow', tag: `Perd souvent sa lane : ${signed(gd)} or à 10 min en moyenne`, fact: `${signed(gd)} or à 10 min`, tl: true });
     }
   }
-  if (role !== 'SUPPORT') {
+  if (tl) {
+    const ka = num(tl.kills_before_10);
+    const de = num(tl.deaths_before_10);
+    if (ka >= TIMELINE.earlyKA) {
+      out.push({ key: 'earlyActive', tag: `Très actif avant 10 min (${dec1(ka)} kills + assists par partie)`, fact: `${dec1(ka)} kills + assists avant 10 min`, tl: true });
+    }
+    if (de >= TIMELINE.earlyDeathsHigh) {
+      out.push({ key: 'earlyDeaths', tag: `Meurt souvent tôt (${dec1(de)} ${unit(de, 'mort')} avant 10 min par partie)`, fact: `${dec1(de)} ${unit(de, 'mort')} avant 10 min par partie`, tl: true });
+    } else if (de <= TIMELINE.earlyDeathsLow && fin(tl.deaths_before_10)) {
+      out.push({ key: 'safeEarly', tag: `Prudent en début de partie (${dec1(de)} mort avant 10 min par partie)`, fact: `${dec1(de)} mort avant 10 min par partie`, tl: true });
+    }
+    const l6 = tl.level6_minute;
+    if (fin(l6) && l6 > 0 && l6 <= (role ? TIMELINE.level6[role] : TIMELINE.level6.MID)) {
+      out.push({ key: 'fastSix', tag: `Niveau 6 rapide (${clock(l6)})`, fact: `niveau 6 vers ${clock(l6)}`, at: l6, tl: true });
+    }
+  }
+  let csRead = false;
+  if (st && role !== 'SUPPORT') {
     const high = role === 'JUNGLE' ? STYLE.csHighJungle : STYLE.csHighLane;
-    if (cs >= high) out.push({ key: 'csHigh', tag: `Farm avant tout (${dec1(cs)} cs/min)`, fact: `${dec1(cs)} cs/min` });
-    else if (role !== 'JUNGLE' && cs > 0 && cs <= STYLE.csLowLane) {
+    if (cs >= high) {
+      out.push({ key: 'csHigh', tag: `Farm avant tout (${dec1(cs)} cs/min)`, fact: `${dec1(cs)} cs/min` });
+      csRead = true;
+    } else if (role !== 'JUNGLE' && cs > 0 && cs <= STYLE.csLowLane) {
       out.push({ key: 'csLow', tag: `Farm faible (${dec1(cs)} cs/min)`, fact: `${dec1(cs)} cs/min` });
+      csRead = true;
+    }
+  }
+  if (tl && !csRead && role !== 'SUPPORT' && fin(tl.cs_10) && tl.cs_10 > 0) {
+    const c10 = pyRound(tl.cs_10);
+    if (tl.cs_10 >= (role === 'JUNGLE' ? TIMELINE.cs10HighJungle : TIMELINE.cs10HighLane)) {
+      out.push({ key: 'csHigh', tag: `Farm solide : ${c10} cs à 10 min`, fact: `${c10} cs à 10 min`, tl: true });
+    } else if (role !== 'JUNGLE' && tl.cs_10 <= TIMELINE.cs10LowLane) {
+      out.push({ key: 'csLow', tag: `Farm faible : ${c10} cs à 10 min`, fact: `${c10} cs à 10 min`, tl: true });
     }
   }
   const vHigh = role === 'SUPPORT' ? STYLE.visionHighSupport : STYLE.visionHigh;
   const vLow = role === 'SUPPORT' ? STYLE.visionLowSupport : STYLE.visionLow;
-  if (vis >= vHigh) out.push({ key: 'visionHigh', tag: `Gros travail de vision (${dec1(vis)} par minute)`, fact: `${dec1(vis)} de score de vision par minute` });
-  else if (vis <= vLow) out.push({ key: 'visionLow', tag: `Vision faible (${dec1(vis)} par minute)`, fact: `${dec1(vis)} de score de vision par minute` });
+  let visRead = false;
+  if (st && vis >= vHigh) {
+    out.push({ key: 'visionHigh', tag: `Gros travail de vision (${dec1(vis)} par minute)`, fact: `${dec1(vis)} de score de vision par minute` });
+    visRead = true;
+  } else if (st && vis <= vLow) {
+    out.push({ key: 'visionLow', tag: `Vision faible (${dec1(vis)} par minute)`, fact: `${dec1(vis)} de score de vision par minute` });
+    visRead = true;
+  }
+  if (tl && !visRead && fin(tl.wards_per_min) && tl.wards_per_min >= 0) {
+    const w = tl.wards_per_min;
+    const low = role === 'SUPPORT' ? TIMELINE.wardsLowSupport : role === 'JUNGLE' ? TIMELINE.wardsLowJungle : TIMELINE.wardsLowLane;
+    const high = role === 'SUPPORT' ? TIMELINE.wardsHighSupport : TIMELINE.wardsHigh;
+    if (w <= low) {
+      out.push({ key: 'visionLow', tag: `Pose peu de balises (${dec1(w)}/min)`, fact: `${dec1(w)} ${unit(w, 'balise')} par minute`, tl: true });
+    } else if (w >= high) {
+      out.push({ key: 'visionHigh', tag: `Pose beaucoup de balises (${dec1(w)}/min)`, fact: `${dec1(w)} ${unit(w, 'balise')} par minute`, tl: true });
+    }
+  }
+  if (tl && fin(tl.first_back_minute) && tl.first_back_minute > 0) {
+    const b = tl.first_back_minute;
+    if (b >= TIMELINE.lateBack) {
+      out.push({ key: 'lateBack', tag: `Retour en base tardif (${clock(b)})`, fact: `premier retour en base vers ${clock(b)}`, at: b, tl: true });
+    } else if (b <= TIMELINE.earlyBack && (role === 'TOP' || role === 'MID' || role === 'BOTTOM')) {
+      out.push({ key: 'earlyBack', tag: `Retour en base précoce (${clock(b)})`, fact: `premier retour en base vers ${clock(b)}`, at: b, tl: true });
+    }
+  }
+  if (!st) return out;
   const kpLow = role === 'TOP' ? STYLE.kpLowTop : STYLE.kpLow;
   if (kp >= STYLE.kpHigh) out.push({ key: 'kpHigh', tag: `Toujours dans les combats (${pct(kp)} % de participation)`, fact: `${pct(kp)} % de participation aux kills` });
   else if (kp > 0 && kp <= kpLow) out.push({ key: 'kpLow', tag: `Joue souvent seul (${pct(kp)} % de participation)`, fact: `${pct(kp)} % de participation aux kills` });
@@ -418,6 +617,20 @@ export function styleReads(style: PlaystyleStats | null, role: Role | null): Sty
   if (tw >= STYLE.turrets) out.push({ key: 'turrets', tag: `Pousse les tours (${dec1(tw)} par partie)`, fact: `${dec1(tw)} tours par partie` });
   if (dmg >= STYLE.damage) out.push({ key: 'damage', tag: `Gros dégâts (${pyRound(dmg)} par minute)`, fact: `${pyRound(dmg)} dégâts par minute` });
   return out;
+}
+
+/** Style tag of the Clash information ("Poste Clash déclaré : Mid · équipe Les Fous [FOU]"), null without it. */
+export function clashTag(prof: EnemyPlayerProfile): string | null {
+  const pos = typeof prof.clash_position === 'string' ? prof.clash_position.toUpperCase() : null;
+  const r = clashRoleOf(pos);
+  const team = prof.clash_team && typeof prof.clash_team.name === 'string' ? prof.clash_team.name.trim() : '';
+  const abbr = prof.clash_team && typeof prof.clash_team.abbreviation === 'string' ? prof.clash_team.abbreviation.trim() : '';
+  let head: string | null = null;
+  if (r) head = `Poste Clash déclaré : ${ROLE_LABELS[r]}`;
+  else if (pos === 'FILL') head = 'Poste Clash déclaré : Fill (tous rôles)';
+  else if (team) head = 'Joueur Clash';
+  if (!head) return null;
+  return team ? `${head}${CLASH_TEAM_SEP}${team}${abbr && abbr !== team ? ` [${abbr}]` : ''}` : head;
 }
 
 // --------------------------------------------------------------------------- insight
@@ -439,7 +652,7 @@ export function enemyInsight(v: EnemyView, o: InsightOpts, catalog: Catalog): En
   const prof = v.prof;
   const role = o.role ?? v.mainRole;
   const champ = o.champion;
-  const reads = styleReads(v.style, role);
+  const reads = styleReads(v.style, role, v.timeline);
   const has = (k: StyleKey): StyleRead | undefined => reads.find((r) => r.key === k);
   const threats: string[] = [];
   const attention: string[] = [];
@@ -488,6 +701,13 @@ export function enemyInsight(v: EnemyView, o: InsightOpts, catalog: Catalog): En
     attention.push(`Série difficile (${w} ${plural(w, 'victoire')} sur ${g}) : mettez-lui la pression tôt`);
   }
   // style → what to do about it
+  const eg = has('earlyGank');
+  if (eg) {
+    const lane = eg.lane ? LANE_FR[eg.lane] : null;
+    attention.push(
+      `Gank tôt (${eg.fact}) : ${lane ? `wardez l'entrée de jungle côté ${lane}` : 'wardez les entrées de votre jungle'} avant ${clockBefore(eg.at!)}`,
+    );
+  }
   const fb = has('firstBlood');
   if (fb) {
     attention.push(
@@ -508,10 +728,19 @@ export function enemyInsight(v: EnemyView, o: InsightOpts, catalog: Catalog): En
   if (kpLow && has('csHigh')) attention.push(`Farme et rejoint peu les combats (${kpLow.fact}) : forcez les objectifs à 5 contre 4`);
   const tw = has('turrets');
   if (tw) attention.push(`Pousse beaucoup les tours (${tw.fact}) : gardez de la vision sur sa lane`);
+  const six = has('fastSix');
+  if (six && role !== 'SUPPORT') attention.push(`Niveau 6 rapide (${clock(six.at!)}) : respectez son ultime dès ${clockBefore(six.at!)}`);
+  const lb = has('lateBack');
+  if (lb) attention.push(`Retour en base tardif (${clock(lb.at!)}) : punissable par un recall synchronisé`);
+  const ed = has('earlyDeaths');
+  if (ed && !deaths) attention.push(`Meurt souvent tôt (${ed.fact}) : jouez autour de lui avant 10:00`);
+  const lg = has('lateGank');
+  if (lg) attention.push(`Farme sa jungle (${lg.fact}) : jouez agressif en lane avant ${clockBefore(lg.at!)}`);
   let likely: string[] = [];
   if (!champ) {
     likely = o.likely ?? sortedWeights(poolWeights(v, role, o.excluded, catalog)).slice(0, 3).map(([cid]) => cid);
   }
+  const clash = clashTag(prof);
   return {
     puuid: v.puuid,
     riot_id: prof.riot_id ?? null,
@@ -519,7 +748,7 @@ export function enemyInsight(v: EnemyView, o: InsightOpts, catalog: Catalog): En
     champion_id: champ,
     level: level > 0 ? level : null,
     rank: prof.rank ?? null,
-    style_tags: reads.slice(0, 5).map((r) => r.tag),
+    style_tags: clash ? [clash, ...reads.slice(0, 5).map((r) => r.tag)] : reads.slice(0, 5).map((r) => r.tag),
     threats: threats.slice(0, 4),
     attention_points: attention.slice(0, 4),
     likely_picks: likely,
@@ -580,9 +809,45 @@ export function linkProfiles(views: readonly EnemyView[], slots: readonly EnemyS
         changed = true;
       }
     }
+    if (!changed) changed = linkByClash(freeViews, freeSlots, link, usedSlot, catalog);
     if (!changed) break;
   }
   return link;
+}
+
+/**
+ * Clash declared positions as slot evidence (only players without an explicit role): a free slot's locked
+ * champion goes to the one player whose declared role is the slot's role (or, slot role unknown, one of the
+ * champion's roles) and who has it in their pool (any game or mastery) or whose declared role is the slot's
+ * explicit role — when that player matches no other slot. Returns true when a link was added.
+ */
+function linkByClash(
+  freeViews: readonly EnemyView[],
+  freeSlots: readonly EnemySlotIn[],
+  link: Map<number, number>,
+  usedSlot: Set<number>,
+  catalog: Catalog,
+): boolean {
+  const clashViews = freeViews.filter((v) => v.clashRole && !v.explicitRole);
+  if (!clashViews.length) return false;
+  const bySlot = new Map<number, EnemyView[]>();
+  const byView = new Map<number, number>();
+  for (const s of freeSlots) {
+    const roles = s.role ? [s.role] : (catalog.data(s.champ!)?.roles ?? []);
+    const m = clashViews.filter((v) => roles.includes(v.clashRole!) && (v.pool.has(s.champ!) || s.role === v.clashRole));
+    bySlot.set(s.idx, m);
+    for (const v of m) byView.set(v.idx, (byView.get(v.idx) ?? 0) + 1);
+  }
+  let changed = false;
+  for (const s of freeSlots) {
+    const m = bySlot.get(s.idx)!;
+    if (m.length === 1 && byView.get(m[0].idx) === 1 && !link.has(m[0].idx)) {
+      link.set(m[0].idx, s.idx);
+      usedSlot.add(s.idx);
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 /** Role a known player most likely holds with `cid` (their share among the champion's roles), null if no evidence. */
@@ -590,6 +855,8 @@ export function linkedRole(v: EnemyView, cid: string, catalog: Catalog): Role | 
   if (v.explicitRole) return v.explicitRole;
   const d = catalog.data(cid);
   const e = v.pool.get(cid);
+  // declared Clash position: kept unless the champion cannot go there (no catalog role, no game there)
+  if (v.clashRole && (!d || d.roles.includes(v.clashRole) || (e?.byRole.get(v.clashRole) ?? 0) > 0)) return v.clashRole;
   let best: Role | null = null;
   let bestV = 0;
   for (const r of ROLE_ORDER) {
@@ -603,16 +870,30 @@ export function linkedRole(v: EnemyView, cid: string, catalog: Catalog): Role | 
   return bestV >= 0.2 ? best : null;
 }
 
+/** Fit of a declared Clash role in the open-role search (other roles: CLASH_OTHER_W × role share). */
+export const CLASH_ROLE_FIT = 1.5;
+const CLASH_OTHER_W = 0.5;
+
 /**
  * Open roles for players whose champion is unknown: exhaustive search maximising the sum of role shares
- * (explicit roles = 2), a role needs a share ≥ 0.15; deterministic. Returns profile idx → role.
+ * (explicit roles = 2; a declared Clash role = 1.5, other roles half their share), a role needs a fit
+ * ≥ 0.15; deterministic. Returns profile idx → role.
  */
 export function assignOpenRoles(views: readonly EnemyView[], open: readonly Role[], forced: ReadonlyMap<number, Role>): Map<number, Role> {
   const out = new Map<number, Role>();
   const free = open.filter((r) => ![...forced.values()].includes(r));
   for (const [i, r] of forced) if (open.includes(r)) out.set(i, r);
   const list = views.filter((v) => !forced.has(v.idx));
-  const fit = (v: EnemyView, r: Role): number => (v.explicitRole ? (v.explicitRole === r ? 2 : 0) : v.roleShare[r]);
+  const fit = (v: EnemyView, r: Role): number =>
+    v.explicitRole
+      ? v.explicitRole === r
+        ? 2
+        : 0
+      : v.clashRole
+        ? v.clashRole === r
+          ? CLASH_ROLE_FIT
+          : CLASH_OTHER_W * v.roleShare[r]
+        : v.roleShare[r];
   let best: (Role | null)[] = list.map(() => null);
   let bestScore = 0;
   const cur: (Role | null)[] = [];
@@ -666,7 +947,7 @@ export function phaseAttention(known: readonly KnownEnemy[], catalog: Catalog): 
   );
   sorted.forEach((k, order) => {
     const role = k.role ?? k.view.mainRole;
-    const reads = styleReads(k.view.style, role);
+    const reads = styleReads(k.view.style, role, k.view.timeline);
     const has = (key: StyleKey): StyleRead | undefined => reads.find((r) => r.key === key);
     const who = role ? THEIR[role] : 'un adversaire';
     const champ = k.champion ? catalog.name(k.champion) : null;
@@ -678,6 +959,50 @@ export function phaseAttention(known: readonly KnownEnemy[], catalog: Catalog): 
       rows.push([PH[phase], prio, order, { phase, text, enemy_puuid: k.view.puuid }]);
     };
     const ot = oneTrickOf(k.view);
+    // timeline facts: concrete timings
+    const eg = has('earlyGank');
+    if (eg) {
+      const lane = eg.lane ? LANE_FR[eg.lane] : null;
+      const ward =
+        eg.lane === 'MID'
+          ? 'wardez les deux entrées de jungle autour du mid'
+          : lane
+            ? `wardez l'entrée de jungle côté ${lane}`
+            : 'wardez les entrées de votre jungle';
+      add('early', 0, `Early : ${who}${tag(eg.fact)} gank tôt : ${ward} avant ${clockBefore(eg.at!)}${lane ? ` et jouez prudemment en ${lane}` : ''}.`);
+    }
+    const six = has('fastSix');
+    if (six && role !== 'SUPPORT') {
+      add(
+        'early',
+        1,
+        role === 'JUNGLE'
+          ? `Early : ${who}${tag(six.fact)} a son ultime tôt : attendez-vous à un gank avec ultime dès ${clockBefore(six.at!)}.`
+          : `Early : ${who}${tag(six.fact)} a son ultime tôt : respectez-le dès ${clockBefore(six.at!)}, ne restez pas en lane avec peu de PV.`,
+      );
+    }
+    const lback = has('lateBack');
+    if (lback && role !== 'JUNGLE') {
+      add('early', 2, `Early : ${who}${tag(lback.fact)} rentre tard : rentrez avant lui sur une vague poussée et revenez avec l'avantage d'objets avant ${clock(lback.at!)}.`);
+    } else if (lback) {
+      add('early', 2, `Early : ${who}${tag(lback.fact)} rentre tard : envahissez sa jungle pendant son retour (vers ${clock(lback.at!)}).`);
+    }
+    const eback = has('earlyBack');
+    if (eback) add('early', 2, `Early : ${who}${tag(eback.fact)} rentre tôt : poussez la vague sous sa tour avant ${clock(eback.at!)} pour lui faire perdre or et XP.`);
+    const lgank = has('lateGank');
+    if (lgank) add('early', 2, `Early : ${who}${tag(lgank.fact)} farme sa jungle : jouez agressif en lane avant ${clockBefore(lgank.at!)} et contestez ses camps.`);
+    const edeath = has('earlyDeaths');
+    if (edeath) {
+      add(
+        'early',
+        2,
+        role === 'JUNGLE'
+          ? `Early : ${who}${tag(edeath.fact)} se met souvent en danger : envahissez sa jungle avant 10:00 avec vos lanes prioritaires.`
+          : `Early : ${who}${tag(edeath.fact)} se met souvent en danger : jouez autour de sa lane avant 10:00.`,
+      );
+    }
+    const eact = has('earlyActive');
+    if (eact && role === 'JUNGLE') add('early', 3, `Early : ${who}${tag(eact.fact)} est très actif : gardez des balises dans la rivière jusqu'à 10:00.`);
     const fb = has('firstBlood');
     if (fb && role === 'JUNGLE') add('early', 0, `Early : ${who}${tag(fb.fact)} envahit souvent : wardez votre jungle à 2:30.`);
     else if (fb) add('early', 1, `Early : ${who}${tag(fb.fact)} cherche le kill tôt : respectez ses niveaux 2 et 3.`);
@@ -754,6 +1079,16 @@ export function matchupEnemies(
       used.add(s.idx);
     }
   }
+  // then the declared Clash position (players without an explicit role)
+  for (const v of views) {
+    if (links.has(v.idx) || v.explicitRole || !v.clashRole) continue;
+    if (v.prof.champion_id && catalog.resolve(v.prof.champion_id)) continue;
+    const s = slots.find((x) => x.role === v.clashRole && !used.has(x.idx));
+    if (s) {
+      links.set(v.idx, s.idx);
+      used.add(s.idx);
+    }
+  }
   const excluded = new Set<string>();
   for (const p of [...ally, ...enemy]) {
     const c = catalog.resolve(p.champion_id);
@@ -761,7 +1096,7 @@ export function matchupEnemies(
   }
   const known: KnownEnemy[] = views.map((v) => {
     const si = links.get(v.idx);
-    if (si !== undefined) return { view: v, champion: slots[si].champ, role: slots[si].role ?? v.explicitRole };
+    if (si !== undefined) return { view: v, champion: slots[si].champ, role: slots[si].role ?? v.explicitRole ?? v.clashRole };
     const pc = v.prof.champion_id ? catalog.resolve(v.prof.champion_id) : null;
     return { view: v, champion: pc, role: v.explicitRole ?? v.mainRole };
   });
