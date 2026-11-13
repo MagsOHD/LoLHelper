@@ -124,6 +124,12 @@ function write_config(string $site, array $extra): void
     file_put_contents("$site/api/config.php", '<?php return ' . var_export(array_merge($base, $extra), true) . ';');
 }
 
+function limits(): array
+{
+    global $DATA;
+    return json_decode((string) @file_get_contents("$DATA/riot_limits.json"), true) ?: [];
+}
+
 function stats(string $patch): ?array
 {
     global $META;
@@ -222,6 +228,12 @@ check(summary_shape_ok($lr, true) && $lr['status'] === 'ok' && $lr['stop'] === '
     && $lr['requests'] === 9 && $lr['source'] === 'cron', 'run1 last_run.json written by the CLI (riot_limit, retry_after)', json_encode($lr));
 check(preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/D', (string) ($lr['at'] ?? '')) === 1 && abs(strtotime($lr['at']) - time()) < 30, 'last_run.at ISO 8601 UTC');
 check(!str_contains((string) @file_get_contents("$META/last_run.json"), KEY), 'key never in last_run.json');
+$lim = limits();
+check(($lim['app']['europe']['w'] ?? null) === [[20, 1, 1], [100, 120, 1]] && ($lim['app']['euw1']['w'] ?? null) === [[20, 1, 1], [100, 120, 1]],
+    'collector records X-App-Rate-Limit(-Count) per host in <data>/riot_limits.json', json_encode($lim));
+check(isset($lim['method']['europe match-v5.match']['w'], $lim['method']['europe match-v5.ids']['w'], $lim['method']['euw1 league-v4.challenger']['w']),
+    'collector records method limits per family', json_encode(array_keys($lim['method'] ?? [])));
+check(($lim['app']['europe']['calls'] ?? null) === [] && filesize("$DATA/riot_limits.json") < 4096, 'limits file stays tiny, reserved calls settled');
 
 // ---------------------------------------------------------------- run 2 : pause Retry-After
 [$code, $out, , $paths] = collect($SITE);
@@ -337,6 +349,53 @@ fclose($lock);
 [$code, $out, , $paths] = collect($ALT);
 check($code === 0 && count($paths) === 5, 'runs again once the lock is released', $out . implode(',', $paths));
 
+// ---------------------------------------------------------------- limites adaptatives (collecteur à 60 %)
+// meta_rate absent / « auto » : aucun rythme fixe, la garde décide.
+foreach (['absent' => null, 'auto' => 'auto'] as $label => $rate) {
+    write_config($ALT, ['meta_rate' => $rate]);
+    [$code, $out, $dur, $paths] = collect($ALT);
+    check($code === 0 && count($paths) === 5 && str_contains($out, 'tour complet') && $dur < 3.0, "meta_rate $label: full round, no fixed pacing", sprintf('%.2f s ', $dur) . $out);
+}
+// 12 appels dans la fenêtre de 1 s (= 60 % de 20) : le collecteur dort jusqu'à ce qu'elle se libère, puis continue.
+ctrl(['app_count' => '12:1,1:120', 'app_count_left' => 1]);
+write_config($ALT, ['meta_rate' => 'auto']);
+[$code, $out, $dur, $paths] = collect($ALT);
+$lr = last_run();
+check($code === 0 && count($paths) === 5 && ($lr['stop'] ?? '') === 'tour complet' && ($lr['requests'] ?? 0) === 5,
+    'collector at 60 % of the 1 s window sleeps instead of failing, then completes', $out . json_encode($lr));
+check($dur >= 0.9 && $dur < 4.0, 'collector slept about one second', sprintf('%.2f s', $dur));
+// 60/100 sur 2 min : attente > budget -> arrêt propre « budget » sans nouvel appel ; les joueurs passent encore (< 95 %).
+ctrl(['app_count' => '1:1,60:120', 'app_count_left' => 1]);
+write_config($ALT, ['meta_rate' => 'auto', 'meta_time_budget' => 5]);
+[$code, $out, $dur, $paths] = collect($ALT);
+$lr = last_run();
+check($code === 0 && count($paths) === 1 && ($lr['stop'] ?? '') === 'budget' && ($lr['requests'] ?? 0) === 1 && $dur < 3.0,
+    'collector yields at 60 % of the 120 s window (stops within budget, no extra call)', sprintf('%.2f s ', $dur) . $out . json_encode($lr));
+check(str_contains((string) ($lr['message'] ?? ''), 'limite de la clé'), 'stop message names the key limit', (string) ($lr['message'] ?? ''));
+$r = req("$M/lolhelper/api/index.php?r=riot-limits", $auth);
+$j = $r['json'] ?? [];
+check($r['status'] === 200 && ($j['host'] ?? '') === 'europe' && ($j['detected'] ?? null) === true && ($j['app'][1]['count'] ?? null) === 60
+    && ($j['app'][1]['limit'] ?? null) === 100 && ($j['collector_share'] ?? null) === 0.6 && ($j['user_share'] ?? null) === 0.95,
+    'riot-limits on the collector site shows 60/100', $r['body']);
+check(array_key_exists('meta_rate', $j) && $j['meta_rate'] == 0, 'riot-limits reports the numeric meta_rate of config.php', $r['body']);
+@unlink($FAKE_LOG);
+$r = req("$M/lolhelper/api/index.php?r=riot/account&platform=euw1&gameName=User&tagLine=EUW", $auth);
+check($r['status'] === 200 && count(fake_log()) === 1, 'user call still served at 60 % (< 95 %)', $r['body']);
+// Site : même garde, même fichier.
+ctrl(['app_count' => '1:1,60:120']);
+write_config($SITE, ['admin_password' => ADMIN, 'meta_rate' => 'auto']);
+@unlink($FAKE_LOG);
+$r = req("$M/lolhelper/api/index.php?r=meta-collect", $auth + ['X-Admin-Password' => ADMIN], 'POST');
+check($r['status'] === 200 && ($r['json']['stop'] ?? '') === 'budget' && ($r['json']['requests'] ?? 0) === 1 && count(fake_log()) === 1,
+    'web collection yields at 60 % too', $r['body']);
+ctrl([]);
+@unlink("$DATA/riot_limits.json");
+write_config($SITE, []);
+// meta_rate numérique : plafond conservé (compatibilité) en plus de la garde.
+write_config($ALT, ['meta_rate' => 2]);
+[$code, $out, $dur, $paths] = collect($ALT);
+check($code === 0 && count($paths) === 5 && $dur >= 1.9, 'numeric meta_rate still caps the collector (5 calls at 2/s >= 2 s)', sprintf('%.2f s ', $dur) . $out);
+
 // ---------------------------------------------------------------- désactivé / sans clé
 write_config($ALT, ['meta_enabled' => false]);
 [$code, $out, , $paths] = collect($ALT);
@@ -378,6 +437,23 @@ foreach (['missing' => null, 'wrong' => 'nope', 'longer' => ADMIN . 'x', 'prefix
     check($r['status'] === 401 && ($r['json']['detail'] ?? '') === $MSG_ADMIN && $noSecret($r), "meta-collect admin password $label -> 401", $r['body']);
 }
 check(fake_log() === [] && last_run() === $cronRun, 'rejected triggers make no Riot call');
+
+// Mot de passe accentué, entouré d'espaces dans config.php, envoyé par le site en b64:<UTF-8>.
+// Le verrou est tenu : un bon mot de passe répond « busy » sans aucun appel Riot.
+$accent = 'Été mdp ñ';
+write_config($SITE, ['admin_password' => "  $accent  "]);
+$lock = fopen("$META/collect.lock", 'c');
+flock($lock, LOCK_EX);
+$r = req($collectUrl, $admin('b64:' . base64_encode($accent)), 'POST');
+check($r['status'] === 200 && ($r['json']['status'] ?? '') === 'busy', 'accented admin password (b64, config trimmed) accepted', $r['body']);
+$r = req($collectUrl, $admin('b64:' . base64_encode(mb_convert_encoding($accent, 'ISO-8859-1', 'UTF-8'))), 'POST');
+check($r['status'] === 401, 'Latin-1 bytes of the admin password rejected', $r['body']);
+$r = req($collectUrl, $admin('b64:%%%'), 'POST');
+check($r['status'] === 401, 'invalid b64 admin password rejected', $r['body']);
+flock($lock, LOCK_UN);
+fclose($lock);
+check(fake_log() === [], 'password encoding checks make no Riot call');
+write_config($SITE, ['admin_password' => ADMIN]);
 
 // Bon mot de passe : un passage complet (tout est déjà vu -> 5 listes d'ids).
 $cursorBefore = state()['cursor'];
@@ -513,6 +589,75 @@ write_config($ALT, ['admin_password' => ['x']]);
 check(load_config("$ALT/api")['admin_password'] === '', 'admin_password non-string -> disabled');
 write_config($ALT, []);
 check(load_config("$ALT/api")['admin_password'] === '' && load_config("$SITE/api")['admin_password'] === ADMIN, 'admin_password default empty / read');
+
+// meta_rate : absent / « auto » / invalide = null (auto) ; nombre = plafond borné à [0, 20].
+foreach ([['absent', null], ['auto', null], [0.6, 0.6], [0, 0.0], [3, 3.0], [50, 20.0], [-1, 0.0], ['abc', null], ['0.6', null], [true, null]] as [$in, $want]) {
+    write_config($ALT, $in === 'absent' ? ['meta_rate' => null] : ['meta_rate' => $in]);
+    check(load_config("$ALT/api")['meta_rate'] === $want, 'meta_rate ' . var_export($in, true) . ' -> ' . var_export($want, true));
+}
+write_config($ALT, []);
+
+// Limites Riot : en-têtes, hôtes, familles.
+check(riot_parse_rate_header('20:1,100:120') === [[20, 1], [100, 120]] && riot_parse_rate_header('3:1, 41:120') === [[3, 1], [41, 120]], 'rate header parsing');
+check(riot_parse_rate_header(null) === [] && riot_parse_rate_header('') === [] && riot_parse_rate_header('20:1;100:120') === []
+    && riot_parse_rate_header('a:b') === [] && riot_parse_rate_header("20:1\r\nX: y") === [], 'malformed rate headers ignored');
+check(riot_url_target('https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_1') === ['europe', '/lol/match/v5/matches/EUW1_1'], 'host of a real Riot URL');
+check(riot_url_target('http://127.0.0.1:8080/euw1/lol/clash/v1/tournaments') === ['euw1', '/lol/clash/v1/tournaments'], 'host of a test URL');
+check(riot_method_family('/lol/match/v5/matches/EUW1_1') === 'match-v5.match' && riot_method_family('/lol/match/v5/matches/EUW1_1/timeline') === 'match-v5.timeline'
+    && riot_method_family('/lol/match/v5/matches/by-puuid/x/ids') === 'match-v5.ids' && riot_method_family('/lol/clash/v1/tournaments') === 'clash-v1.tournaments'
+    && riot_method_family('/lol/clash/v1/tournaments/by-team/abc') === 'clash-v1.tournament-by-team' && riot_method_family('/lol/status/v4/platform-data') === 'lol.status.v4.platform-data',
+    'method families');
+
+// Garde : formules (usage × 100 < part × limite pour chaque fenêtre).
+$now = 1800000000.0;
+$b = static fn (array $w, float $at, array $calls = [], float $until = 0.0): array => ['w' => $w, 'at' => $at, 'calls' => $calls, 'until' => $until];
+check(riot_gate_wait($b([[20, 1, 0], [100, 120, 94]], $now), $now, RIOT_USER_SHARE_PCT, true) === 0.0, 'user: 94/100 passes');
+check(abs(riot_gate_wait($b([[20, 1, 0], [100, 120, 95]], $now - 10), $now, RIOT_USER_SHARE_PCT, true) - 110.0) < 1e-6, 'user: 95/100 waits until the window frees (110 s)');
+check(riot_gate_wait($b([[20, 1, 0], [100, 120, 59]], $now), $now, RIOT_COLLECTOR_SHARE_PCT, true) === 0.0, 'collector: 59/100 passes');
+check(riot_gate_wait($b([[20, 1, 0], [100, 120, 60]], $now), $now, RIOT_COLLECTOR_SHARE_PCT, true) > 119.0, 'collector: 60/100 waits');
+check(riot_gate_wait($b([[20, 1, 12], [100, 120, 1]], $now - 0.25), $now, RIOT_COLLECTOR_SHARE_PCT, true) === 0.75
+    && riot_gate_wait($b([[20, 1, 12], [100, 120, 1]], $now - 0.25), $now, RIOT_USER_SHARE_PCT, true) === 0.0, 'collector yields at 12/20 in 1 s, users do not');
+check(riot_gate_wait($b([[20, 1, 0], [100, 120, 99]], $now - 121), $now, RIOT_COLLECTOR_SHARE_PCT, true) === 0.0, 'counts older than their window ignored');
+$inflight = $b([[20, 1, 0], [100, 120, 93]], $now - 10, [$now - 20, $now - 5, $now - 2]);
+check(abs(riot_gate_wait($inflight, $now, RIOT_USER_SHARE_PCT, true) - 110.0) < 1e-6, 'calls sent since the last header are added (93 + 2 in flight = 95)');
+check(riot_gate_wait($b([[20, 1, 0], [100, 120, 1]], $now - 1, [], $now + 4.5), $now, RIOT_USER_SHARE_PCT, true) === 4.5, 'Riot 429 pause honoured');
+check(riot_gate_wait(null, $now, RIOT_USER_SHARE_PCT, false) === 0.0, 'unknown method limits never block');
+$calls = array_map(static fn (int $i): float => $now - 0.5 + $i * 0.01, range(0, 11));
+$def = ['at' => 0.0, 'calls' => $calls, 'until' => 0.0];
+check(abs(riot_gate_wait($def, $now, RIOT_COLLECTOR_SHARE_PCT, true) - 0.5) < 1e-6 && riot_gate_wait($def, $now, RIOT_USER_SHARE_PCT, true) === 0.0,
+    'before any header: 20/1 s assumed (collector 12, users 19)');
+$def['calls'] = array_map(static fn (int $i): float => $now - 100 + $i * 0.5, range(0, 94));
+check(abs(riot_gate_wait($def, $now, RIOT_USER_SHARE_PCT, true) - 20.0) < 1e-6, 'before any header: 100/120 s assumed (95 calls -> wait for the oldest)');
+
+// Garde + enregistrement sur fichier (instants explicites : déterministe).
+$ld = "$T/limits-test";
+@mkdir($ld, 0700);
+$u = 'http://127.0.0.1:1/europe/lol/match/v5/matches/EUW1_1';
+$okUser = 0;
+for ($i = 0; $i < 25; $i++) {
+    if (riot_gate_acquire($ld, $u, RIOT_USER_SHARE_PCT, $now + $i * 0.001) === 0.0) {
+        $okUser++;
+    }
+}
+check($okUser === 19, 'file gate: 19 user calls in the same second before any header', (string) $okUser);
+check(riot_gate_acquire($ld, $u, RIOT_COLLECTOR_SHARE_PCT, $now + 0.03) > 0.9, 'file gate: collector refused meanwhile');
+check(riot_gate_acquire($ld, $u, RIOT_USER_SHARE_PCT, $now + 1.5) === 0.0, 'file gate: next second free again');
+riot_limits_record($ld, $u, $now + 1.5, 200, ['x-app-rate-limit' => '500:10,30000:600', 'x-app-rate-limit-count' => '450:10,100:600'], null);
+$st = json_decode((string) file_get_contents("$ld/riot_limits.json"), true);
+check(($st['app']['europe']['w'] ?? null) === [[500, 10, 450], [30000, 600, 100]] && ($st['app']['europe']['at'] ?? 0) === $now + 1.5, 'production key limits learned from headers', json_encode($st['app']['europe'] ?? null));
+check(riot_gate_acquire($ld, $u, RIOT_USER_SHARE_PCT, $now + 2) === 0.0 && riot_gate_acquire($ld, $u, RIOT_COLLECTOR_SHARE_PCT, $now + 2) > 9.0, 'learned limits used: users < 95 % of 500, collector >= 60 %');
+riot_limits_record($ld, $u, $now + 1.0, 200, ['x-app-rate-limit' => '20:1,100:120', 'x-app-rate-limit-count' => '1:1,1:120'], null);
+check((json_decode((string) file_get_contents("$ld/riot_limits.json"), true)['app']['europe']['w'][0][0] ?? 0) === 500, 'older response never overwrites newer counts');
+$snap = riot_limits_snapshot($ld, $now + 2);
+check($snap['host'] === 'europe' && $snap['detected'] && $snap['app'][0]['limit'] === 500 && $snap['app'][0]['count'] === 451 && $snap['app'][1]['count'] === 101,
+    'snapshot: learned limits + estimated usage', json_encode($snap));
+check(filesize("$ld/riot_limits.json") < 4096 && glob("$ld/*.tmp-*") === [], 'limits file tiny, no temp files');
+file_put_contents("$ld/riot_limits.json", '{oops');
+$prevLog = ini_set('error_log', "$ld/errors.log");
+check(riot_gate_acquire($ld, $u, RIOT_USER_SHARE_PCT, $now + 5) === 0.0 && is_array(json_decode((string) file_get_contents("$ld/riot_limits.json"), true)), 'corrupt limits file reset');
+check(str_contains((string) @file_get_contents("$ld/errors.log"), 'riot_limits.json illisible'), 'corrupt limits file logged');
+ini_set('error_log', (string) $prevLog);
+check(riot_gate_acquire(null, $u, RIOT_COLLECTOR_SHARE_PCT) === 0.0, 'no storage: gate open');
 
 $pk = static fn (array $g): array => array_map(static fn (int $n): array => ['games' => $n, 'updated_at' => 'x'], $g);
 check(meta_pick_patch([], 300) === null, 'pick: nothing');

@@ -11,6 +11,8 @@ import {
   mapPosition,
   pickRank,
   RateLimiter,
+  browserLimits,
+  parseRateLimitHeader,
   realSleep,
   riotGet,
   summarizeMatch,
@@ -294,15 +296,115 @@ describe('rate limiting', () => {
     expect(times).toEqual([0, 0, 1000, 10_000]);
   });
 
-  it('default dev-key limits allow 20 requests per second', async () => {
+  it('default limits: 30 % of the dev key (6 requests per second, 30 per 2 minutes)', async () => {
     vi.useFakeTimers();
     const limiter = new RateLimiter();
+    expect(limiter.limits).toEqual([[6, 1000], [30, 120_000]]);
     const start = Date.now();
     const times: number[] = [];
-    const all = Promise.all(Array.from({ length: 21 }, () => limiter.acquire().then(() => times.push(Date.now() - start))));
+    const all = Promise.all(Array.from({ length: 7 }, () => limiter.acquire().then(() => times.push(Date.now() - start))));
     await vi.advanceTimersByTimeAsync(2000);
     await all;
-    expect(times.filter((t) => t === 0)).toHaveLength(20);
-    expect(times[20]).toBe(1000);
+    expect(times.filter((t) => t === 0)).toHaveLength(6);
+    expect(times[6]).toBe(1000);
+  });
+});
+
+describe('adaptive limits (X-App-Rate-Limit passed through by the proxy)', () => {
+  const adaptive = () => new RateLimiter(undefined, undefined, undefined, { adaptive: true });
+  const transport = (limiter: RateLimiter, sleep = realSleep): RiotTransport => ({ limiter, sleep, maxRetries: 3 });
+
+  it('parses the headers and keeps 30 % of each window (at least 1, never above the key)', () => {
+    expect(parseRateLimitHeader('20:1,100:120')).toEqual([[20, 1000], [100, 120_000]]);
+    expect(parseRateLimitHeader(' 100:120 , 20:1,bad,5:0')).toEqual([[20, 1000], [100, 120_000]]);
+    expect(parseRateLimitHeader(null)).toEqual([]);
+    expect(browserLimits([[500, 10_000], [30_000, 600_000]])).toEqual([[150, 10_000], [9000, 600_000]]);
+    expect(browserLimits([[2, 1000], [1, 60_000]])).toEqual([[1, 1000], [1, 60_000]]);
+  });
+
+  it('follows the key limit seen in a response; fixed limiters ignore headers', async () => {
+    installWindow('');
+    vi.stubGlobal('fetch', vi.fn(async () => json(FIXTURES.account, 200, { 'X-App-Rate-Limit': '500:10,30000:600', 'X-App-Rate-Limit-Count': '1:10,1:600' })));
+    const limiter = adaptive();
+    expect(limiter.limits).toEqual([[6, 1000], [30, 120_000]]); // before any header: dev key assumed
+    await riotGet('account', { platform: 'euw1' }, transport(limiter));
+    expect(limiter.limits).toEqual([[150, 10_000], [9000, 600_000]]);
+    expect(limiter.keyLimits).toEqual([[500, 10_000], [30_000, 600_000]]);
+    const fixed = new RateLimiter([[2, 1000]]);
+    await riotGet('account', { platform: 'euw1' }, transport(fixed));
+    expect(fixed.limits).toEqual([[2, 1000]]);
+  });
+
+  it('backs off while the shared key is at the server gate (95 %)', async () => {
+    vi.useFakeTimers();
+    const limiter = adaptive();
+    limiter.observe([[100, 120_000]], [[94, 120_000]]);
+    expect(limiter.waitTime(Date.now())).toBe(0);
+    limiter.observe([[100, 120_000]], [[96, 120_000]]);
+    // (96 − 95 + 1) requests to drain at 100 per 120 s.
+    expect(limiter.waitTime(Date.now())).toBe(2400);
+    const start = Date.now();
+    let at = -1;
+    const p = limiter.acquire().then(() => { at = Date.now() - start; });
+    await vi.advanceTimersByTimeAsync(3000);
+    await p;
+    expect(at).toBe(2400);
+  });
+
+  it('a 429 + Retry-After pauses every request of the browser, not only the one retried', async () => {
+    installWindow('');
+    vi.useFakeTimers();
+    const sent: number[] = [];
+    const start = Date.now();
+    let first = true;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      sent.push(Date.now() - start);
+      if (first) {
+        first = false;
+        return json({ detail: 'Limite de requêtes Riot atteinte, réessaie dans quelques secondes.' }, 429, { 'Retry-After': '3' });
+      }
+      return json(FIXTURES.account);
+    }));
+    const t = transport(adaptive());
+    const a = riotGet('account', { platform: 'euw1' }, t);
+    await vi.advanceTimersByTimeAsync(10);
+    const b = riotGet('summoner', { platform: 'euw1' }, t);
+    await vi.advanceTimersByTimeAsync(5000);
+    await Promise.all([a, b]);
+    expect(sent[0]).toBe(0);
+    expect(sent.slice(1).every((ms) => ms >= 3000)).toBe(true);
+    expect(sent).toHaveLength(3);
+  });
+
+  it('after 3 retries: French message with the wait', async () => {
+    installWindow('');
+    vi.stubGlobal('fetch', vi.fn(async () => json({ detail: 'x' }, 429, { 'Retry-After': '7' })));
+    const err = await failure(riotGet('summoner', {}, noLimit()));
+    expect(err.status).toBe(429);
+    expect(err.message).toBe('Limite de requêtes Riot atteinte (clé du site partagée) : réessaie dans 7 s.');
+    expect(err.retryAfter).toBe(7);
+  });
+
+  it('answers from the PHP cache give their slot back', async () => {
+    installWindow('');
+    vi.useFakeTimers();
+    const responses = [
+      json(FIXTURES.account, 200, { 'X-Cache': 'HIT' }), // cache: refunded
+      json(FIXTURES.account, 200, { 'X-Cache': 'MISS' }), // a Riot call: kept
+      json(FIXTURES.account, 200),
+    ];
+    vi.stubGlobal('fetch', vi.fn(async () => responses.shift()!));
+    const limiter = new RateLimiter([[1, 60_000]]);
+    const t = transport(limiter);
+    const start = Date.now();
+    const times: number[] = [];
+    const all = Promise.all([0, 1, 2].map((i) => riotGet('match', { id: String(i) }, t).then(() => times.push(Date.now() - start))));
+    await vi.advanceTimersByTimeAsync(130_000);
+    await all;
+    expect(times).toEqual([0, 0, 60_000]);
+    // Once count headers are known to be passed through, a counted answer is kept and an uncounted one refunded.
+    const adapt = adaptive();
+    adapt.observe([], [[1, 1]]);
+    expect(adapt.seenCounts).toBe(true);
   });
 });

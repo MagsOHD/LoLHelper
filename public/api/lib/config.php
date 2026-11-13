@@ -30,7 +30,7 @@ const PLATFORM_REGIONS = [
 /**
  * Charge api/config.php (facultatif) et normalise les types.
  * @return array{riot_api_key:string, riot_platform:string, app_password:string, admin_password:string, cors_origins:list<string>,
- *   data_dir:?string, meta_enabled:bool, meta_tiers:list<string>, meta_time_budget:int, meta_web_budget:int, meta_rate:float,
+ *   data_dir:?string, meta_enabled:bool, meta_tiers:list<string>, meta_time_budget:int, meta_web_budget:int, meta_rate:?float,
  *   meta_min_games:int}
  */
 function load_config(string $apiDir): array
@@ -77,21 +77,23 @@ function load_config(string $apiDir): array
     }
     $budget = $raw['meta_time_budget'] ?? 1500;
     $webBudget = $raw['meta_web_budget'] ?? 45;
-    $rate = $raw['meta_rate'] ?? 0.6;
+    // meta_rate : absent ou « auto » = pas de rythme fixe (la garde des limites Riot décide, 60 % de chaque
+    // fenêtre) ; un nombre (anciennes configs) plafonne en plus le collecteur à ce nombre de requêtes/s.
+    $rate = $raw['meta_rate'] ?? 'auto';
     $minGames = $raw['meta_min_games'] ?? 300;
 
     return [
         'riot_api_key' => is_string($key) ? trim($key) : '',
         'riot_platform' => (is_string($platform) && isset(PLATFORM_REGIONS[$platform])) ? $platform : 'euw1',
-        'app_password' => is_string($password) ? $password : '',
-        'admin_password' => is_string($adminPassword) ? $adminPassword : '',
+        'app_password' => is_string($password) ? trim($password) : '',
+        'admin_password' => is_string($adminPassword) ? trim($adminPassword) : '',
         'cors_origins' => $cleanOrigins,
         'data_dir' => (is_string($dataDir) && $dataDir !== '') ? rtrim($dataDir, '/\\') : null,
         'meta_enabled' => is_bool($metaEnabled) ? $metaEnabled : true,
         'meta_tiers' => $cleanTiers ?: ['CHALLENGER', 'GRANDMASTER', 'MASTER'],
         'meta_time_budget' => (is_int($budget) || is_float($budget)) ? max(1, min(3300, (int) $budget)) : 1500,
         'meta_web_budget' => (is_int($webBudget) || is_float($webBudget)) ? max(5, min(120, (int) $webBudget)) : 45,
-        'meta_rate' => (is_int($rate) || is_float($rate)) ? max(0.0, min(20.0, (float) $rate)) : 0.6,
+        'meta_rate' => (is_int($rate) || is_float($rate)) ? max(0.0, min(20.0, (float) $rate)) : null,
         'meta_min_games' => is_int($minGames) ? max(0, $minGames) : 300,
     ];
 }

@@ -109,7 +109,8 @@ L'onglet **Méta** du site les affiche : tier list par rôle, taux de victoire/p
    ```php
    'admin_password' => 'un-long-mot-de-passe-admin',
    ```
-   puis renvoyez `api/config.php` par FTP.
+   puis renvoyez `api/config.php` par FTP. Seul ce fichier compte : le site ne lit aucun fichier
+   `.env`. Accents et espaces autour du mot de passe ne posent pas de problème.
 2. Onglet **Méta** → « Mettre à jour la méta » → mot de passe administrateur → **Lancer**.
    Les passes (45 s chacune) s'enchaînent tant que l'onglet reste ouvert, jusqu'à « Arrêter » ou
    jusqu'à ce que toutes les parties récentes soient collectées.
@@ -174,9 +175,6 @@ et synchronisé avec la clé Riot (un joueur créé en mode manuel, sans clé, n
 Le programme n'envoie que les champions et les rôles ; l'identité des adversaires n'est jamais
 lue ni envoyée (Riot la masque pendant la draft). Une fois la partie lancée, le bouton
 « Détecter la partie » de la page Draft récupère l'équipe adverse via l'API Riot officielle.
-
-Le mot de passe du site ne doit pas contenir d'accents ni de caractères spéciaux hors ASCII
-(limite des en-têtes HTTP utilisés par le programme compagnon).
 
 ## 9. Mettre à jour et sauvegarder
 

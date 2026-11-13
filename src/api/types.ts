@@ -479,9 +479,55 @@ export interface PlaystyleStats {
   early_lead?: number | null;
   turret_takedowns: number; // per game
   avg_game_minutes: number;
+  /** From match timelines (a few recent games); absent when no timeline was fetched. */
+  timeline?: TimelineStyle | null;
 }
 
-export type EnemyProfileSource = 'scouting' | 'client' | 'game';
+/** Averages over the timelines analysed (match-v5 /timeline). Fields are null when not applicable. */
+export interface TimelineStyle {
+  games: number; // timelines analysed
+  gold_diff_10: number | null; // vs lane opponent at 10:00
+  cs_10: number | null; // lane + jungle minions at 10:00
+  kills_before_10: number; // kills + assists before 10:00, per game
+  deaths_before_10: number; // per game
+  /** Jungle only: minute of the first kill/assist on an enemy laner (gank), null if none before 8:00. */
+  first_gank_minute: number | null;
+  /** Jungle only: lane of the first gank most often ('TOP' | 'MID' | 'BOTTOM'). */
+  first_gank_lane: Role | null;
+  /** Minute of the first return to base (first purchase after 2:00). */
+  first_back_minute: number | null;
+  wards_per_min: number; // wards placed
+  /** Minute when level 6 is reached. */
+  level6_minute: number | null;
+}
+
+export type ClashPosition = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | 'FILL' | 'UNSELECTED';
+
+export interface ClashPlayer {
+  puuid: string | null; // may be missing in old payloads
+  position: ClashPosition;
+  role: 'CAPTAIN' | 'MEMBER' | string;
+}
+
+export interface ClashTeam {
+  id: string;
+  tournament_id: number;
+  name: string;
+  abbreviation: string;
+  tier: number;
+  icon_id: number;
+  players: ClashPlayer[];
+}
+
+export interface ClashTournament {
+  id: number;
+  name: string; // nameKey
+  name_secondary: string; // nameKeySecondary
+  /** epoch ms of registration and start for each phase */
+  phases: { id: number; registration_time: number; start_time: number; cancelled: boolean }[];
+}
+
+export type EnemyProfileSource = 'scouting' | 'client' | 'game' | 'clash';
 
 export interface EnemyPlayerProfile {
   puuid: string;
@@ -495,6 +541,9 @@ export interface EnemyPlayerProfile {
   /** Their current champion once known (locked in draft or in game). */
   champion_id?: string | null;
   role?: Role | null;
+  /** Declared Clash position (from the Clash API) when the player is in a Clash team. */
+  clash_position?: ClashPosition | null;
+  clash_team?: { id: string; name: string; abbreviation: string } | null;
   fetched_at: string;
 }
 

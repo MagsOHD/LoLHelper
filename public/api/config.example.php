@@ -17,8 +17,12 @@ return [
     'meta_enabled' => true,                         // false = le cron ne fait plus rien
     'meta_tiers' => ['CHALLENGER', 'GRANDMASTER', 'MASTER'],  // paliers suivis
     'meta_time_budget' => 1500,    // secondes de travail max par passage du cron (1 à 3300), 25 min
-    'meta_rate' => 0.6,            // requêtes Riot par seconde pour le cron ; la clé est partagée avec
-                                   // les synchronisations (clé perso : 20/s et 100/2 min), garder de la marge
+    'meta_rate' => 'auto',         // 'auto' (ou ligne absente) : pas de rythme fixe, la collecte suit la limite
+                                   // de la clé lue dans les réponses Riot (riot_limits.json du dossier de données)
+                                   // et s'arrête d'appeler à 60 % de chaque fenêtre pour laisser la place aux
+                                   // joueurs (eux sont servis jusqu'à 95 %). Un nombre (ex. 0.6, anciennes
+                                   // configs) plafonne en plus la collecte à ce nombre de requêtes par seconde ;
+                                   // supprimer la ligne ou mettre 'auto' pour passer en automatique.
     'meta_web_budget' => 45,       // secondes de travail max par clic sur « Lancer » depuis le site (5 à 120) ;
                                    // rester sous la limite d'exécution PHP de l'hébergeur
     'meta_min_games' => 300,       // parties nécessaires pour servir le nouveau patch plutôt que le précédent

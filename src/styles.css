@@ -993,3 +993,59 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
   .nav { gap: 0; }
   .nav__link { padding: 6px 7px; font-size: 0.85rem; }
 }
+
+/* ---------- Clash, timelines, key limits ---------- */
+.esource--clash { color: var(--r-support); border-color: color-mix(in srgb, var(--r-support) 55%, transparent); }
+.eclash {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; padding: 1px 8px 1px 2px;
+  border-radius: 999px; font-size: 0.78rem; color: var(--text-2);
+  background: color-mix(in srgb, var(--r-support) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--r-support) 40%, transparent);
+}
+.eclash__tag {
+  flex: none; padding: 0 6px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.05em;
+  color: var(--surface); background: var(--r-support);
+}
+.eclash__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: 600; color: var(--text); }
+.eclash__pos { flex: none; font-weight: 650; }
+.eclash__pos--unknown { color: var(--muted); font-weight: 500; }
+
+.etl { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.etl__title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal); }
+.etl__title .muted { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.estats--tl { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); }
+.etl__v--neg { color: var(--enemy) !important; }
+.etl__v--pos { color: var(--green) !important; }
+
+.scouting__clash { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.scouting__clash .sub { margin: 0; }
+
+.ctours { border-top: 3px solid var(--r-support); }
+.ctours__list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.ctour { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-width: 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.ctour:last-child { border-bottom: none; padding-bottom: 0; }
+.ctour__main { display: flex; flex-direction: column; min-width: 0; flex: 1 1 200px; }
+.ctour__name { overflow-wrap: anywhere; }
+.ctour__state {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+  border: 1px solid var(--border-strong); color: var(--text-2);
+}
+.ctour__state--registration { color: var(--green); border-color: color-mix(in srgb, var(--green) 55%, transparent); background: var(--green-soft); }
+.ctour__state--live { color: var(--enemy); border-color: color-mix(in srgb, var(--enemy) 55%, transparent); background: var(--enemy-soft); }
+
+.oclash { display: flex; flex-direction: column; gap: 8px; border-top: 3px solid var(--r-support); }
+.oclash__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.oclash__head .card__title { margin-bottom: 0; }
+.oclash__next { color: var(--text-2); overflow-wrap: anywhere; }
+.oclash__body { display: flex; flex-direction: column; gap: 8px; }
+.oclash__body .small { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.oclash__team { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
+.oclash__members { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.oclash__members li {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; min-width: 0; max-width: 100%;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 0.85rem;
+}
+.oclash__who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: 600; }
+
+.collect__limits { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--border); }
+.collect__limits-main { font-weight: 650; font-size: 0.9rem; overflow-wrap: anywhere; }
+.collect__limits-icon { margin-right: 6px; color: var(--teal); }

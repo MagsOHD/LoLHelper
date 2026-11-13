@@ -181,7 +181,7 @@ describe('meta status / manual collection', () => {
     const [url, init] = calls(fetchMock)[0];
     expect(url).toBe('api/index.php?r=meta-collect');
     expect(init.method).toBe('POST');
-    expect((init.headers as Record<string, string>)['X-Admin-Password']).toBe('s3cret');
+    expect((init.headers as Record<string, string>)['X-Admin-Password']).toBe(`b64:${btoa('s3cret')}`);
     expect(win.dispatchEvent).not.toHaveBeenCalled();
     expect(normalizeCollectResult({ status: 'busy' })).toEqual({ status: 'busy' });
     expect(() => normalizeCollectResult('<html>')).toThrow(ApiError);

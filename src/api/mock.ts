@@ -30,8 +30,11 @@ import type {
   SavedComposition,
   Team,
   ThemeInfo,
+  TimelineStyle,
 } from './types';
 import { ROLES } from './types';
+import type { ClashFetcher } from './clash';
+import type { RiotKeyLimits } from './riotLimits';
 import type { ChampionCatalog } from '../engine';
 import type { LiveDraft } from './draft';
 import type { DetectedGame } from './spectator';
@@ -543,6 +546,7 @@ interface DemoPlayer {
   /** [champion, mastery points, recent games, recent wins] */
   pool: [string, number, number, number][];
   style: Partial<PlaystyleStats>;
+  timeline?: Partial<TimelineStyle>;
 }
 
 const DEMO_PLAYERS: Record<string, DemoPlayer> = {
@@ -550,26 +554,31 @@ const DEMO_PLAYERS: Record<string, DemoPlayer> = {
     puuid: 'enemy-Zed', level: 412, tier: 'PLATINUM', division: 'II', role: 'MID',
     pool: [['Zed', 612_000, 7, 5], ['Ahri', 48_000, 2, 1], ['Veigar', 21_000, 1, 0]],
     style: { kills: 9.4, deaths: 5.1, assists: 4.2, cs_per_min: 7.8, vision_per_min: 0.5, kill_participation: 0.58, solo_kills: 2.6, first_blood_rate: 0.4, early_lead: 0.6 },
+    timeline: { gold_diff_10: 520, cs_10: 86, kills_before_10: 1.33, deaths_before_10: 0.67, first_back_minute: 6.1, wards_per_min: 0.31, level6_minute: 5.83 },
   },
   'hache rouge#1337': {
     puuid: 'enemy-Darius', level: 233, tier: 'GOLD', division: 'I', role: 'TOP',
     pool: [['Darius', 88_000, 4, 2], ['Sett', 64_000, 3, 2], ['MonkeyKing', 30_000, 2, 1], ['Malphite', 12_000, 1, 0]],
     style: { kills: 6.1, deaths: 6.4, assists: 4.0, cs_per_min: 6.9, vision_per_min: 0.45, kill_participation: 0.42, solo_kills: 1.8, first_blood_rate: 0.2, early_lead: 0.4 },
+    timeline: { gold_diff_10: -180, cs_10: 71, kills_before_10: 0.67, deaths_before_10: 1.33, first_back_minute: 8.4, wards_per_min: 0.22, level6_minute: 7.1 },
   },
   'aube#sun': {
     puuid: 'enemy-Leona', level: 301, tier: 'GOLD', division: 'II', role: 'SUPPORT',
     pool: [['Leona', 140_500, 5, 3], ['Thresh', 92_000, 3, 2], ['Lulu', 18_000, 2, 1]],
     style: { kills: 1.8, deaths: 5.2, assists: 13.6, cs_per_min: 1.1, vision_per_min: 2.1, kill_participation: 0.66, solo_kills: 0.1, first_blood_rate: 0.3, early_lead: 0.5 },
+    timeline: { gold_diff_10: 60, cs_10: 9, kills_before_10: 1.67, deaths_before_10: 0.67, first_back_minute: 5.2, wards_per_min: 1.15, level6_minute: 8.9 },
   },
   'glace#frj': {
     puuid: 'enemy-Sejuani', level: 158, tier: 'SILVER', division: 'I', role: 'JUNGLE',
     pool: [['Sejuani', 23_000, 4, 3], ['Vi', 61_000, 4, 2], ['Amumu', 40_000, 2, 1]],
     style: { kills: 4.9, deaths: 3.8, assists: 9.1, cs_per_min: 5.6, vision_per_min: 1.1, kill_participation: 0.71, solo_kills: 0.6, first_blood_rate: 0.62, early_lead: 0.7 },
+    timeline: { gold_diff_10: 310, cs_10: 58, kills_before_10: 2, deaths_before_10: 0.33, first_gank_minute: 3.33, first_gank_lane: 'BOTTOM', first_back_minute: 7.67, wards_per_min: 0.3, level6_minute: 6.4 },
   },
   'gâchette#zau': {
     puuid: 'enemy-Jinx', level: 96, tier: 'GOLD', division: 'III', role: 'BOTTOM',
     pool: [['Jinx', 54_000, 5, 2], ['Caitlyn', 47_000, 3, 2], ['Kaisa', 22_000, 2, 0]],
     style: { kills: 7.2, deaths: 6.8, assists: 6.0, cs_per_min: 6.1, vision_per_min: 0.35, kill_participation: 0.55, solo_kills: 0.4, first_blood_rate: 0.1, early_lead: 0.2 },
+    timeline: { gold_diff_10: -240, cs_10: 69, kills_before_10: 0.33, deaths_before_10: 1, first_back_minute: 7.9, wards_per_min: 0.18, level6_minute: 9.2 },
   },
 };
 const DEMO_BY_PUUID = new Map(Object.entries(DEMO_PLAYERS).map(([id, d]) => [d.puuid, id]));
@@ -616,10 +625,30 @@ function profileOf(riotKey: string | null, d: DemoPlayer, source: EnemyPlayerPro
       kills: 5, deaths: 5, assists: 5, cs_per_min: 6, vision_per_min: 0.8, damage_per_min: 640, kill_participation: 0.5,
       solo_kills: 0.5, first_blood_rate: 0.2, early_lead: 0.5, turret_takedowns: 1.2, avg_game_minutes: 29.4,
       ...d.style,
+      timeline: demoTimeline(d),
     },
     champion_id: null,
     role: null,
     fetched_at: '2026-11-10T19:55:00.000Z',
+  };
+}
+
+/** Timeline facts of a demo player (3 games), generic values derived from the puuid. */
+function demoTimeline(d: DemoPlayer): TimelineStyle {
+  const h = hash(d.puuid);
+  const jungle = d.role === 'JUNGLE';
+  return {
+    games: 3,
+    gold_diff_10: ((h % 900) - 400),
+    cs_10: d.role === 'SUPPORT' ? 8 : jungle ? 52 + (h % 12) : 62 + (h % 25),
+    kills_before_10: Math.round(((h >> 3) % 20) / 10 * 100) / 100,
+    deaths_before_10: Math.round(((h >> 5) % 15) / 10 * 100) / 100,
+    first_gank_minute: jungle ? 3 + ((h >> 7) % 30) / 10 : null,
+    first_gank_lane: jungle ? (['TOP', 'MID', 'BOTTOM'] as Role[])[h % 3] : null,
+    first_back_minute: 5 + ((h >> 9) % 40) / 10,
+    wards_per_min: d.role === 'SUPPORT' ? 1.1 : Math.round((0.15 + ((h >> 11) % 30) / 100) * 100) / 100,
+    level6_minute: 5.5 + ((h >> 13) % 40) / 10,
+    ...d.timeline,
   };
 }
 
@@ -634,7 +663,7 @@ drafts.get('team-t1')!.enemy_profiles = [demoProfile('OmbreDuMid#EUW', 'scouting
 /** Simulates the Riot calls (progress ticks) of a profile build. */
 export async function mockEnemyProfile(req: ProfileRequest, onProgress?: (p: ProfileProgress) => void): Promise<EnemyPlayerProfile> {
   const count = req.match_count ?? (req.source === 'scouting' ? 10 : 5);
-  const total = (req.puuid ? 0 : 1) + 4 + count;
+  const total = (req.puuid ? 0 : 1) + 4 + count + Math.min(3, count);
   for (let calls = 0; calls <= total; calls++) {
     onProgress?.({ calls, total });
     if (calls < total) await delay(110 + Math.random() * 90);
@@ -647,7 +676,87 @@ export async function mockEnemyProfile(req: ProfileRequest, onProgress?: (p: Pro
   const p = demo ? profileOf(key, demo, req.source, count, display ?? DISPLAY_ID[key ?? ''] ?? null) : profileOf(null, genericPlayer(req.riot_id ?? req.puuid ?? 'x'), req.source, count, display);
   if (req.source === 'client') p.riot_id = null;
   if (req.puuid) p.puuid = req.puuid;
-  return { ...p, champion_id: req.champion_id ?? null, role: req.role ?? null, fetched_at: new Date().toISOString() };
+  const clash = req.clash_team !== undefined ? { clash_team: req.clash_team, clash_position: req.clash_team ? req.clash_position ?? null : null } : {};
+  return { ...p, ...clash, champion_id: req.champion_id ?? null, role: req.role ?? null, fetched_at: new Date().toISOString() };
+}
+
+// ---- Clash + key limits (demo) -------------------------------------------------------------------
+
+/** Raw clash-v1 payloads: the scouted opponents' team (one member without puuid) and ours. */
+const MOCK_CLASH_TEAMS: Record<string, unknown> = {
+  'team-ombres': {
+    id: 'team-ombres', tournamentId: 4201, name: 'Les Ombres', iconId: 12, tier: 2, captain: 'x', abbreviation: 'OMB',
+    players: [
+      { summonerId: 's1', puuid: 'enemy-Zed', position: 'MIDDLE', role: 'CAPTAIN' },
+      { summonerId: 's2', puuid: 'enemy-Darius', position: 'TOP', role: 'MEMBER' },
+      { summonerId: 's3', puuid: 'enemy-Leona', position: 'UTILITY', role: 'MEMBER' },
+      { summonerId: 's4', puuid: 'enemy-Sejuani', position: 'JUNGLE', role: 'MEMBER' },
+      { summonerId: 's5', position: 'BOTTOM', role: 'MEMBER' },
+    ],
+  },
+  'team-jeudi': {
+    id: 'team-jeudi', tournamentId: 4201, name: 'Les Potes du Jeudi', iconId: 7, tier: 3, captain: 'y', abbreviation: 'JEU',
+    players: [
+      { summonerId: 'f1', puuid: 'puuid-1', position: 'MIDDLE', role: 'CAPTAIN' },
+      { summonerId: 'f2', puuid: 'puuid-2', position: 'TOP', role: 'MEMBER' },
+      { summonerId: 'f3', puuid: 'puuid-friend-3', position: 'JUNGLE', role: 'MEMBER' },
+      { summonerId: 'f4', puuid: 'puuid-friend-4', position: 'BOTTOM', role: 'MEMBER' },
+      { summonerId: 'f5', puuid: 'puuid-friend-5', position: 'FILL', role: 'MEMBER' },
+    ],
+  },
+};
+const MOCK_CLASH_PLAYERS: Record<string, string> = {
+  'enemy-Zed': 'team-ombres', 'enemy-Darius': 'team-ombres', 'enemy-Leona': 'team-ombres', 'enemy-Sejuani': 'team-ombres',
+  'puuid-1': 'team-jeudi', 'puuid-2': 'team-jeudi',
+};
+
+function mockTournaments(now: number): unknown[] {
+  const day = 24 * 3600 * 1000;
+  const at18 = (offsetDays: number) => {
+    const d = new Date(now + offsetDays * day);
+    d.setHours(18, 0, 0, 0);
+    return d.getTime();
+  };
+  return [
+    { id: 4201, themeId: 3, nameKey: 'bilgewater', nameKeySecondary: 'day_1', schedule: [{ id: 1, registrationTime: now - 3 * day, startTime: at18(1), cancelled: false }] },
+    { id: 4202, themeId: 3, nameKey: 'bilgewater', nameKeySecondary: 'day_2', schedule: [{ id: 2, registrationTime: now - 3 * day, startTime: at18(2), cancelled: false }] },
+    { id: 4310, themeId: 5, nameKey: 'ionia', nameKeySecondary: 'day_1', schedule: [{ id: 3, registrationTime: at18(10), startTime: at18(15), cancelled: false }] },
+  ];
+}
+
+/** Same payloads as the PHP proxy routes (riot/clash-*), with a little latency. */
+export const mockClashFetcher: ClashFetcher = {
+  async player(puuid) {
+    await delay(150);
+    const team = MOCK_CLASH_PLAYERS[puuid];
+    if (!team) return [];
+    const raw = MOCK_CLASH_TEAMS[team] as { players: { puuid?: string; position: string; role: string }[] };
+    const me = raw.players.find((p) => p.puuid === puuid);
+    return [{ summonerId: 'x', puuid, teamId: team, position: me?.position ?? 'FILL', role: me?.role ?? 'MEMBER' }];
+  },
+  async team(teamId) {
+    await delay(180);
+    const raw = MOCK_CLASH_TEAMS[teamId];
+    if (!raw) throw new ApiError('Introuvable chez Riot.', 404);
+    return clone(raw);
+  },
+  async tournaments() {
+    await delay(150);
+    return mockTournaments(Date.now());
+  },
+};
+
+export async function mockRiotLimits(): Promise<RiotKeyLimits> {
+  await delay(150);
+  const at = new Date(Date.now() - 40_000).toISOString();
+  return {
+    app: [
+      { limit: 20, window: 1, count: 2, at },
+      { limit: 100, window: 120, count: 41, at },
+    ],
+    collector_share: 0.6,
+    user_share: 0.95,
+  };
 }
 
 const TIER_ORDER = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
@@ -670,10 +779,12 @@ function inferredChampion(p: EnemyPlayerProfile, input?: DraftInput): string | n
   return hits.length === 1 ? hits[0] : null;
 }
 
+const clock = (m: number) => `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')}`;
+
 function mockInsight(p: EnemyPlayerProfile, input?: DraftInput): EnemyPlayerInsight {
   const s = p.style;
   const champion = inferredChampion(p, input);
-  const role = p.role ?? mainRole(p);
+  const role = p.role ?? mainRole(p) ?? (p.clash_position ? ({ TOP: 'TOP', JUNGLE: 'JUNGLE', MIDDLE: 'MID', BOTTOM: 'BOTTOM', UTILITY: 'SUPPORT' } as Record<string, Role>)[p.clash_position] ?? null : null);
   const tags: string[] = [];
   const threats: string[] = [];
   const attention: string[] = [];
@@ -698,6 +809,21 @@ function mockInsight(p: EnemyPlayerProfile, input?: DraftInput): EnemyPlayerInsi
   if (role === 'MID' && s && s.solo_kills >= 2) attention.push('Respectez son niveau 6 : pas d’échange sans votre jungler à proximité.');
   if (s && s.vision_per_min < 0.6 && role !== 'SUPPORT') attention.push('Peu de vision : punissez-le avec des gank par la rivière.');
   if (s && s.deaths >= 6.5) attention.push('Prend des risques : un gank tôt peut le faire craquer.');
+  const tl = s?.timeline;
+  if (tl) {
+    if (role === 'JUNGLE' && tl.first_gank_minute !== null && tl.first_gank_minute < 4) {
+      tags.push('Jungler qui gank tôt');
+      const lane = tl.first_gank_lane ? ({ TOP: 'top', MID: 'mid', BOTTOM: 'bot' } as Partial<Record<Role, string>>)[tl.first_gank_lane] : null;
+      attention.unshift(`Premier gank vers ${clock(tl.first_gank_minute)}${lane ? `, surtout ${lane}` : ''} : wardez la rivière avant.`);
+    }
+    if ((tl.gold_diff_10 ?? 0) >= 400) tags.push('Prend l’avance en lane');
+    if (role !== 'SUPPORT' && tl.wards_per_min < 0.25) tags.push('Pose peu de balises');
+    if ((tl.first_back_minute ?? 0) >= 7.5) attention.push(`Retour en base tardif (${clock(tl.first_back_minute as number)}) : punissable par un recall synchronisé.`);
+  }
+  if (p.clash_position && p.clash_team) {
+    const pos: Record<string, string> = { TOP: 'top', JUNGLE: 'jungle', MIDDLE: 'mid', BOTTOM: 'ADC', UTILITY: 'support', FILL: 'remplaçant' };
+    if (pos[p.clash_position]) threats.push(`Poste Clash déclaré : ${pos[p.clash_position]} (${p.clash_team.name})`);
+  }
   if (!attention.length) attention.push('Joueur régulier : jouez votre plan sans prendre de risque inutile.');
   return {
     puuid: p.puuid,

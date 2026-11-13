@@ -16,33 +16,158 @@ import { ApiError, backendRequest, type Params } from './backend';
 
 // ---- rate limiting ---------------------------------------------------------------------------
 
-/** Riot development key limits: 20 requests / 1 s and 100 requests / 2 min. */
-export const DEV_KEY_LIMITS: ReadonlyArray<readonly [number, number]> = [
+/** [maxRequests, periodMs] pairs. */
+export type Limits = ReadonlyArray<readonly [number, number]>;
+
+/** Riot development key limits: 20 requests / 1 s and 100 requests / 2 min (assumed until a header says otherwise). */
+export const DEV_KEY_LIMITS: Limits = [
   [20, 1000],
   [100, 120_000],
 ];
+/** Share of each application window one browser aims for (the key is shared by the team and the collector). */
+export const BROWSER_SHARE = 0.3;
+/** The PHP gate answers 429 locally above this share of a window (user-facing calls). */
+export const USER_SHARE = 0.95;
 
 export type Sleep = (ms: number) => Promise<void>;
 export const realSleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Sliding-window limiter; `limits` = [maxRequests, periodMs][]. */
+/**
+ * "20:1,100:120" (X-App-Rate-Limit: limit:seconds, or X-App-Rate-Limit-Count: count:seconds) ->
+ * [[20, 1000], [100, 120000]]. Malformed pairs are dropped; null/empty -> [].
+ */
+export function parseRateLimitHeader(value: string | null | undefined): [number, number][] {
+  if (!value) return [];
+  const out: [number, number][] = [];
+  for (const part of value.split(',')) {
+    const m = /^\s*(\d{1,7})\s*:\s*(\d{1,6})\s*$/.exec(part);
+    if (!m) continue;
+    const n = Number(m[1]);
+    const seconds = Number(m[2]);
+    if (seconds > 0) out.push([n, seconds * 1000]);
+  }
+  return out.sort((a, b) => a[1] - b[1]);
+}
+
+/** Per-browser limits: `share` of each application window (at least 1, never above the window itself). */
+export function browserLimits(app: Limits, share: number = BROWSER_SHARE): [number, number][] {
+  return app
+    .filter(([n, p]) => n > 0 && p > 0)
+    .map(([n, p]): [number, number] => [Math.min(n, Math.max(1, Math.floor(n * share))), p]);
+}
+
+const sameLimits = (a: Limits, b: Limits) => a.length === b.length && a.every(([n, p], i) => n === b[i][0] && p === b[i][1]);
+
+export interface RateLimiterOptions {
+  /** Follow the application limits passed through by the PHP proxy (X-App-Rate-Limit[-Count]). */
+  adaptive?: boolean;
+  /** Share of each window this browser may use when adaptive (BROWSER_SHARE). */
+  share?: number;
+}
+
+/**
+ * Sliding-window limiter; `limits` = [maxRequests, periodMs][] (empty = disabled, e.g. tests).
+ * Adaptive limiters re-derive their windows from the key's application limit seen in the proxied
+ * headers, back off while the key's shared usage is near the server gate, and pause everyone on a
+ * 429 + Retry-After.
+ */
 export class RateLimiter {
   private events: number[] = [];
-  private queue: Promise<void> = Promise.resolve();
-  private readonly maxPeriod: number;
+  private queue: Promise<unknown> = Promise.resolve();
+  private maxPeriod = 0;
+  private pausedUntil = 0;
+  private limitsNow: Limits;
+  private appLimits: Limits | null = null;
+  /** An X-App-Rate-Limit-Count header was seen: responses without one come from the PHP cache. */
+  seenCounts = false;
+  readonly adaptive: boolean;
+  readonly share: number;
+  /** Wakes a waiting acquire early (slot refunded, limits raised). */
+  private wake: (() => void) | null = null;
 
   constructor(
-    private readonly limits: ReadonlyArray<readonly [number, number]> = DEV_KEY_LIMITS,
+    limits: Limits = browserLimits(DEV_KEY_LIMITS),
     private readonly clock: () => number = () => Date.now(),
     private readonly sleep: Sleep = (ms) => realSleep(ms),
+    options: RateLimiterOptions = {},
   ) {
+    this.limitsNow = limits;
     this.maxPeriod = Math.max(0, ...limits.map(([, p]) => p));
+    this.adaptive = Boolean(options.adaptive) && limits.length > 0;
+    this.share = options.share ?? BROWSER_SHARE;
+  }
+
+  /** Current per-browser windows. */
+  get limits(): Limits {
+    return this.limitsNow;
+  }
+
+  /** Application limits of the key as last seen (null before any header). */
+  get keyLimits(): Limits | null {
+    return this.appLimits;
+  }
+
+  setLimits(limits: Limits): void {
+    if (!limits.length || sameLimits(limits, this.limitsNow)) return;
+    this.limitsNow = limits;
+    this.maxPeriod = Math.max(this.maxPeriod, ...limits.map(([, p]) => p));
+    this.wakeUp();
+  }
+
+  private wakeUp(): void {
+    const w = this.wake;
+    this.wake = null;
+    w?.();
+  }
+
+  /** Nobody sends before now + ms (local 429 + Retry-After, key nearly exhausted). */
+  pauseFor(ms: number, now: number = this.clock()): void {
+    if (!this.limitsNow.length || !(ms > 0)) return;
+    this.pausedUntil = Math.max(this.pausedUntil, now + ms);
+  }
+
+  /**
+   * Key limits / shared counts seen in a response (adaptive limiters only). The browser keeps
+   * `share` of each window; when the key's count reaches the server gate (USER_SHARE) in a window,
+   * sending pauses for about the time the excess needs to drain (uniform spread assumption).
+   */
+  observe(app: Limits, counts: Limits, now: number = this.clock()): void {
+    if (!this.adaptive) return;
+    if (app.length) {
+      this.appLimits = app;
+      this.setLimits(browserLimits(app, this.share));
+    }
+    if (counts.length) this.seenCounts = true;
+    const known = app.length ? app : this.appLimits ?? DEV_KEY_LIMITS;
+    for (const [count, period] of counts) {
+      const limit = known.find(([, p]) => p === period)?.[0];
+      if (!limit) continue;
+      const gate = Math.floor(limit * USER_SHARE);
+      if (count < gate) continue;
+      const drain = Math.ceil(((count - gate + 1) * period) / limit);
+      this.pauseFor(Math.min(period, Math.max(250, drain)), now);
+    }
+  }
+
+  /** observe() from the proxied response headers. */
+  observeHeaders(headers: Headers | null | undefined, now: number = this.clock()): void {
+    if (!headers || !this.adaptive) return;
+    this.observe(parseRateLimitHeader(headers.get('X-App-Rate-Limit')), parseRateLimitHeader(headers.get('X-App-Rate-Limit-Count')), now);
+  }
+
+  /** Gives back the slot taken at `token` (the answer came from the PHP cache: no Riot call). */
+  refund(token: number): void {
+    const i = this.events.lastIndexOf(token);
+    if (i >= 0) {
+      this.events.splice(i, 1);
+      this.wakeUp();
+    }
   }
 
   waitTime(now: number): number {
     while (this.events.length && now - this.events[0] >= this.maxPeriod) this.events.shift();
-    let wait = 0;
-    for (const [limit, period] of this.limits) {
+    let wait = Math.max(0, this.pausedUntil - now);
+    for (const [limit, period] of this.limitsNow) {
       const recent = this.events.filter((t) => now - t < period);
       if (recent.length >= limit) {
         // The oldest request that must leave the window before we may send another one.
@@ -52,18 +177,19 @@ export class RateLimiter {
     return wait;
   }
 
-  /** Resolves when a request may be sent (FIFO). */
-  acquire(): Promise<void> {
-    if (!this.limits.length) return Promise.resolve();
+  /** Resolves (FIFO) with a token identifying the slot when a request may be sent. */
+  acquire(): Promise<number> {
+    if (!this.limitsNow.length) return Promise.resolve(-1);
     const next = this.queue.then(async () => {
       for (;;) {
         const now = this.clock();
         const wait = this.waitTime(now);
         if (wait <= 0) {
           this.events.push(now);
-          return;
+          return now;
         }
-        await this.sleep(wait);
+        await Promise.race([this.sleep(wait), new Promise<void>((resolve) => { this.wake = resolve; })]);
+        this.wake = null;
       }
     });
     this.queue = next.catch(() => undefined);
@@ -84,7 +210,13 @@ export interface RiotTransport {
 let defaultTransport: RiotTransport | null = null;
 
 export function getTransport(): RiotTransport {
-  if (!defaultTransport) defaultTransport = { limiter: new RateLimiter(), sleep: realSleep, maxRetries: MAX_RETRIES };
+  if (!defaultTransport) {
+    defaultTransport = {
+      limiter: new RateLimiter(browserLimits(DEV_KEY_LIMITS), undefined, undefined, { adaptive: true }),
+      sleep: realSleep,
+      maxRetries: MAX_RETRIES,
+    };
+  }
   return defaultTransport;
 }
 
@@ -93,20 +225,41 @@ export function setTransportForTests(t: RiotTransport | null): void {
   defaultTransport = t;
 }
 
-const RATE_LIMITED_MESSAGE = 'Limite de requêtes Riot atteinte, réessaie dans quelques secondes.';
+export function rateLimitedMessage(retryAfter?: number): string {
+  return retryAfter && retryAfter > 0
+    ? `Limite de requêtes Riot atteinte (clé du site partagée) : réessaie dans ${Math.ceil(retryAfter)} s.`
+    : 'Limite de requêtes Riot atteinte, réessaie dans quelques secondes.';
+}
 
-/** GET r=riot/<endpoint> through the client limiter, retrying 429 (Retry-After) up to maxRetries. */
+/**
+ * GET r=riot/<endpoint> through the client limiter. The proxied X-App-Rate-Limit headers adapt the
+ * limiter; a 429 (local gate or Riot, Retry-After) pauses every request of this browser and is
+ * retried up to maxRetries, then fails with a French message. Answers served from the PHP cache
+ * (X-Cache: HIT, or no count header once the proxy is known to pass them) give their slot back.
+ */
 export async function riotGet<T>(endpoint: string, params: Params, t: RiotTransport = getTransport()): Promise<T> {
   let attempt = 0;
   for (;;) {
-    await t.limiter.acquire();
+    const token = await t.limiter.acquire();
+    let counted = false;
+    let cacheHit = false;
     try {
-      return await backendRequest<T>('GET', `riot/${endpoint}`, { params });
+      const data = await backendRequest<T>('GET', `riot/${endpoint}`, {
+        params,
+        onHeaders: (h) => {
+          cacheHit = (h.get('X-Cache') ?? '').toUpperCase() === 'HIT';
+          counted = h.get('X-App-Rate-Limit-Count') !== null;
+          t.limiter.observeHeaders(h);
+        },
+      });
+      if (cacheHit || (!counted && t.limiter.seenCounts)) t.limiter.refund(token);
+      return data;
     } catch (err) {
       if (!(err instanceof ApiError) || err.status !== 429) throw err;
-      if (attempt >= t.maxRetries) throw new ApiError(err.message || RATE_LIMITED_MESSAGE, 429);
+      const seconds = err.retryAfter ?? attempt + 1;
+      if (attempt >= t.maxRetries) throw new ApiError(rateLimitedMessage(err.retryAfter), 429, err.retryAfter);
       attempt += 1;
-      const seconds = err.retryAfter ?? attempt;
+      t.limiter.pauseFor(seconds * 1000);
       await t.sleep(seconds * 1000);
     }
   }

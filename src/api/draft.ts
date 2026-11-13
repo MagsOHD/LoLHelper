@@ -2,6 +2,7 @@
 // Pure functions first (unit-tested), then the thin I/O helpers.
 import type { ChampionCatalog } from '../engine';
 import type {
+  ClashPosition,
   DraftAllySlot,
   DraftEnemySlot,
   DraftInput,
@@ -16,6 +17,7 @@ import type {
   PlayerInput,
   Rank,
   Role,
+  TimelineStyle,
 } from './types';
 import { ROLES } from './types';
 import { backendRequest, store } from './backend';
@@ -438,8 +440,8 @@ export function mergeCompanion(base: DraftState, live: LiveMapping, held: Iterab
 export const MAX_SCOUTED = DRAFT_SIZE;
 /** Profiles kept in the document: 5 scouted + 5 from the client / the started game. */
 export const MAX_ENEMY_PROFILES = 2 * DRAFT_SIZE;
-const PROFILE_SOURCES: EnemyProfileSource[] = ['scouting', 'client', 'game'];
-const SOURCE_RANK: Record<EnemyProfileSource, number> = { scouting: 0, client: 1, game: 2 };
+const PROFILE_SOURCES: EnemyProfileSource[] = ['scouting', 'clash', 'client', 'game'];
+const SOURCE_RANK: Record<EnemyProfileSource, number> = { scouting: 0, clash: 1, client: 2, game: 3 };
 const MAX_RIOT_ID = 64;
 
 const finite = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -457,9 +459,39 @@ function normalizeRank(v: unknown): Rank | null {
   };
 }
 
+const optFinite = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? r2(v) : null);
+const LANES: Role[] = ['TOP', 'MID', 'BOTTOM'];
+
+function normalizeTimeline(v: unknown): TimelineStyle | null {
+  if (!isObject(v) || !(finite(v.games) > 0)) return null;
+  return {
+    games: Math.trunc(finite(v.games)),
+    gold_diff_10: optFinite(v.gold_diff_10),
+    cs_10: optFinite(v.cs_10),
+    kills_before_10: r2(finite(v.kills_before_10)),
+    deaths_before_10: r2(finite(v.deaths_before_10)),
+    first_gank_minute: optFinite(v.first_gank_minute),
+    first_gank_lane: LANES.includes(v.first_gank_lane as Role) ? (v.first_gank_lane as Role) : null,
+    first_back_minute: optFinite(v.first_back_minute),
+    wards_per_min: r2(finite(v.wards_per_min)),
+    level6_minute: optFinite(v.level6_minute),
+  };
+}
+
+const CLASH_POSITIONS: ClashPosition[] = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'FILL', 'UNSELECTED'];
+const TEAM_ID = /^[A-Za-z0-9-]{1,64}$/;
+
+/** undefined = never looked up, null = looked up (no Clash team), else the team reference. */
+function normalizeClashTeam(v: unknown): EnemyPlayerProfile['clash_team'] | undefined {
+  if (v === null) return null;
+  if (!isObject(v) || typeof v.id !== 'string' || !TEAM_ID.test(v.id)) return undefined;
+  return { id: v.id, name: (str(v.name) ?? 'Équipe Clash').slice(0, 64), abbreviation: (str(v.abbreviation) ?? '').slice(0, 8) };
+}
+
 function normalizeStyle(v: unknown): PlaystyleStats | null {
   if (!isObject(v) || !(finite(v.games) > 0)) return null;
   const f = (k: string) => r2(finite(v[k]));
+  const timeline = normalizeTimeline(v.timeline);
   return {
     games: Math.trunc(finite(v.games)),
     wins: Math.trunc(finite(v.wins)),
@@ -475,6 +507,7 @@ function normalizeStyle(v: unknown): PlaystyleStats | null {
     early_lead: typeof v.early_lead === 'number' && Number.isFinite(v.early_lead) ? r2(v.early_lead) : null,
     turret_takedowns: f('turret_takedowns'),
     avg_game_minutes: f('avg_game_minutes'),
+    ...(timeline ? { timeline } : {}),
   };
 }
 
@@ -512,6 +545,7 @@ export function normalizeProfile(raw: unknown): EnemyPlayerProfile | null {
       })),
   });
   const riot = str(raw.riot_id);
+  const clashTeam = normalizeClashTeam(raw.clash_team);
   return {
     puuid,
     riot_id: riot ? riot.slice(0, MAX_RIOT_ID) : null,
@@ -523,6 +557,9 @@ export function normalizeProfile(raw: unknown): EnemyPlayerProfile | null {
     style: normalizeStyle(raw.style),
     champion_id: str(raw.champion_id),
     role: isRole(raw.role) ? raw.role : null,
+    ...(clashTeam !== undefined
+      ? { clash_team: clashTeam, clash_position: clashTeam && CLASH_POSITIONS.includes(raw.clash_position as ClashPosition) ? (raw.clash_position as ClashPosition) : null }
+      : {}),
     fetched_at: str(raw.fetched_at) ?? '',
   };
 }
@@ -566,6 +603,13 @@ export function upsertProfile(list: EnemyPlayerProfile[] | undefined, incoming: 
     source: SOURCE_RANK[old.source] <= SOURCE_RANK[p.source] ? old.source : p.source,
     riot_id: old.riot_id ?? p.riot_id ?? null,
   };
+  // A rebuilt profile without Clash data keeps what was looked up before.
+  if (p.clash_team === undefined && old.clash_team !== undefined) {
+    merged.clash_team = old.clash_team;
+    merged.clash_position = old.clash_position ?? null;
+  }
+  // Same for the timeline facts (a quicker rebuild may have skipped them).
+  if (merged.style && !merged.style.timeline && old.style?.timeline) merged.style = { ...merged.style, timeline: old.style.timeline };
   return cur.map((x, j) => (j === i ? merged : x));
 }
 
@@ -575,6 +619,35 @@ export function removeProfile(list: EnemyPlayerProfile[] | undefined, puuid: str
 
 export function scoutedProfiles(d: DraftState): EnemyPlayerProfile[] {
   return (d.enemy_profiles ?? []).filter((p) => p.source === 'scouting');
+}
+
+/** Members of an enemy Clash team added from a roster (source "clash"). */
+export function clashProfiles(d: DraftState): EnemyPlayerProfile[] {
+  return (d.enemy_profiles ?? []).filter((p) => p.source === 'clash');
+}
+
+/** Profiles kept when the draft is reset: scouted players and their Clash teammates. */
+export function keptOnReset(d: DraftState): EnemyPlayerProfile[] {
+  return (d.enemy_profiles ?? []).filter((p) => p.source === 'scouting' || p.source === 'clash');
+}
+
+/** Sets Clash data on known profiles (puuid -> team/position); unchanged list when nothing changes. */
+export function annotateClash(
+  list: EnemyPlayerProfile[] | undefined,
+  updates: { puuid: string; team: EnemyPlayerProfile['clash_team']; position: ClashPosition | null }[],
+): EnemyPlayerProfile[] {
+  const cur = list ?? [];
+  let changed = false;
+  const by = new Map(updates.map((u) => [u.puuid, u]));
+  const out = cur.map((p) => {
+    const u = by.get(p.puuid);
+    if (!u) return p;
+    const position = u.team ? u.position : null;
+    if (JSON.stringify(p.clash_team ?? null) === JSON.stringify(u.team ?? null) && (p.clash_position ?? null) === position && p.clash_team !== undefined) return p;
+    changed = true;
+    return { ...p, clash_team: u.team ?? null, clash_position: position };
+  });
+  return changed ? out : cur;
 }
 
 /**
@@ -593,11 +666,13 @@ export function activeEnemyProfiles(d: DraftState): EnemyPlayerProfile[] {
     const acc = accounts.get(p.puuid);
     if (p.source === 'client' && !slot && !acc) continue;
     if (p.source === 'game' && !acc) continue;
+    // Scouted ahead of time (Riot ID or Clash roster): champion and role only from the draft/game.
+    const ahead = p.source === 'scouting' || p.source === 'clash';
     out.push({
       ...p,
       riot_id: p.riot_id ?? acc?.riot_id ?? null,
-      champion_id: acc?.champion_id || slot?.champion_id || (p.source === 'scouting' ? null : p.champion_id ?? null),
-      role: acc?.role ?? slot?.role ?? (p.source === 'scouting' ? null : p.role ?? null),
+      champion_id: acc?.champion_id || slot?.champion_id || (ahead ? null : p.champion_id ?? null),
+      role: acc?.role ?? slot?.role ?? (ahead ? null : p.role ?? null),
     });
   }
   return out;

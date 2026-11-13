@@ -165,6 +165,8 @@ expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), ''), 400, 'empty body -> 
 expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), "{\"a\":\"\xC3\x28\"}"), 400, 'invalid UTF-8 -> 400');
 $big = '{"x":"' . str_repeat('a', 262144) . '"}';
 expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), $big), 413, 'oversized body -> 413');
+expect(req('GET', api($A, 'r=store/teams'), ['X-App-Password' => 'b64:' . base64_encode(PW)]), 200, 'app password sent as b64 accepted');
+expect(req('GET', api($A, 'r=store/teams'), ['X-App-Password' => 'b64:' . base64_encode(PW . 'x')]), 401, 'wrong b64 app password rejected');
 expect(req('POST', api($A, 'r=store/teams/x1'), auth(), '{}'), 405, 'POST doc -> 405');
 expect(req('PUT', api($A, 'r=store/drafts/team-abc'), auth(), '{"phase":"pick","ally":[]}'), 200, 'PUT draft');
 $r = req('GET', api($A, 'r=store/drafts/team-abc'), auth());
@@ -603,8 +605,273 @@ expect(req('GET', api($B, 'r=riot/active-game&platform=euw1&puuid=' . PUUID)), 4
 expect(req('GET', api($C, 'r=riot/active-game&platform=euw1&puuid=' . PUUID)), 502, 'active-game network error');
 expect(req('PUT', api($A, 'r=riot/active-game&platform=euw1&puuid=' . PUUID), auth(), '{}'), 405, 'active-game PUT -> 405');
 
+// ---------------------------------------------------------------- adaptive Riot rate limits
+$FAKE_CTRL = getenv('FAKE_CTRL');
+$limitsFile = "$T/a/data/riot_limits.json";
+$MSG_RATE = 'Limite de requêtes Riot atteinte, réessaie dans quelques secondes.';
+
+function ctrl(array $c): void
+{
+    global $FAKE_CTRL;
+    file_put_contents($FAKE_CTRL, json_encode($c));
+}
+
+function limits_state(string $file): array
+{
+    return json_decode((string) @file_get_contents($file), true) ?: [];
+}
+
+function header_list(array $r, string $name): array
+{
+    return array_map('trim', explode(',', $r['headers'][$name] ?? ''));
+}
+
+ctrl([]);
+@unlink($limitsFile);
+@unlink($FAKE_LOG);
+$r = req('GET', api($A, 'r=riot/summoner&platform=euw1&puuid=' . PUUID), auth());
+expect($r, 200, 'summoner with Riot rate headers');
+check(($r['headers']['x-app-rate-limit'] ?? '') === '20:1,100:120' && ($r['headers']['x-app-rate-limit-count'] ?? '') === '1:1,1:120',
+    'X-App-Rate-Limit(-Count) passed through', json_encode($r['headers']));
+check(!isset($r['headers']['x-method-rate-limit']) && !isset($r['headers']['x-method-rate-limit-count']), 'method headers kept server side');
+$st = limits_state($limitsFile);
+check(($st['app']['euw1']['w'] ?? null) === [[20, 1, 1], [100, 120, 1]], 'app limits + counts recorded for the euw1 host', json_encode($st));
+check(($st['app']['euw1']['calls'] ?? null) === [], 'reserved call settled by its response', json_encode($st['app']['euw1'] ?? null));
+check(abs(($st['app']['euw1']['at'] ?? 0) - microtime(true)) < 30, 'counts timestamped');
+check(($st['method']['euw1 summoner-v4.by-puuid']['w'] ?? null) === [[2000, 10, 1]], 'method limits recorded per method family', json_encode($st['method'] ?? null));
+check(filesize($limitsFile) < 2048 && is_file("$T/a/data/riot_limits.lock") && glob("$T/a/data/*.tmp-*") === [], 'limits file tiny, flock + atomic write, in the data dir');
+check(!is_file("$T/a/www/riot_limits.json") && !is_file("$T/a/www/api/riot_limits.json"), 'limits file not under the web root');
+check(!str_contains((string) file_get_contents($limitsFile), KEY), 'key never in the limits file');
+$r = $acc('Missing');
+check($r['status'] === 404 && ($r['headers']['x-app-rate-limit'] ?? '') === '20:1,100:120', 'rate headers passed through on Riot errors too');
+$st = limits_state($limitsFile);
+check(isset($st['app']['europe']['w']) && isset($st['app']['euw1']['w']), 'one bucket per routing host (euw1, europe)', json_encode(array_keys($st['app'] ?? [])));
+$r = req('GET', api($A, 'r=riot/match&platform=euw1&id=EUW1_7000000001'), auth());
+check(($r['headers']['x-cache'] ?? '') === 'HIT' && !isset($r['headers']['x-app-rate-limit']), 'cache hit: no Riot call, no Riot headers');
+$r = req('GET', api($A, 'r=riot/summoner&platform=euw1&puuid=' . PUUID), auth(['Origin' => ORIGIN]));
+$expose = header_list($r, 'access-control-expose-headers');
+check(in_array('X-App-Rate-Limit', $expose, true) && in_array('X-App-Rate-Limit-Count', $expose, true) && in_array('Retry-After', $expose, true),
+    'CORS exposes Retry-After + rate headers', implode('|', $expose));
+$r = req('OPTIONS', api($A, 'r=riot/summoner'), ['Origin' => ORIGIN]);
+check(in_array('X-App-Rate-Limit-Count', header_list($r, 'access-control-expose-headers'), true), 'preflight carries the exposed headers too');
+
+// riot-limits route
+expect(req('GET', api($A, 'r=riot-limits')), 401, 'riot-limits needs the password', $MSG_401);
+expect(req('POST', api($A, 'r=riot-limits'), auth()), 405, 'riot-limits POST -> 405');
+ctrl(['app_count' => '3:1,41:120', 'app_count_host' => 'europe']);
+$r = req('GET', api($A, 'r=riot/match-ids&platform=euw1&puuid=' . PUUID), auth());
+check(($r['headers']['x-app-rate-limit-count'] ?? '') === '3:1,41:120', 'counts passed through as Riot sent them');
+$r = req('GET', api($A, 'r=riot-limits'), auth());
+expect($r, 200, 'riot-limits');
+$j = $r['json'] ?? [];
+check(array_keys($j) === ['app', 'collector_share', 'user_share', 'host', 'detected', 'meta_rate'], 'riot-limits keys', $r['body']);
+check(($j['collector_share'] ?? null) === 0.6 && ($j['user_share'] ?? null) === 0.95, 'riot-limits shares 0.6 / 0.95', $r['body']);
+check(($j['host'] ?? null) === 'europe' && ($j['detected'] ?? null) === true && array_key_exists('meta_rate', $j) && $j['meta_rate'] === null, 'riot-limits: busiest host, detected, meta_rate auto', $r['body']);
+$app = $j['app'] ?? [];
+check(count($app) === 2 && array_keys($app[0]) === ['limit', 'window', 'count', 'at']
+    && $app[0]['limit'] === 20 && $app[0]['window'] === 1 && $app[0]['count'] >= 0 && $app[0]['count'] <= 3
+    && $app[1]['limit'] === 100 && $app[1]['window'] === 120 && $app[1]['count'] === 41, 'riot-limits app windows', $r['body']);
+check(preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/D', (string) ($app[1]['at'] ?? '')) === 1 && abs(strtotime($app[1]['at']) - time()) < 30, 'riot-limits at ISO 8601');
+$r = req('GET', api($B, 'r=riot-limits'));
+check($r['status'] === 200 && ($r['json']['detected'] ?? null) === false && array_key_exists('host', $r['json'] ?? []) && $r['json']['host'] === null
+    && ($r['json']['app'] ?? null) === [['limit' => 20, 'window' => 1, 'count' => 0, 'at' => null], ['limit' => 100, 'window' => 120, 'count' => 0, 'at' => null]],
+    'riot-limits before any header: assumed 20/1 s + 100/120 s', $r['body']);
+
+// user gate: 95 % of each window
+$gate = fn () => req('GET', api($A, 'r=riot/account&platform=euw1&gameName=Gate&tagLine=EUW'), auth());
+ctrl(['app_count' => '1:1,94:120', 'app_count_host' => 'europe']);
+expect($gate(), 200, 'europe recorded at 94/100');
+@unlink($FAKE_LOG);
+ctrl(['app_count' => '1:1,95:120', 'app_count_host' => 'europe']);
+expect($gate(), 200, '94 < 95 % of 100: call still sent');
+check(count(fake_log()) === 1, 'sent to Riot');
+$r = $gate();
+expect($r, 429, '95 >= 95 % of 100: local 429', $MSG_RATE);
+$ra = (int) ($r['headers']['retry-after'] ?? 0);
+check($ra >= 110 && $ra <= 120, 'local 429 Retry-After = seconds until the 120 s window frees', (string) $ra);
+check(count(fake_log()) === 1, 'local 429: no Riot call', implode(' | ', fake_log()));
+check(($r['headers']['x-app-rate-limit'] ?? '') === '20:1,100:120' && str_ends_with($r['headers']['x-app-rate-limit-count'] ?? '', ',95:120'),
+    'local 429 carries the known limits + estimated counts', json_encode($r['headers']));
+$r = req('GET', api($A, 'r=riot/match&platform=euw1&id=EUW1_404'), auth());
+expect($r, 429, 'other route on the same host refused locally', $MSG_RATE);
+expect(req('GET', api($A, 'r=riot/summoner&platform=euw1&puuid=' . PUUID), auth()), 200, 'other host (euw1) still served');
+check(req('GET', api($A, 'r=riot/match&platform=euw1&id=EUW1_7000000001'), auth())['status'] === 200, 'cached match still served while limited');
+check(count(fake_log()) === 2, 'only the euw1 call reached Riot', implode(' | ', fake_log()));
+ctrl([]);
+@unlink($limitsFile);
+expect($gate(), 200, 'limits reset -> served again');
+
+// 1 s window: 19 >= 95 % of 20, frees after one second
+ctrl(['app_count' => '19:1,1:120', 'app_count_host' => 'europe', 'app_count_left' => 1]);
+expect($gate(), 200, 'europe recorded at 19/20 in the 1 s window');
+$r = $gate();
+expect($r, 429, '1 s window full: local 429', $MSG_RATE);
+check(($r['headers']['retry-after'] ?? '') === '1', 'Retry-After 1 for the 1 s window', $r['headers']['retry-after'] ?? '');
+usleep(1100000);
+expect($gate(), 200, '1 s window freed');
+
+// Riot 429 of the application: pause recorded for the host; service 429 does not pause
+@unlink($limitsFile);
+$r = $acc('LimitedApp');
+expect($r, 429, 'Riot application 429', $MSG_RATE);
+check(($r['headers']['retry-after'] ?? '') === '5', 'Riot Retry-After copied (5)');
+@unlink($FAKE_LOG);
+$r = $gate();
+expect($r, 429, 'after a Riot application 429 the host is paused locally', $MSG_RATE);
+check(in_array($r['headers']['retry-after'] ?? '', ['4', '5'], true) && fake_log() === [], 'remaining pause, no Riot call', ($r['headers']['retry-after'] ?? '') . implode(' | ', fake_log()));
+@unlink($limitsFile);
+expect($acc('Limited'), 429, 'Riot 429 without X-Rate-Limit-Type');
+expect($gate(), 200, 'service 429 does not pause the key');
+
+// network errors (C): reserved calls stay counted, no limits learned
+$stC = limits_state("$T/c/www/api/data/riot_limits.json");
+check(count($stC['app']['euw1']['calls'] ?? []) >= 1 && !isset($stC['app']['euw1']['w']), 'network errors: calls stay counted, defaults kept', json_encode($stC));
+
+// ---------------------------------------------------------------- Clash
+$clash = fn (string $q, ?string $base = null) => req('GET', api($base ?? $A, 'r=riot/' . $q), $base === null ? auth() : []);
+@unlink($FAKE_LOG);
+$r = $clash('clash-player&platform=euw1&puuid=' . PUUID);
+expect($r, 200, 'clash-player');
+check(($r['json'][0]['teamId'] ?? '') === 'c0ffee-1234-abcd' && ($r['json'][0]['puuid'] ?? '') === PUUID && ($r['json'][0]['position'] ?? '') === 'MIDDLE', 'clash-player body passthrough', $r['body']);
+check(($r['json'][0]['_host'] ?? '') === 'euw1' && fake_log() === ['/euw1/lol/clash/v1/players/by-puuid/' . PUUID], 'clash-player platform host + path', implode(' | ', fake_log()));
+check(isset($r['headers']['x-app-rate-limit']) && !isset($r['headers']['x-cache']) && ($r['headers']['cache-control'] ?? '') === 'no-store', 'clash-player: rate headers, not cached');
+$clash('clash-player&platform=euw1&puuid=' . PUUID);
+check(count(fake_log()) === 2, 'clash-player not cached');
+$r = $clash('clash-player&platform=kr&puuid=' . PUUID);
+check(($r['json'][0]['_host'] ?? '') === 'kr', 'clash-player kr host');
+$r = $clash('clash-player&platform=euw1&puuid=nobody' . substr(PUUID, 6));
+check($r['status'] === 200 && $r['body'] === '[]', 'clash-player not registered -> []', $r['body']);
+$cp = fn (string $prefix) => $clash('clash-player&platform=euw1&puuid=' . $prefix . substr(PUUID, strlen($prefix)));
+expect($cp('missing'), 404, 'clash-player 404', 'Introuvable chez Riot.');
+$r = $cp('limited');
+expect($r, 429, 'clash-player 429', $MSG_RATE);
+check(($r['headers']['retry-after'] ?? '') === '5', 'clash-player Retry-After copied');
+expect($cp('badkey'), 502, 'clash-player 403 -> 502', $msgAuth);
+expect($cp('boom'), 502, 'clash-player 500 -> 502', 'Serveur Riot indisponible.');
+expect($clash('clash-player&platform=euw1&puuid=short'), 400, 'clash-player bad puuid', 'PUUID invalide.');
+expect($clash('clash-player&platform=europe&puuid=' . PUUID), 400, 'clash-player region is not a platform', 'Serveur (platform) invalide.');
+expect($clash('clash-player&puuid=' . PUUID), 400, 'clash-player missing platform');
+expect($clash('clash-player&platform=euw1&puuid=' . PUUID, $B), 400, 'clash-player no key', $noKey);
+expect($clash('clash-player&platform=euw1&puuid=' . PUUID, $C), 502, 'clash-player network error');
+expect(req('GET', api($A, 'r=riot/clash-player&platform=euw1&puuid=' . PUUID)), 401, 'clash-player needs the password', $MSG_401);
+expect(req('PUT', api($A, 'r=riot/clash-player&platform=euw1&puuid=' . PUUID), auth(), '{}'), 405, 'clash-player PUT -> 405');
+
+$MSG_TEAM_ID = "Identifiant d'équipe Clash (teamId) invalide : 1 à 64 caractères A-Z, a-z, 0-9 ou -.";
+@unlink($FAKE_LOG);
+$r = $clash('clash-team&platform=euw1&teamId=c0ffee-1234-abcd');
+expect($r, 200, 'clash-team');
+check(($r['json']['id'] ?? '') === 'c0ffee-1234-abcd' && ($r['json']['name'] ?? '') === 'Les Fous Élégants' && count($r['json']['players'] ?? []) === 5, 'clash-team body passthrough', $r['body']);
+check(fake_log() === ['/euw1/lol/clash/v1/teams/c0ffee-1234-abcd'] && ($r['json']['_host'] ?? '') === 'euw1', 'clash-team path', implode(' | ', fake_log()));
+$clash('clash-team&platform=euw1&teamId=c0ffee-1234-abcd');
+check(count(fake_log()) === 2 && !is_dir("$T/a/data/clash-teams"), 'clash-team not cached');
+expect($clash('clash-team&platform=euw1&teamId=Missing'), 404, 'clash-team 404', 'Équipe Clash introuvable.');
+$r = $clash('clash-team&platform=euw1&teamId=Limited');
+expect($r, 429, 'clash-team 429', $MSG_RATE);
+check(($r['headers']['retry-after'] ?? '') === '7', 'clash-team Retry-After copied');
+expect($clash('clash-team&platform=euw1&teamId=BadKey'), 502, 'clash-team 401 -> 502', $msgAuth);
+expect($clash('clash-team&platform=euw1&teamId=Boom'), 502, 'clash-team 503 -> 502', 'Serveur Riot indisponible.');
+expect($clash('clash-team&platform=euw1&teamId=' . str_repeat('a', 64)), 200, 'clash-team id 64 chars ok');
+foreach (['a_b', 'a.b', rawurlencode('../x'), str_repeat('a', 65), '', 'a%20b', 'a%2Fb', '%C3%A9'] as $badId) {
+    expect($clash("clash-team&platform=euw1&teamId=$badId"), 400, "clash-team teamId=$badId -> 400", $MSG_TEAM_ID);
+}
+expect($clash('clash-team&platform=euw1'), 400, 'clash-team missing teamId', $MSG_TEAM_ID);
+expect($clash('clash-team&platform=euw1&teamId[]=x'), 400, 'clash-team array teamId', $MSG_TEAM_ID);
+expect($clash('clash-team&platform=xx&teamId=abc'), 400, 'clash-team bad platform');
+expect($clash('clash-team&platform=euw1&teamId=abc', $B), 400, 'clash-team no key', $noKey);
+expect($clash('clash-team&platform=euw1&teamId=abc', $C), 502, 'clash-team network error');
+
+@unlink($FAKE_LOG);
+$r = $clash('clash-tournament-by-team&platform=euw1&teamId=c0ffee-1234-abcd');
+expect($r, 200, 'clash-tournament-by-team');
+check(($r['json']['id'] ?? 0) === 2001 && ($r['json']['_team'] ?? '') === 'c0ffee-1234-abcd' && ($r['json']['_host'] ?? '') === 'euw1', 'clash-tournament-by-team body', $r['body']);
+check(fake_log() === ['/euw1/lol/clash/v1/tournaments/by-team/c0ffee-1234-abcd'], 'clash-tournament-by-team path', implode(' | ', fake_log()));
+expect($clash('clash-tournament-by-team&platform=euw1&teamId=Missing'), 404, 'clash-tournament-by-team 404', 'Aucun tournoi Clash pour cette équipe.');
+expect($clash('clash-tournament-by-team&platform=euw1&teamId=Limited'), 429, 'clash-tournament-by-team 429');
+expect($clash('clash-tournament-by-team&platform=euw1&teamId=a_b'), 400, 'clash-tournament-by-team bad teamId', $MSG_TEAM_ID);
+expect($clash('clash-tournament-by-team&teamId=abc'), 400, 'clash-tournament-by-team missing platform');
+expect($clash('clash-tournament-by-team&platform=euw1&teamId=abc', $B), 400, 'clash-tournament-by-team no key', $noKey);
+
+$tourFile = "$T/a/data/clash/tournaments-euw1.json";
+@unlink($FAKE_LOG);
+$r = $clash('clash-tournaments&platform=euw1');
+expect($r, 200, 'clash-tournaments (miss)');
+check(count($r['json'] ?? []) === 2 && ($r['json'][0]['nameKey'] ?? '') === 'bilgewater' && ($r['json'][0]['_host'] ?? '') === 'euw1', 'clash-tournaments body', $r['body']);
+check(($r['headers']['x-cache'] ?? '') === 'MISS' && isset($r['headers']['x-app-rate-limit']), 'clash-tournaments MISS + rate headers');
+check(fake_log() === ['/euw1/lol/clash/v1/tournaments'] && is_file($tourFile), 'clash-tournaments path + cached on disk', implode(' | ', fake_log()));
+$r2 = $clash('clash-tournaments&platform=euw1');
+check($r2['status'] === 200 && $r2['body'] === $r['body'] && ($r2['headers']['x-cache'] ?? '') === 'HIT' && count(fake_log()) === 1, 'clash-tournaments served from cache');
+$r = $clash('clash-tournaments&platform=kr');
+check(($r['headers']['x-cache'] ?? '') === 'MISS' && ($r['json'][0]['_host'] ?? '') === 'kr' && count(fake_log()) === 2, 'clash-tournaments cached per platform');
+touch($tourFile, time() - 590);
+clearstatcache();
+check(($clash('clash-tournaments&platform=euw1')['headers']['x-cache'] ?? '') === 'HIT', 'clash-tournaments still fresh at 9 min 50');
+touch($tourFile, time() - 601);
+clearstatcache();
+$r = $clash('clash-tournaments&platform=euw1');
+check(($r['headers']['x-cache'] ?? '') === 'MISS' && count(fake_log()) === 3, 'clash-tournaments refreshed after 10 min', implode(' | ', fake_log()));
+check(filemtime($tourFile) >= time() - 30, 'clash-tournaments cache rewritten');
+ctrl(['tournaments_status' => 503]);
+expect($clash('clash-tournaments&platform=na1'), 502, 'clash-tournaments Riot 503 -> 502', 'Serveur Riot indisponible.');
+expect($clash('clash-tournaments&platform=na1'), 502, 'clash-tournaments error again');
+check(!is_file("$T/a/data/clash/tournaments-na1.json") && count(fake_log()) === 5, 'clash-tournaments errors never cached');
+ctrl(['tournaments_status' => 429]);
+$r = $clash('clash-tournaments&platform=na1');
+expect($r, 429, 'clash-tournaments 429', $MSG_RATE);
+check(($r['headers']['retry-after'] ?? '') === '4', 'clash-tournaments Retry-After copied');
+ctrl(['tournaments_status' => 404]);
+expect($clash('clash-tournaments&platform=na1'), 404, 'clash-tournaments 404', 'Introuvable chez Riot.');
+ctrl([]);
+check(!is_file("$T/a/data/clash/tournaments-na1.json") && glob("$T/a/data/clash/*.tmp-*") === [], 'no cache file for errors, no temp files');
+expect($clash('clash-tournaments&platform=xx1'), 400, 'clash-tournaments bad platform', 'Serveur (platform) invalide.');
+expect($clash('clash-tournaments'), 400, 'clash-tournaments missing platform');
+expect($clash('clash-tournaments&platform=euw1', $B), 400, 'clash-tournaments no key', $noKey);
+expect($clash('clash-tournaments&platform=euw1', $C), 502, 'clash-tournaments network error');
+expect(req('GET', api($A, 'r=riot/clash-tournaments&platform=euw1')), 401, 'clash-tournaments needs the password', $MSG_401);
+expect(req('POST', api($A, 'r=riot/clash-tournaments&platform=euw1'), auth(), '{}'), 405, 'clash-tournaments POST -> 405');
+
+// ---------------------------------------------------------------- match timeline
+$tl = fn (string $q, ?string $base = null) => req('GET', api($base ?? $A, 'r=riot/match-timeline&' . $q), $base === null ? auth() : []);
+$tlFile = "$T/a/data/timelines/EUW1_7000000001.json";
+@unlink($FAKE_LOG);
+$r = $tl('platform=euw1&id=EUW1_7000000001');
+expect($r, 200, 'match-timeline (miss)');
+check(($r['json']['metadata']['matchId'] ?? '') === 'EUW1_7000000001' && count($r['json']['info']['frames'] ?? []) === 8, 'match-timeline body passthrough');
+check(($r['headers']['x-cache'] ?? '') === 'MISS' && isset($r['headers']['x-app-rate-limit']), 'match-timeline MISS + rate headers');
+check(fake_log() === ['/europe/lol/match/v5/matches/EUW1_7000000001/timeline'], 'match-timeline region host + path', implode(' | ', fake_log()));
+check(is_file($tlFile) && file_get_contents($tlFile) === $r['body'], 'timeline cached in its own folder');
+check(file_get_contents("$T/a/data/matches/EUW1_7000000001.json") !== $r['body'], 'match cache untouched by the timeline');
+$r2 = $tl('platform=euw1&id=EUW1_7000000001');
+check($r2['status'] === 200 && $r2['body'] === $r['body'] && ($r2['headers']['x-cache'] ?? '') === 'HIT' && count(fake_log()) === 1, 'timeline served from cache, no Riot call');
+touch($tlFile, time() - 86400 * 400);
+clearstatcache();
+check(($tl('platform=euw1&id=EUW1_7000000001')['headers']['x-cache'] ?? '') === 'HIT', 'timeline cache never expires');
+$r = req('GET', api($A, 'r=riot/match&platform=euw1&id=EUW1_7000000001'), auth());
+check(($r['json']['metadata']['matchId'] ?? '') === 'EUW1_7000000001' && !isset($r['json']['info']['frames']), 'match route still serves the match');
+expect($tl('platform=euw1&id=EUW1_404'), 404, 'timeline 404', 'Introuvable chez Riot.');
+expect($tl('platform=euw1&id=EUW1_404'), 404, 'timeline 404 again');
+check(count(fake_log()) === 3, 'timeline 404 not cached', implode(' | ', fake_log()));
+$r = $tl('platform=euw1&id=EUW1_429');
+expect($r, 429, 'timeline 429', $MSG_RATE);
+check(($r['headers']['retry-after'] ?? '') === '3', 'timeline Retry-After copied');
+expect($tl('platform=euw1&id=EUW1_401'), 502, 'timeline 401 -> 502', $msgAuth);
+expect($tl('platform=euw1&id=EUW1_500'), 502, 'timeline 500 -> 502', 'Serveur Riot indisponible.');
+check(glob("$T/a/data/timelines/*") === [$tlFile], 'timeline errors never cached', json_encode(glob("$T/a/data/timelines/*")));
+@unlink($FAKE_LOG);
+$tl('platform=kr&id=KR_123');
+check(fake_log() === ['/asia/lol/match/v5/matches/KR_123/timeline'], 'timeline kr -> asia', implode(' | ', fake_log()));
+foreach (['euw1_123', rawurlencode('../config'), 'EUW1_1234567890123456', rawurlencode('EUW1_1/timeline'), ''] as $badId) {
+    expect($tl("platform=euw1&id=$badId"), 400, "timeline id=$badId -> 400", 'Identifiant de partie invalide.');
+}
+expect($tl('platform=euw1'), 400, 'timeline missing id');
+expect($tl('platform=europe&id=EUW1_7000000001'), 400, 'timeline bad platform');
+expect($tl('platform=euw1&id=EUW1_7000000001', $B), 400, 'timeline no key', $noKey);
+expect($tl('platform=euw1&id=EUW1_7000000001', $C), 502, 'timeline network error');
+expect(req('GET', api($A, 'r=riot/match-timeline&platform=euw1&id=EUW1_7000000001')), 401, 'timeline needs the password', $MSG_401);
+expect(req('PUT', api($A, 'r=riot/match-timeline&platform=euw1&id=EUW1_7000000001'), auth(), '{}'), 405, 'timeline PUT -> 405');
+ctrl([]);
+
 // ---------------------------------------------------------------- direct file access
-foreach (['lib/http.php', 'lib/storage.php', 'lib/riot.php', 'lib/config.php', 'lib/live.php'] as $f) {
+foreach (['lib/http.php', 'lib/storage.php', 'lib/riot.php', 'lib/riot_limits.php', 'lib/config.php', 'lib/live.php'] as $f) {
     $r = req('GET', "$A/api/$f");
     check($r['status'] === 403 && !str_contains($r['body'], '<?php') && $r['body'] === '', "direct /api/$f -> 403, no source", "got {$r['status']} " . substr($r['body'], 0, 80));
 }

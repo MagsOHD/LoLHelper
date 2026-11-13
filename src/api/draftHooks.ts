@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useQuery } from '@tanstack/react-query';
 import { api, type DraftEngine } from './client';
 import {
+  annotateClash,
   mapCompanionPayload,
+  MAX_ENEMY_PROFILES,
   MAX_SCOUTED,
   playerToInput,
   removeProfile,
@@ -14,6 +16,8 @@ import { DraftSession, type DraftSnapshot } from './draftSession';
 import { EnemyProfileService, requestKey, type ProfileRequest, type ProfileStatus } from './enemyProfile';
 import type { DraftAdvice, DraftState, EnemyPlayerProfile, Player } from './types';
 import { parseRiotId } from '../lib/format';
+import { planRoster, rosterNote, teamRef, type ClashLookup } from './clash';
+import { clashDirectory } from './clashHooks';
 
 /** Catalog + advisor, loaded once per page load. */
 export function useDraftEngine() {
@@ -99,7 +103,13 @@ export interface EnemyProfilesApi {
   scout(riotId: string, platform: string): string | null;
   removeScouted(puuidOrKey: string): void;
   retry(key: string): void;
+  /** French notes about enemy Clash rosters (members added / skipped), one per team. */
+  clashNotes: string[];
 }
+
+/** Enemy puuids whose Clash team was looked up this page load, and teams already expanded. */
+const clashChecked = new Set<string>();
+const clashExpanded = new Set<string>();
 
 /**
  * Fetches and stores enemy profiles in the shared draft (path "enemy_profiles"): scouting by Riot
@@ -201,6 +211,52 @@ export function useEnemyProfiles(session: DraftSession | null, draft: DraftState
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantedKey, start]);
 
+  // Clash: every known enemy (scouted, revealed by the client or in the started game) is looked up
+  // once (clash-player); a scouted/revealed player's Clash team adds its other members as "clash"
+  // profiles. Game profiles are only annotated (in ranked, their Clash team is not the opponent).
+  const [clashNotes, setClashNotes] = useState<Map<string, string>>(() => new Map());
+  const clashKey = enabled
+    ? (draft?.enemy_profiles ?? []).filter((p) => p.source !== 'clash' && p.clash_team === undefined && !clashChecked.has(p.puuid)).map((p) => p.puuid).join(',')
+    : '';
+  useEffect(() => {
+    if (!clashKey) return;
+    const t = setTimeout(() => {
+      for (const p of draftRef.current?.enemy_profiles ?? []) {
+        if (p.source === 'clash' || p.clash_team !== undefined || clashChecked.has(p.puuid)) continue;
+        clashChecked.add(p.puuid);
+        const source = p.source;
+        clashDirectory.lookup(p.puuid, platform).then((look: ClashLookup) => {
+          const cur = draftRef.current;
+          if (!cur) return;
+          const team = look.team ? teamRef(look.team) : null;
+          const updates: Parameters<typeof annotateClash>[1] = [{ puuid: p.puuid, team, position: look.position }];
+          if (look.team && team) {
+            const known = (cur.enemy_profiles ?? []).map((x) => x.puuid);
+            const pending = profileService.getStatuses().filter((x) => x.state === 'loading').length;
+            const expand = source !== 'game' && !clashExpanded.has(look.team.id);
+            const plan = planRoster(look.team, known, expand ? MAX_ENEMY_PROFILES - known.length - pending : 0);
+            for (const m of plan.annotate) if (m.puuid !== p.puuid) updates.push({ puuid: m.puuid, team, position: m.position });
+            if (expand) {
+              clashExpanded.add(look.team.id);
+              for (const m of plan.add) start({ source: 'clash', platform, puuid: m.puuid, clash_team: team, clash_position: m.position });
+              const note = rosterNote(team, plan);
+              if (note) setClashNotes((n) => new Map(n).set(team.id, note));
+            }
+          }
+          session?.edit(['enemy_profiles'], (d) => {
+            const next = annotateClash(d.enemy_profiles, updates);
+            return next === d.enemy_profiles ? d : { ...d, enemy_profiles: next };
+          }, { data: true });
+        }, () => {
+          // Clash unavailable (route not deployed, rate limit): retried on the next page load.
+        });
+      }
+    }, Math.round(Math.random() * AUTO_FETCH_JITTER_MS));
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clashKey, platform, session, start]);
+
   const statuses = useMemo(() => all.filter((s) => mine.has(s.key) && s.state !== 'done'), [all, mine]);
-  return { statuses, scout, removeScouted, retry };
+  const notes = useMemo(() => [...clashNotes.values()], [clashNotes]);
+  return { statuses, scout, removeScouted, retry, clashNotes: notes };
 }

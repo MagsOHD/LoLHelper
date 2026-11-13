@@ -62,7 +62,7 @@ function handle_request(string $apiDir): void
 
     // Toutes les autres routes : mot de passe partagé si configuré.
     if ($config['app_password'] !== '') {
-        $given = request_header('X-App-Password') ?? '';
+        $given = request_secret_header('X-App-Password');
         if (!hash_equals($config['app_password'], $given)) {
             throw new HttpError(401, 'Mot de passe requis ou incorrect.');
         }
@@ -84,6 +84,12 @@ function handle_request(string $apiDir): void
         require_method(['POST']);
         require_once $apiDir . '/lib/meta_collector.php';
         handle_meta_collect($config, $apiDir);
+        return;
+    }
+
+    if ($route === 'riot-limits') {
+        require_method(['GET']);
+        handle_riot_limits($config, $apiDir);
         return;
     }
 
@@ -134,7 +140,7 @@ function handle_request(string $apiDir): void
     }
 
     if ($parts[0] === 'riot' && count($parts) === 2
-        && in_array($parts[1], ['account', 'summoner', 'league', 'masteries', 'match-ids', 'match', 'active-game'], true)) {
+        && in_array($parts[1], RIOT_PROXY_ROUTES, true)) {
         require_method(['GET']);
         handle_riot($parts[1], $config, $apiDir);
         return;

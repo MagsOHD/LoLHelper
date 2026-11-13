@@ -29,7 +29,12 @@ if ($route === 'meta') {
     out(200, ['riot_configured' => true, 'password_required' => $password !== '', 'storage_ok' => true]);
     return true;
 }
-if ($password !== '' && !hash_equals($password, (string) ($_SERVER['HTTP_X_APP_PASSWORD'] ?? ''))) {
+// Comme l'API réelle : « b64:<UTF-8> » ou forme brute.
+$given = (string) ($_SERVER['HTTP_X_APP_PASSWORD'] ?? '');
+if (str_starts_with($given, 'b64:')) {
+    $given = (string) base64_decode(substr($given, 4), true);
+}
+if ($password !== '' && !hash_equals($password, trim($given))) {
     out(401, ['detail' => 'Mot de passe requis ou incorrect.']);
     return true;
 }

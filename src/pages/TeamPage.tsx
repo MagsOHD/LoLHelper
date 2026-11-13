@@ -8,6 +8,18 @@ import { Avatar, ChampionAvatar } from '../components/ChampionAvatar';
 import { Modal } from '../components/Modal';
 import { Chip, EmptyState, ErrorMessage, RoleBadge, SectionTitle, SkeletonCards, Spinner } from '../components/ui';
 import { formatRank, parseRiotId, riotId } from '../lib/format';
+import { MOCK_MODE } from '../api/client';
+import { useUpcomingClash } from '../api/clashHooks';
+import { ClashTournamentsCard } from '../components/clash/ClashCards';
+
+/** Upcoming Clash tournaments of the site's server (only with a Riot key). */
+function ClashSection() {
+  const meta = useMeta();
+  const enabled = MOCK_MODE || Boolean(meta.data?.riot_configured);
+  const clash = useUpcomingClash(meta.data?.platform ?? '', enabled);
+  if (!enabled) return null;
+  return <ClashTournamentsCard list={clash.list} isPending={clash.isPending} error={clash.error} />;
+}
 
 function AddFriendForm() {
   const meta = useMeta();
@@ -329,6 +341,7 @@ export function TeamPage() {
         )}
       </section>
       {players.data && <TeamsSection players={players.data} />}
+      <ClashSection />
     </div>
   );
 }

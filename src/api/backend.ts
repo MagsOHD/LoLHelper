@@ -1,6 +1,17 @@
 // Thin fetch wrapper around the PHP API (public/api/index.php?r=<route>).
 import { loadLocal, saveLocal } from '../lib/storage';
 
+/**
+ * HTTP headers are not UTF-8: passwords go as "b64:<base64 of the UTF-8 bytes>" so accents survive
+ * (the PHP API decodes it and still accepts the raw form).
+ */
+export function encodeSecretHeader(value: string): string {
+  const bytes = new TextEncoder().encode(value.trim());
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return `b64:${btoa(bin)}`;
+}
+
 export class ApiError extends Error {
   status: number;
   /** Seconds to wait before retrying (only set on 429 responses carrying Retry-After). */
@@ -73,6 +84,8 @@ export interface RequestOptions {
    * default). A function receives the French detail and decides (admin password routes).
    */
   authEvent?: boolean | ((detail: string | null) => boolean);
+  /** Called with the response headers of every HTTP answer (errors included), before parsing. */
+  onHeaders?: (headers: Headers, status: number) => void;
 }
 
 /** Calls the PHP API. Resolves with the parsed JSON body (undefined for 204), throws ApiError. */
@@ -81,7 +94,7 @@ export async function backendRequest<T>(method: Method, route: string, options: 
   const headers: Record<string, string> = { Accept: 'application/json', ...(options.headers ?? {}) };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const password = getPassword();
-  if (password) headers['X-App-Password'] = password;
+  if (password) headers['X-App-Password'] = encodeSecretHeader(password);
 
   let res: Response;
   try {
@@ -94,6 +107,13 @@ export async function backendRequest<T>(method: Method, route: string, options: 
     res = await fetch(apiUrl(route, params), init);
   } catch {
     throw new ApiError('Impossible de joindre le serveur. Vérifie ta connexion internet.', 0);
+  }
+  if (options.onHeaders) {
+    try {
+      options.onHeaders(res.headers, res.status);
+    } catch {
+      /* header bookkeeping never breaks a request */
+    }
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();

@@ -1,0 +1,16 @@
+{
+  "id": "",
+  "tournamentId": 2001,
+  "name": "Les Fous Élégants",
+  "iconId": 4321,
+  "tier": 2,
+  "captain": "enc-summoner-id-clash-1",
+  "abbreviation": "FOU",
+  "players": [
+    {"summonerId": "enc-summoner-id-clash-1", "puuid": "kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k", "position": "MIDDLE", "role": "CAPTAIN"},
+    {"summonerId": "enc-summoner-id-clash-2", "puuid": "Qa1Wb2Ec3Rd4Tf5Yg6Uh7Ij8Ok9Pl0Am1Sn2Do3Fp4Gq5Hr6Js7Kt8Lu9Mv0Nw1Bx2Vy3Cz4Xa5Zb6", "position": "JUNGLE", "role": "MEMBER"},
+    {"summonerId": "enc-summoner-id-clash-3", "position": "TOP", "role": "MEMBER"},
+    {"summonerId": "enc-summoner-id-clash-4", "puuid": "Zz9Yy8Xx7Ww6Vv5Uu4Tt3Ss2Rr1Qq0Pp9Oo8Nn7Mm6Ll5Kk4Jj3Ii2Hh1Gg0Ff9Ee8Dd7Cc6Bb5Aa4", "position": "UTILITY", "role": "MEMBER"},
+    {"summonerId": "enc-summoner-id-clash-5", "puuid": "Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0Uv1Wx2Yz3Ab4Cd5Ef6Gh7Ij8Kl9Mn0Op1Qr2St3Uv4Wx5Yz6", "position": "FILL", "role": "MEMBER"}
+  ]
+}

@@ -17,6 +17,8 @@ import m8 from './__fixtures__/match_EUW1_7000000008.json';
 import m9 from './__fixtures__/match_EUW1_7000000009.json';
 import m10 from './__fixtures__/match_EUW1_7000000010.json';
 import m11 from './__fixtures__/match_EUW1_7000000011.json';
+import t8 from './__fixtures__/timeline_EUW1_7000000008.json';
+import t10 from './__fixtures__/timeline_EUW1_7000000010.json';
 
 const ENEMY = 'enemy-puuid-scouted-0001';
 const MATCHES: Record<string, unknown> = {
@@ -36,7 +38,7 @@ function countingTransport() {
 }
 
 /** Fake PHP riot proxy for the enemy account (ids list includes a vanished match). */
-function riotServer(opts: { ids?: string[]; accountStatus?: number } = {}) {
+function riotServer(opts: { ids?: string[]; accountStatus?: number; timelines?: Record<string, unknown>; timelineStatus?: number } = {}) {
   const calls: string[] = [];
   vi.stubGlobal('fetch', vi.fn(async (input: string) => {
     const url = new URL(String(input), 'http://site.test');
@@ -59,6 +61,12 @@ function riotServer(opts: { ids?: string[]; accountStatus?: number } = {}) {
       case 'riot/match': {
         const m = MATCHES[p.get('id') ?? ''];
         return m ? json(m) : json({ detail: 'Introuvable chez Riot.' }, 404);
+      }
+      case 'riot/match-timeline': {
+        if (!opts.timelines) break;
+        if (opts.timelineStatus) return json({ detail: 'Serveur Riot indisponible.' }, opts.timelineStatus);
+        const t = opts.timelines[p.get('id') ?? ''];
+        return t ? json(t) : json({ detail: 'Introuvable chez Riot.' }, 404);
       }
     }
     return json({ detail: 'Route inconnue.' }, 404);
@@ -150,16 +158,56 @@ describe('profile builder', () => {
     expect(profile.style?.games).toBe(3);
   });
 
-  it('scouting by Riot ID: 1 account call + 4 + 10 matches max', async () => {
+  it('scouting by Riot ID: 1 account call + 4 + 10 matches + 3 timelines max', async () => {
     installWindow('');
     const ids = Array.from({ length: 12 }, (_, i) => (i < 3 ? `EUW1_700000000${8 + i}` : `EUW1_10${i}`));
     const calls = riotServer({ ids });
     const { profile, calls: n } = await buildEnemyProfile({ source: 'scouting', platform: 'euw1', riot_id: ' lee fou#euw ' }, catalog, { transport: countingTransport().t });
     expect(calls[0]).toBe('riot/account');
     expect(calls).toContain(`riot/match-ids:${SCOUT_MATCH_COUNT}`);
-    expect(n).toBe(profileCallBudget(SCOUT_MATCH_COUNT, true));
+    expect(profileCallBudget(SCOUT_MATCH_COUNT, true)).toBe(18);
+    // Only 2 of the ids are real games: 2 timelines (the budget is an upper bound).
+    expect(n).toBe(1 + 4 + 10 + 2);
+    expect(calls.filter((c) => c.startsWith('riot/match-timeline'))).toEqual(['riot/match-timeline:EUW1_7000000008', 'riot/match-timeline:EUW1_7000000009']);
     expect(profile.riot_id).toBe('Lee Fou#EUW'); // Riot's spelling
     expect(profile.puuid).toBe(ENEMY);
+  });
+
+  it('timelines of up to 3 recent games become style.timeline (+3 calls max, through the limiter)', async () => {
+    installWindow('');
+    const calls = riotServer({ timelines: { EUW1_7000000008: t8, EUW1_7000000010: t10 } });
+    const { t, acquire } = countingTransport();
+    const { profile, calls: n } = await buildEnemyProfile({ source: 'client', platform: 'euw1', puuid: ENEMY }, catalog, { transport: t });
+    // 8, 9 and 10 are Summoner's Rift games of 10+ minutes; 9 has no timeline (404: skipped).
+    expect(calls.filter((c) => c.startsWith('riot/match-timeline'))).toEqual([
+      'riot/match-timeline:EUW1_7000000008', 'riot/match-timeline:EUW1_7000000009', 'riot/match-timeline:EUW1_7000000010',
+    ]);
+    expect(n).toBe(4 + 5 + 3);
+    expect(acquire).toHaveBeenCalledTimes(n);
+    expect(profile.style?.timeline).toMatchObject({ games: 2, gold_diff_10: 25, first_gank_lane: 'BOTTOM', wards_per_min: 0.26 });
+    expect(profile.style?.games).toBe(3); // the match-based stats are unchanged
+  });
+
+  it('timeline failures never fail the profile; timeline_count 0 skips them', async () => {
+    installWindow('');
+    riotServer({ timelines: {}, timelineStatus: 502 });
+    const { profile } = await buildEnemyProfile({ source: 'game', platform: 'euw1', puuid: ENEMY }, catalog, { transport: countingTransport().t });
+    expect(profile.style?.games).toBe(3);
+    expect(profile.style?.timeline).toBeUndefined();
+    const calls = riotServer({ timelines: { EUW1_7000000008: t8 } });
+    const r = await buildEnemyProfile({ source: 'game', platform: 'euw1', puuid: ENEMY, timeline_count: 0 }, catalog, { transport: countingTransport().t });
+    expect(calls.some((c) => c.startsWith('riot/match-timeline'))).toBe(false);
+    expect(r.calls).toBe(9);
+  });
+
+  it('Clash data given by the request is kept on the profile', async () => {
+    installWindow('');
+    riotServer();
+    const team = { id: 'team-1', name: 'Les Ombres', abbreviation: 'OMB' };
+    const { profile } = await buildEnemyProfile({ source: 'clash', platform: 'euw1', puuid: ENEMY, clash_team: team, clash_position: 'JUNGLE' }, catalog, { transport: countingTransport().t });
+    expect(profile).toMatchObject({ source: 'clash', clash_team: team, clash_position: 'JUNGLE' });
+    const plain = await buildEnemyProfile({ source: 'game', platform: 'euw1', puuid: ENEMY }, catalog, { transport: countingTransport().t });
+    expect('clash_team' in plain.profile).toBe(false);
   });
 
   it('invalid or unknown Riot ID fails before any other call', async () => {
@@ -225,17 +273,20 @@ describe('profile service: dedupe, session cache, budget', () => {
     expect(svc.getStatuses().some((s) => s.key === 'bad')).toBe(false);
   });
 
-  it('a full 5-enemy game fetch stays within 45 Riot calls; a second one costs nothing', async () => {
+  it('a full 5-enemy game fetch stays within 60 Riot calls (+3 timelines each); a second one costs nothing', async () => {
     installWindow('');
     const calls = riotServer({ ids: ['EUW1_7000000008', 'EUW1_7000000009', 'EUW1_7000000010', 'EUW1_7000000011', 'EUW1_0000000404', 'EUW1_7000000008'] });
     const { t, acquire } = countingTransport();
     const svc = new EnemyProfileService((req, onProgress) => buildEnemyProfile(req, catalog, { transport: t, onProgress }).then((r) => r.profile));
-    const enemies = ['a', 'b', 'c', 'd', 'e'].map((x) => `enemy-${x}`);
+    // The fixture enemy played these games (3 timelines); the others did not (no timeline needed).
+    const enemies = [ENEMY, ...['b', 'c', 'd', 'e'].map((x) => `enemy-${x}`)];
     await Promise.all(enemies.map((puuid) => svc.request({ source: 'game', platform: 'euw1', puuid })));
-    expect(calls.length).toBe(5 * profileCallBudget(QUICK_MATCH_COUNT, false));
-    expect(calls.length).toBeLessThanOrEqual(45);
+    expect(profileCallBudget(QUICK_MATCH_COUNT, false)).toBe(12);
+    expect(calls.filter((c) => c.startsWith('riot/match-timeline'))).toHaveLength(3);
+    expect(calls.length).toBe(5 * (4 + 5) + 3);
+    expect(calls.length).toBeLessThanOrEqual(5 * profileCallBudget(QUICK_MATCH_COUNT, false));
     expect(acquire).toHaveBeenCalledTimes(calls.length);
     await Promise.all(enemies.map((puuid) => svc.request({ source: 'client', platform: 'euw1', puuid })));
-    expect(calls.length).toBe(45);
+    expect(calls.length).toBe(48);
   });
 });

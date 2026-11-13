@@ -136,6 +136,14 @@ export interface FakeServerOptions {
  * In-memory PHP API (store + meta + Riot proxy backed by the fixtures). Data Dragon is offline.
  * Returns the fetch mock plus the stored collections.
  */
+/** Mirrors the PHP API: "b64:<base64 of UTF-8>" or the raw value. */
+function decodeSecret(value: string | undefined): string {
+  if (!value) return '';
+  if (!value.startsWith('b64:')) return value.trim();
+  const bin = atob(value.slice(4));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))).trim();
+}
+
 export function fakeServer(opts: FakeServerOptions = {}) {
   const db: Record<string, Map<string, Record<string, unknown>>> = {
     players: new Map(),
@@ -161,7 +169,7 @@ export function fakeServer(opts: FakeServerOptions = {}) {
         ...(opts.metaSummary !== undefined ? { meta_stats: opts.metaSummary } : {}),
       });
     }
-    if (opts.password && headers['X-App-Password'] !== opts.password) {
+    if (opts.password && decodeSecret(headers['X-App-Password']) !== opts.password) {
       return json({ detail: 'Mot de passe requis ou incorrect.' }, 401);
     }
     if (route === 'meta-stats' && opts.metaStats !== undefined) {

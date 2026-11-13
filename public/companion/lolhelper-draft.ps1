@@ -460,7 +460,8 @@ function Invoke-Site {
         [int]$TimeoutSec = 15
     )
     $headers = @{ 'Accept' = 'application/json' }
-    if ($Password -ne '') { $headers['X-App-Password'] = $Password }
+    # En-tête en « b64:<UTF-8> » : les accents passent (le site décode, et accepte aussi la forme brute).
+    if ($Password -ne '') { $headers['X-App-Password'] = 'b64:' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Password.Trim())) }
     $params = @{
         Uri             = "$SiteUrl/api/index.php?$Query"
         Method          = $Method

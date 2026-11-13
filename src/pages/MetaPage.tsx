@@ -2,6 +2,8 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useChampionMap, useMeta } from '../api/hooks';
 import { refreshMetaEverywhere, useMetaCollection, useMetaStats, useMetaStatus } from '../api/metaHooks';
+import { useRiotLimits } from '../api/clashHooks';
+import { MOCK_MODE } from '../api/client';
 import { patchOptions, resolvePatch } from '../api/metaTier';
 import type { Role } from '../api/types';
 import { META_MIN_GAMES } from '../engine/meta';
@@ -19,6 +21,7 @@ export function MetaPage() {
   const status = useMetaStatus();
   const progress = useMetaCollection();
   const champs = useChampionMap();
+  const keyLimits = useRiotLimits(MOCK_MODE || Boolean(app.data?.riot_configured));
 
   const served = app.data?.meta_stats ?? null;
   const options = useMemo(() => patchOptions(status.data?.patches ?? [], served), [status.data?.patches, served]);
@@ -99,6 +102,7 @@ export function MetaPage() {
         progress={progress}
         defaultOpen={noMeta}
         onRetryStatus={() => void status.refetch()}
+        keyLimits={keyLimits.data}
       />
 
       {stats.isError ? (

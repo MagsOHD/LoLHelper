@@ -4,6 +4,7 @@ import type { MetaStatus } from '../../api/meta';
 import { stopLabel, type CollectProgress } from '../../api/metaCollect';
 import { loadAdminPassword, metaCollector, saveAdminPassword } from '../../api/metaHooks';
 import { formatDate } from '../../lib/format';
+import { formatKeyLimits, formatKeyUsage, type RiotKeyLimits } from '../../api/riotLimits';
 import { ErrorMessage, Skeleton, Spinner } from '../ui';
 import { fmtInt } from './format';
 
@@ -61,8 +62,21 @@ function Progress({ p }: { p: CollectProgress }) {
   );
 }
 
+/** "Limite de la clé : … · collecte automatique à 60 % de la limite" (r=riot-limits). */
+export function KeyLimits({ limits }: { limits: RiotKeyLimits | null | undefined }) {
+  if (!limits) return null;
+  return (
+    <div className="collect__limits">
+      <p className="collect__limits-main"><span aria-hidden="true" className="collect__limits-icon">⏱</span>{formatKeyLimits(limits)}</p>
+      <p className="hint">{formatKeyUsage(limits)}</p>
+    </div>
+  );
+}
+
 /** "Mettre à jour la méta": admin password + loop of server passes with live progress. */
-export function CollectPanel({ status, statusError, statusLoading, progress, defaultOpen, onRetryStatus }: {
+export function CollectPanel({ status, statusError, statusLoading, progress, defaultOpen, onRetryStatus, keyLimits }: {
+  /** Key limits recorded by the server, shown on top of the panel. */
+  keyLimits?: RiotKeyLimits | null;
   status: MetaStatus | undefined;
   statusError: unknown;
   statusLoading: boolean;
@@ -134,7 +148,8 @@ export function CollectPanel({ status, statusError, statusLoading, progress, def
       <>
         <p className="hint">
           Chaque passe dure au plus ~45 s sur le serveur. Les passes s’enchaînent jusqu’à « Arrêter », deux tours complets
-          de suite ou une erreur. Tu peux changer de page : la collecte continue dans cet onglet.
+          de suite ou une erreur. Tu peux changer de page : la collecte continue dans cet onglet. La collecte cède la place
+          aux joueurs : elle ralentit d’elle-même quand la clé est très sollicitée.
         </p>
         {status.collecting && !active && (
           <p className="notice" role="status">Une collecte automatique tourne en ce moment sur le serveur : « Lancer » attendra qu’elle se termine.</p>
@@ -176,7 +191,7 @@ export function CollectPanel({ status, statusError, statusLoading, progress, def
         <span className="collect__title">Mettre à jour la méta</span>
         {summary && <span className="collect__state">{active && <span className="spinner" aria-hidden="true" />}{summary}</span>}
       </summary>
-      <div className="collect__body">{body}</div>
+      <div className="collect__body"><KeyLimits limits={keyLimits} />{body}</div>
     </details>
   );
 }

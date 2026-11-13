@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, AUTH_REQUIRED_EVENT, apiUrl, backendRequest, setPassword, store } from './backend';
+import { ApiError, AUTH_REQUIRED_EVENT, apiUrl, backendRequest, encodeSecretHeader, setPassword, store } from './backend';
 import { installWindow, json } from './__fixtures__/fakes';
 import { failure } from './__fixtures__/fakes';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('encodeSecretHeader', () => {
+  it('sends accented passwords as base64 of their UTF-8 bytes, trimmed', () => {
+    expect(encodeSecretHeader('  Été-2026! ')).toBe('b64:w4l0w6ktMjAyNiE=');
+  });
 });
 
 describe('backend wrapper', () => {
@@ -27,7 +33,7 @@ describe('backend wrapper', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('api/index.php?r=store%2Fteams%2Fa');
     expect(init.method).toBe('PUT');
-    expect((init.headers as Record<string, string>)['X-App-Password']).toBe('secret');
+    expect((init.headers as Record<string, string>)['X-App-Password']).toBe(`b64:${btoa('secret')}`);
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
     expect(JSON.parse(String(init.body))).toEqual({ id: 'a', x: 1 });
   });

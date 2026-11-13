@@ -86,6 +86,20 @@ function request_header(string $name): ?string
 }
 
 /**
+ * Mot de passe reçu dans un en-tête. Les clients l'envoient en « b64:<base64 de l'UTF-8> » pour que
+ * les accents passent (un en-tête HTTP n'est pas en UTF-8) ; la forme brute reste acceptée.
+ */
+function request_secret_header(string $name): string
+{
+    $value = request_header($name) ?? '';
+    if (str_starts_with($value, 'b64:')) {
+        $decoded = base64_decode(substr($value, 4), true);
+        $value = is_string($decoded) ? $decoded : '';
+    }
+    return trim($value);
+}
+
+/**
  * En-têtes CORS : seulement si l'Origin figure dans la liste blanche de la config.
  * @param list<string> $allowedOrigins
  */
@@ -102,7 +116,7 @@ function apply_cors(array $allowedOrigins): void
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, X-App-Password, X-Admin-Password');
-    header('Access-Control-Expose-Headers: Retry-After');
+    header('Access-Control-Expose-Headers: Retry-After, X-App-Rate-Limit, X-App-Rate-Limit-Count, X-Cache');
     header('Access-Control-Max-Age: 600');
 }
 

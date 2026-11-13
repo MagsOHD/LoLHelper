@@ -29,6 +29,7 @@ import {
   type RawMeta,
 } from './catalog';
 import { recommendDraftRaw } from './draft';
+import { CLASH_TEAM_SEP } from './enemies';
 import { generateCompositionsRaw } from './generator';
 import { buildGamePlanRaw, buildMatchupPlanRaw } from './plans';
 import { computePool as computePoolImpl } from './pool';
@@ -52,7 +53,7 @@ export {
   DRAFT_W_LANE,
   ONE_TRICK_POINTS,
 } from './draft';
-export { ONE_TRICK_SHARE, STYLE, STYLE_MIN_GAMES } from './enemies';
+export { CLASH_ROLE_FIT, clashRoleOf, clock, ONE_TRICK_SHARE, STYLE, STYLE_MIN_GAMES, TIMELINE, TL_MIN_GAMES } from './enemies';
 export { PRED_PLAYER_MASS } from './predict';
 export { guessEnemyRoles, metaMatchup, metaPickValue, metaUsable, META_MIN_GAMES } from './meta';
 
@@ -67,6 +68,11 @@ function restoreIdentities(raw: { enemy_players?: EnemyPlayerInsight[]; attentio
     out.enemy_players![i].puuid = p.puuid;
     out.enemy_players![i].riot_id = p.riot_id ?? null;
     if (p.rank) out.enemy_players![i].rank = { ...p.rank };
+    // the Clash team name ends the Clash tag: kept verbatim ("Le Arcane" must not become "L'Arcane")
+    p.style_tags.forEach((t, j) => {
+      const at = t.indexOf(CLASH_TEAM_SEP);
+      if (at >= 0) out.enemy_players![i].style_tags[j] = `${elide(t.slice(0, at))}${t.slice(at)}`;
+    });
   });
   raw.attention?.forEach((a, i) => {
     if (a.enemy_puuid !== undefined) out.attention![i].enemy_puuid = a.enemy_puuid;
@@ -174,7 +180,10 @@ export function buildMatchupPlan(
  * - `pick_order`: swaps / priorities from the side's turns (ally slots = pick order);
  * - `enemy_players`: one insight per profile (style tags, threats, attention points, likely picks); the
  *   enemy slot of a profile comes from the slot puuid, the profile's champion, or a locked champion
- *   clearly in exactly one pool. Enemy identities only ever come from `enemy_profiles`.
+ *   clearly in exactly one pool (else in the pool of the one player declared in its role in Clash).
+ *   `PlaystyleStats.timeline` adds timeline facts (first gank, gold / cs at 10:00, first back, level 6,
+ *   wards) with their timings; `clash_position` is a strong role hint and the Clash team is cited once.
+ *   Enemy identities only ever come from `enemy_profiles`.
  * Deterministic; every sentence goes through French elision (identities are kept verbatim).
  */
 export function recommendDraft(
