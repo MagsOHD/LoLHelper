@@ -94,11 +94,29 @@ c'est ce qui permet à l'appli de marcher dans un sous-dossier sans configuratio
 | `api/config.php` ne renvoie pas 403 | `.htaccess` non envoyés : refaites l'étape 4 avec les fichiers cachés affichés |
 | « Clé API Riot invalide ou expirée » | Clé expirée : mettez à jour `public/api/config.php`, recompilez, renvoyez `api/config.php` |
 
-## 7. Collecte de la méta (tâche planifiée)
+## 7. Collecte de la méta (bouton et/ou tâche planifiée)
 
 La méta (taux de victoire par champion et par rôle, bans, duels de lane) est calculée à partir
 de parties classées Challenger, Grandmaster et Master de votre serveur, récupérées avec votre clé Riot.
-Il faut une clé Riot configurée (étape 1).
+Il faut une clé Riot configurée (étape 1). Les données sont communes à tous les joueurs du site :
+une seule collecte sert tout le monde, et elles restent sur le serveur (les deux derniers patchs).
+L'onglet **Méta** du site les affiche : tier list par rôle, taux de victoire/pick/ban, duels de lane.
+
+### Lancer la collecte depuis le site (bouton)
+
+1. Dans `api/config.php`, ajoutez un mot de passe administrateur, différent du mot de passe
+   partagé entre amis, long et difficile à deviner (le nombre d'essais n'est pas limité) :
+   ```php
+   'admin_password' => 'un-long-mot-de-passe-admin',
+   ```
+   puis renvoyez `api/config.php` par FTP.
+2. Onglet **Méta** → « Mettre à jour la méta » → mot de passe administrateur → **Lancer**.
+   Les passes (45 s chacune) s'enchaînent tant que l'onglet reste ouvert, jusqu'à « Arrêter » ou
+   jusqu'à ce que toutes les parties récentes soient collectées.
+
+### Ou automatiquement (tâche planifiée OVH)
+
+Pour que la méta se mette à jour toute seule, sans laisser d'onglet ouvert :
 
 Espace client OVH → *Web Cloud* → *Hébergements* → votre hébergement → onglet
 **Tâches planifiées - Cron** → **Ajouter une planification** :
