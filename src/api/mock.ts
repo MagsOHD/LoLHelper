@@ -36,6 +36,8 @@ import type { ChampionCatalog } from '../engine';
 import type { LiveDraft } from './draft';
 import type { DetectedGame } from './spectator';
 import type { ProfileProgress, ProfileRequest } from './enemyProfile';
+import type { CollectResult, MetaStatus } from './meta';
+import type { GamesWins, MetaStats } from './types';
 
 const ZERO: ChampionTraits = {
   engage: 0, peel: 0, poke: 0, waveclear: 0, splitpush: 0, pick: 0, teamfight: 0,
@@ -791,7 +793,7 @@ export async function mockRequest(method: string, path: string, body?: unknown):
 
   switch (route) {
     case 'GET /health': return { status: 'ok' };
-    case 'GET /meta': return META;
+    case 'GET /meta': return { ...META, meta_stats: { patch: '16.19', ...mockPatches['16.19'] } };
     case 'GET /champions': return clone(CHAMPIONS);
     case 'GET /archetypes': return clone(ARCHETYPES);
     case 'GET /themes': return clone(THEMES);
@@ -879,4 +881,101 @@ export async function mockRequest(method: string, path: string, body?: unknown):
     }
   }
   throw new ApiError(`Route mock inconnue : ${method} ${path}`, 404);
+}
+
+// ---- high-elo meta (Meta page) ---------------------------------------------------------------
+
+const mockPatches: Record<string, { games: number; updated_at: string }> = {
+  '16.19': { games: 4213, updated_at: '2026-10-10T12:00:00Z' },
+  '16.18': { games: 9876, updated_at: '2026-09-26T23:00:00Z' },
+};
+let mockPass = 0;
+let mockLastRun: MetaStatus['last_run'] = {
+  stop: 'budget de temps atteint', requests: 1074, new_matches: 212, patch: '16.19', games: 4213, duration_s: 1500, at: '2026-10-10T12:00:00Z', source: 'cron',
+};
+
+/** Deterministic 0..1 noise from a string. */
+function noise(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 10_000) / 10_000;
+}
+
+const patchList = () =>
+  Object.entries(mockPatches)
+    .map(([patch, v]) => ({ patch, ...v }))
+    .sort((a, b) => b.patch.localeCompare(a.patch, 'en', { numeric: true }));
+
+export async function mockMetaStatus(): Promise<MetaStatus> {
+  await delay(200);
+  return { collecting: false, admin_enabled: true, meta_enabled: true, last_run: clone(mockLastRun), patches: patchList() };
+}
+
+/** Fake aggregates scaled on the patch's games (a few rare picks keep the small-sample UI visible). */
+export async function mockMetaStats(patch?: string | null): Promise<MetaStats | null> {
+  await delay(250);
+  const p = patch || '16.19';
+  const info = mockPatches[p];
+  if (!info) return null;
+  const G = info.games;
+  const champions: MetaStats['champions'] = {};
+  const bans: MetaStats['bans'] = {};
+  const byRole: Partial<Record<Role, string[]>> = {};
+  for (const c of CHAMPIONS) {
+    const roles: Partial<Record<Role, GamesWins>> = {};
+    c.roles.forEach((role, i) => {
+      const n = noise(`${p}:${c.id}:${role}`);
+      const share = i === 0 ? 0.04 + n * 0.22 : n < 0.5 ? 0.003 + n * 0.012 : 0.01 + n * 0.05;
+      const games = Math.max(1, Math.round(G * share));
+      const wr = 0.45 + noise(`${p}:${c.id}:${role}:wr`) * 0.1;
+      roles[role] = [games, Math.round(games * wr)];
+      (byRole[role] ??= []).push(c.id);
+    });
+    champions[c.id] = roles;
+    const b = noise(`${p}:${c.id}:ban`);
+    if (b > 0.25) bans[c.id] = Math.round(G * (b - 0.25) * 0.35);
+  }
+  const matchups: MetaStats['matchups'] = {};
+  for (const role of ROLES) {
+    const ids = byRole[role] ?? [];
+    const out: Record<string, Record<string, GamesWins>> = {};
+    for (const a of ids) {
+      for (const b of ids) {
+        if (a >= b) continue;
+        const ga = champions[a]?.[role]?.[0] ?? 0;
+        const gb = champions[b]?.[role]?.[0] ?? 0;
+        const games = Math.round(Math.min(ga, gb) * (0.08 + noise(`${p}:${role}:${a}:${b}`) * 0.25));
+        if (games < 1) continue;
+        const wins = Math.round(games * (0.38 + noise(`${p}:${role}:${b}:${a}`) * 0.24));
+        (out[a] ??= {})[b] = [games, wins];
+        (out[b] ??= {})[a] = [games, games - wins];
+      }
+    }
+    matchups[role] = out;
+  }
+  return { patch: p, platform: META.platform, games: G, updated_at: info.updated_at, champions, bans, matchups };
+}
+
+/** Simulated pass (~2 s): three "budget" passes then two "tour complet". "faux" = wrong password. */
+export async function mockCollectMeta(password: string): Promise<CollectResult> {
+  await delay(1800 + Math.random() * 600);
+  if (password.trim().toLowerCase() === 'faux') throw new ApiError('Mot de passe administrateur incorrect.', 401);
+  mockPass++;
+  const complete = mockPass % 5 === 4 || mockPass % 5 === 0;
+  const fresh = complete ? Math.round(Math.random() * 6) : 35 + Math.round(Math.random() * 45);
+  const cur = mockPatches['16.19'];
+  cur.games += fresh;
+  cur.updated_at = new Date().toISOString();
+  const run = {
+    stop: complete ? 'tour complet' : 'budget',
+    requests: complete ? 40 + Math.round(Math.random() * 30) : 26,
+    new_matches: fresh,
+    patch: '16.19',
+    games: cur.games,
+    duration_s: complete ? 12.4 : 45,
+    at: cur.updated_at,
+    source: 'web' as const,
+  };
+  mockLastRun = run;
+  return { status: 'ok', ...run, patches: patchList() };
 }

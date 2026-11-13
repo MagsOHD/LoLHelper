@@ -59,27 +59,39 @@ function parseRetryAfter(value: string | null): number | undefined {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
-type Method = 'GET' | 'PUT' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
+export interface RequestOptions {
+  params?: Params;
+  body?: unknown;
+  /** Extra request headers (e.g. X-Admin-Password). */
+  headers?: Record<string, string>;
+  /** Fetch cache mode ("reload" bypasses a Cache-Control max-age kept by the browser). */
+  cache?: RequestCache;
+  /**
+   * Whether a 401 means "shared app password missing/wrong" (dispatches AUTH_REQUIRED_EVENT, the
+   * default). A function receives the French detail and decides (admin password routes).
+   */
+  authEvent?: boolean | ((detail: string | null) => boolean);
+}
 
 /** Calls the PHP API. Resolves with the parsed JSON body (undefined for 204), throws ApiError. */
-export async function backendRequest<T>(
-  method: Method,
-  route: string,
-  options: { params?: Params; body?: unknown } = {},
-): Promise<T> {
-  const { params, body } = options;
-  const headers: Record<string, string> = { Accept: 'application/json' };
+export async function backendRequest<T>(method: Method, route: string, options: RequestOptions = {}): Promise<T> {
+  const { params, body, cache, authEvent = true } = options;
+  const headers: Record<string, string> = { Accept: 'application/json', ...(options.headers ?? {}) };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const password = getPassword();
   if (password) headers['X-App-Password'] = password;
 
   let res: Response;
   try {
-    res = await fetch(apiUrl(route, params), {
+    const init: RequestInit = {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    };
+    if (cache) init.cache = cache;
+    res = await fetch(apiUrl(route, params), init);
   } catch {
     throw new ApiError('Impossible de joindre le serveur. Vérifie ta connexion internet.', 0);
   }
@@ -94,7 +106,8 @@ export async function backendRequest<T>(
       invalidJson = true;
     }
   }
-  if (res.status === 401 && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+  const appAuthFailed = res.status === 401 && (typeof authEvent === 'function' ? authEvent(extractDetail(data)) : authEvent);
+  if (appAuthFailed && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
   }
   if (!res.ok) {

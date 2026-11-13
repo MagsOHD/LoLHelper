@@ -7,6 +7,8 @@ import { CompositionsPage } from './pages/CompositionsPage';
 import { MatchupPage } from './pages/MatchupPage';
 import { SavedPage } from './pages/SavedPage';
 import { DraftPage } from './pages/DraftPage';
+import { MetaPage } from './pages/MetaPage';
+import { useMetaCollectorBridge } from './api/metaHooks';
 import { EmptyState } from './components/ui';
 import { PasswordGate } from './components/PasswordGate';
 
@@ -15,6 +17,7 @@ const NAV: { to: string; label: string; short?: string; end?: boolean }[] = [
   { to: '/compositions', label: 'Compositions', short: 'Compos' },
   { to: '/matchup', label: 'Matchup' },
   { to: '/saved', label: 'Sauvegardées', short: 'Sauvées' },
+  { to: '/meta', label: 'Méta' },
 ];
 
 function Logo() {
@@ -28,6 +31,7 @@ function Logo() {
 
 export function App() {
   const meta = useMeta();
+  useMetaCollectorBridge();
   return (
     <div className="app">
       <a href="#main" className="skip-link">Aller au contenu</a>
@@ -73,6 +77,7 @@ export function App() {
           <Route path="/matchup" element={<MatchupPage />} />
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/draft/:kind/:id" element={<DraftPage />} />
+          <Route path="/meta" element={<MetaPage />} />
           <Route
             path="*"
             element={<EmptyState title="Page introuvable" action={<Link className="btn btn--primary" to="/">Retour à l’équipe</Link>} />}
@@ -83,7 +88,7 @@ export function App() {
       <footer className="footer">
         {meta.data && <span>Patch {meta.data.ddragon_version} · {meta.data.platform.toUpperCase()}</span>}
         {meta.data?.meta_stats && (
-          <span>Méta : patch {meta.data.meta_stats.patch} · {meta.data.meta_stats.games.toLocaleString('fr-FR')} parties haut elo</span>
+          <Link to="/meta" className="footer__link">Méta : patch {meta.data.meta_stats.patch} · {meta.data.meta_stats.games.toLocaleString('fr-FR')} parties haut elo</Link>
         )}
         {MOCK_MODE && <span className="chip chip--amber">Mode démo (données fictives)</span>}
         <span>Projet non affilié à Riot Games.</span>

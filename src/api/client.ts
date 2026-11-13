@@ -5,6 +5,7 @@
 // engine runs locally (src/engine). See service.ts.
 // VITE_MOCK=1: in-memory demo backend (mock.ts), never bundled in production builds.
 import type {
+  MetaStats,
   ArchetypeInfo,
   DraftAdvice,
   DraftInput,
@@ -29,11 +30,19 @@ import type {
   TeamBody,
   ThemeInfo,
 } from './types';
-import { localApi } from './service';
+import { localApi, resetPhpMeta } from './service';
 import { recommendDraft, type ChampionCatalog } from '../engine';
 import { fetchLiveDraft, loadDraft, saveDraft, type LiveDraft } from './draft';
 import { getCatalog } from './ddragon';
-import { getMetaStats } from './meta';
+import {
+  collectMetaOnce,
+  fetchMetaStatus,
+  getMetaStats,
+  getMetaStatsForPatch,
+  invalidateMetaStats,
+  type CollectResult,
+  type MetaStatus,
+} from './meta';
 import { detectActiveGame, type DetectedGame, type DetectFriend, type DetectOptions } from './spectator';
 import { buildEnemyProfile, type ProfileProgress, type ProfileRequest } from './enemyProfile';
 
@@ -73,6 +82,22 @@ export const api = {
   champions: (): Promise<ChampionInfo[]> => (MOCK_MODE ? mock('GET', '/champions') : localApi.champions()),
   archetypes: (): Promise<ArchetypeInfo[]> => (MOCK_MODE ? mock('GET', '/archetypes') : localApi.archetypes()),
   themes: (): Promise<ThemeInfo[]> => (MOCK_MODE ? mock('GET', '/themes') : localApi.themes()),
+
+  // High-elo meta (Meta page)
+  /** Collector state: lock held, last run, kept patches, manual collection allowed. */
+  metaStatus: (): Promise<MetaStatus> =>
+    MOCK_MODE ? import('./mock').then((m) => m.mockMetaStatus()) : fetchMetaStatus(),
+  /** One bounded collection pass on the server (header X-Admin-Password). */
+  collectMeta: (adminPassword: string): Promise<CollectResult> =>
+    MOCK_MODE ? import('./mock').then((m) => m.mockCollectMeta(adminPassword)) : collectMetaOnce(adminPassword),
+  /** Stats of a kept patch, or of the served one when `patch` is empty; null when nothing collected. */
+  metaStats: (patch?: string | null): Promise<MetaStats | null> =>
+    MOCK_MODE ? import('./mock').then((m) => m.mockMetaStats(patch)) : getMetaStatsForPatch(patch),
+  /** Drops cached meta (stats + r=meta summary) so generation, draft and pages use fresh data. */
+  invalidateMeta: (): void => {
+    invalidateMetaStats();
+    resetPhpMeta();
+  },
 
   // Players
   listPlayers: (): Promise<Player[]> => (MOCK_MODE ? mock('GET', '/players') : localApi.listPlayers()),

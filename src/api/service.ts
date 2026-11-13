@@ -104,6 +104,11 @@ function phpMeta(): Promise<PhpMeta> {
   return phpMetaPromise;
 }
 
+/** Forget the cached r=meta answer (its meta_stats summary changes after a collection). */
+export function resetPhpMeta(): void {
+  phpMetaPromise = null;
+}
+
 /** Tests only. */
 export function resetServiceForTests(): void {
   phpMetaPromise = null;
