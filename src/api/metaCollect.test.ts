@@ -5,6 +5,9 @@ import {
   BUSY_RETRY_MS,
   classifyStop,
   CollectController,
+  MAX_RIOT_LIMIT_WAITS,
+  RIOT_LIMIT_DEFAULT_WAIT_S,
+  riotLimitWait,
   runCollectLoop,
   stopLabel,
   type CollectProgress,
@@ -49,7 +52,7 @@ describe('classifyStop / stopLabel', () => {
   it('gives French labels, with the Riot wait when known', () => {
     expect(stopLabel('riot_limit', 120)).toBe('limite de requêtes Riot atteinte — réessaie dans 2 min');
     expect(stopLabel('riot_limit', 30)).toMatch(/30 s$/);
-    expect(stopLabel('tour complet')).toBe('tour complet des joueurs haut elo');
+    expect(stopLabel('tour complet')).toBe('tour complet des joueurs suivis');
     expect(stopLabel('riot_key')).toMatch(/clé API Riot/);
     expect(stopLabel('quelque chose')).toBe('quelque chose');
   });
@@ -97,16 +100,80 @@ describe('runCollectLoop', () => {
     expect(end.error).toMatch(/occupé/);
   });
 
-  it('stops on a Riot limit, key or other non-budget stop', async () => {
-    const end = await runCollectLoop({
-      collect: script(ok('budget'), ok('riot_limit', { retry_after: 90, new_matches: 3 })),
-      signal: new AbortController().signal,
-    });
-    expect(end).toMatchObject({ phase: 'error', passes: 2, new_matches: 43 });
-    expect(end.error).toBe('Arrêt du collecteur : limite de requêtes Riot atteinte — réessaie dans 2 min.');
+  it('waits retry_after on a Riot limit (countdown) then continues', async () => {
+    const t0 = 1_000_000;
+    let clock = t0;
+    const seen: CollectProgress[] = [];
+    const onPass = vi.fn();
+    const collect = script(ok('budget'), ok('riot_limit', { retry_after: 30, new_matches: 3 }), ok('budget', { new_matches: 5 }), ok('disabled', { new_matches: 0 }));
+    const run = runCollectLoop({ collect, signal: new AbortController().signal, onProgress: (p) => seen.push(p), onPass, now: () => clock });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(collect).toHaveBeenCalledTimes(2);
+    const waiting = seen[seen.length - 1];
+    expect(waiting).toMatchObject({ phase: 'waiting', wait_reason: 'riot_limit', retry_at: t0 + 30_000, passes: 2, riot_waits: 1 });
+    expect(waiting.message).toMatch(/reprend dans 30 s/);
+    clock += 29_000;
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(collect).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const end = await run;
+    expect(collect).toHaveBeenCalledTimes(4);
+    // The loop went on after the pause and stopped only on the "disabled" stop.
+    expect(end).toMatchObject({ phase: 'error', passes: 4, new_matches: 48, riot_waits: 0, wait_reason: null });
+    expect(end.error).toMatch(/désactivée/);
+    expect(onPass).toHaveBeenCalledTimes(4);
+  });
 
+  it('waits 5 s when the server gives no retry_after; caps long waits', async () => {
+    expect(RIOT_LIMIT_DEFAULT_WAIT_S).toBe(5);
+    expect(riotLimitWait(undefined)).toBe(5);
+    expect(riotLimitWait(0)).toBe(5);
+    expect(riotLimitWait(2.2)).toBe(3);
+    expect(riotLimitWait(3600)).toBe(120);
+
+    const collect = script(ok('riot_limit'), ok('tour complet'), ok('tour complet'));
+    const run = runCollectLoop({ collect, signal: new AbortController().signal });
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(collect).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    const end = await run;
+    expect(collect).toHaveBeenCalledTimes(3);
+    expect(end.phase).toBe('done');
+  });
+
+  it('a Riot pause does not break a run of full rounds', async () => {
+    const collect = script(ok('tour complet'), ok('riot_limit', { retry_after: 1 }), ok('tour complet'));
+    const run = runCollectLoop({ collect, signal: new AbortController().signal });
+    await vi.advanceTimersByTimeAsync(1_000);
+    const end = await run;
+    expect(collect).toHaveBeenCalledTimes(3);
+    expect(end.phase).toBe('done');
+  });
+
+  it('gives up after too many Riot limits in a row; user stop is immediate during the pause', async () => {
+    const collect = script(ok('riot_limit', { retry_after: 1, new_matches: 0 }));
+    const run = runCollectLoop({ collect, signal: new AbortController().signal, maxRiotWaits: 3 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    const end = await run;
+    expect(collect).toHaveBeenCalledTimes(3);
+    expect(end.phase).toBe('error');
+    expect(end.error).toMatch(/3 passes de suite/);
+    expect(MAX_RIOT_LIMIT_WAITS).toBeGreaterThan(3);
+
+    const abort = new AbortController();
+    const once = script(ok('riot_limit', { retry_after: 60 }));
+    const run2 = runCollectLoop({ collect: once, signal: abort.signal });
+    await vi.advanceTimersByTimeAsync(1_000);
+    abort.abort();
+    expect(await run2).toMatchObject({ phase: 'stopped', passes: 1, retry_at: null });
+    expect(once).toHaveBeenCalledTimes(1);
+  });
+
+  it('still stops on the key or other non-budget stops', async () => {
     const key = await runCollectLoop({ collect: script(ok('riot_key', { message: 'Clé API Riot refusée (HTTP 403).' })), signal: new AbortController().signal });
     expect(key.error).toBe('Arrêt du collecteur : Clé API Riot refusée (HTTP 403).');
+    const down = await runCollectLoop({ collect: script(ok('budget'), ok('riot_down')), signal: new AbortController().signal });
+    expect(down).toMatchObject({ phase: 'error', passes: 2 });
   });
 
   it('a full round followed by a budget pass resets the counter', async () => {
@@ -156,6 +223,8 @@ describe('CollectController', () => {
     c.subscribe(listener);
     const onData = vi.fn();
     c.setOnNewData(onData);
+    const onPass = vi.fn();
+    c.setOnPass(onPass);
 
     expect(c.start('pw')).toBe(true);
     expect(c.start('pw')).toBe(false);
@@ -170,11 +239,31 @@ describe('CollectController', () => {
     expect(c.running).toBe(false);
     expect(c.getSnapshot()).toMatchObject({ phase: 'stopped', passes: 1 });
     expect(onData).toHaveBeenCalledTimes(1);
+    expect(onPass).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalled();
     expect(collect).toHaveBeenCalledTimes(1);
 
     c.reset();
     expect(c.getSnapshot().phase).toBe('idle');
     expect(c.start('pw')).toBe(true);
+  });
+
+  it('calls onPass after every pass, even without new matches (key limits refresh)', async () => {
+    const collect = vi.fn()
+      .mockResolvedValueOnce(ok('riot_limit', { new_matches: 0, retry_after: 2 }))
+      .mockResolvedValueOnce(ok('riot_key', { new_matches: 0 }));
+    const c = new CollectController(collect);
+    const onPass = vi.fn();
+    const onData = vi.fn();
+    c.setOnPass(onPass);
+    c.setOnNewData(onData);
+    c.start('pw');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onPass).toHaveBeenCalledTimes(1);
+    expect(c.getSnapshot()).toMatchObject({ phase: 'waiting', wait_reason: 'riot_limit' });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(onPass).toHaveBeenCalledTimes(2);
+    expect(onData).not.toHaveBeenCalled();
+    expect(c.running).toBe(false);
   });
 });

@@ -40,7 +40,9 @@ import type { LiveDraft } from './draft';
 import type { DetectedGame } from './spectator';
 import type { ProfileProgress, ProfileRequest } from './enemyProfile';
 import type { CollectResult, MetaStatus } from './meta';
-import type { GamesWins, MetaStats } from './types';
+import type { GamesWins, MetaStats, MetaTier } from './types';
+import { META_TIERS } from './types';
+import type { MetaTierProgress } from './metaRank';
 
 const ZERO: ChampionTraits = {
   engage: 0, peel: 0, poke: 0, waveclear: 0, splitpush: 0, pick: 0, teamfight: 0,
@@ -152,7 +154,7 @@ let players: Player[] = [
   },
   {
     id: 'p2', game_name: 'Méga Tank du 92', tag_line: '1234', platform: 'euw1', puuid: 'puuid-2',
-    profile_icon_url: '', summoner_level: 342, rank: null, last_synced_at: '2026-10-01T09:00:00Z',
+    profile_icon_url: '', summoner_level: 342, rank: { queue: 'RANKED_SOLO_5x5', tier: 'PLATINUM', division: 'IV', lp: 12, wins: 41, losses: 39 }, last_synced_at: '2026-10-01T09:00:00Z',
     preferences: prefs({ roles: ['TOP', 'JUNGLE'], wanted_archetypes: ['tank', 'juggernaut'] }),
     masteries: [
       { champion_id: 'Malphite', level: 7, points: 251_000 },
@@ -919,7 +921,7 @@ export async function mockRequest(method: string, path: string, body?: unknown):
 
   switch (route) {
     case 'GET /health': return { status: 'ok' };
-    case 'GET /meta': return { ...META, meta_stats: { patch: '16.19', ...mockPatches['16.19'] } };
+    case 'GET /meta': return { ...META, meta_stats: { patch: MOCK_PATCH, ...mockPatches[MOCK_PATCH] } };
     case 'GET /champions': return clone(CHAMPIONS);
     case 'GET /archetypes': return clone(ARCHETYPES);
     case 'GET /themes': return clone(THEMES);
@@ -1011,14 +1013,35 @@ export async function mockRequest(method: string, path: string, body?: unknown):
 
 // ---- high-elo meta (Meta page) ---------------------------------------------------------------
 
-const mockPatches: Record<string, { games: number; updated_at: string }> = {
-  '16.19': { games: 4213, updated_at: '2026-10-10T12:00:00Z' },
-  '16.18': { games: 9876, updated_at: '2026-09-26T23:00:00Z' },
+const MOCK_PATCH = '16.19';
+const MOCK_TARGET = 500;
+/** Kept games per tier on the current patch (ring buffers of MOCK_TARGET); the old patch is full. */
+const mockTierGames: Record<MetaTier, number> = {
+  IRON: 46, BRONZE: 188, SILVER: 342, GOLD: 500, PLATINUM: 500, EMERALD: 417, DIAMOND: 263, MASTER_PLUS: 500,
 };
+const mockTierNewest: Partial<Record<MetaTier, string>> = {};
+const tierGames = (patch: string, tier: MetaTier) => (patch === MOCK_PATCH ? mockTierGames[tier] : MOCK_TARGET);
+const mockPatches: Record<string, { games: number; updated_at: string }> = {
+  [MOCK_PATCH]: { games: 0, updated_at: '2026-10-10T12:00:00Z' },
+  '16.18': { games: MOCK_TARGET * META_TIERS.length, updated_at: '2026-09-26T23:00:00Z' },
+};
+const syncPatchTotal = () => {
+  mockPatches[MOCK_PATCH].games = META_TIERS.reduce((n, t) => n + mockTierGames[t], 0);
+};
+syncPatchTotal();
 let mockPass = 0;
 let mockLastRun: MetaStatus['last_run'] = {
-  stop: 'budget de temps atteint', requests: 1074, new_matches: 212, patch: '16.19', games: 4213, duration_s: 1500, at: '2026-10-10T12:00:00Z', source: 'cron',
+  stop: 'budget de temps atteint', requests: 412, new_matches: 38, patch: MOCK_PATCH, games: 500, duration_s: 1500, at: '2026-10-10T12:00:00Z', source: 'cron',
 };
+
+const mockTierList = (): MetaTierProgress[] => META_TIERS.map((tier, i) => ({
+  tier,
+  patch: MOCK_PATCH,
+  games: mockTierGames[tier],
+  target: MOCK_TARGET,
+  oldest: new Date(Date.UTC(2026, 9, 8, 6 + i)).toISOString(),
+  newest: mockTierNewest[tier] ?? new Date(Date.UTC(2026, 9, 10, 11, 5 * i)).toISOString(),
+}));
 
 /** Deterministic 0..1 noise from a string. */
 function noise(s: string): number {
@@ -1034,31 +1057,38 @@ const patchList = () =>
 
 export async function mockMetaStatus(): Promise<MetaStatus> {
   await delay(200);
-  return { collecting: false, admin_enabled: true, meta_enabled: true, last_run: clone(mockLastRun), patches: patchList() };
+  const h = new Date().getHours();
+  return {
+    collecting: false, admin_enabled: true, meta_enabled: true, last_run: clone(mockLastRun), patches: patchList(),
+    tiers: mockTierList(), window: { start: 4, end: 15, open: h >= 4 && h < 15 },
+  };
 }
 
-/** Fake aggregates scaled on the patch's games (a few rare picks keep the small-sample UI visible). */
-export async function mockMetaStats(patch?: string | null): Promise<MetaStats | null> {
+/** Fake aggregates scaled on the tier's games (a few rare picks keep the small-sample UI visible). */
+export async function mockMetaStats(patch?: string | null, tier?: MetaTier | null): Promise<MetaStats | null> {
   await delay(250);
-  const p = patch || '16.19';
+  const p = patch || MOCK_PATCH;
+  const t: MetaTier = tier ?? 'MASTER_PLUS';
   const info = mockPatches[p];
   if (!info) return null;
-  const G = info.games;
+  const G = tierGames(p, t);
+  if (!G) return null;
+  const seed = `${p}:${t}`;
   const champions: MetaStats['champions'] = {};
   const bans: MetaStats['bans'] = {};
   const byRole: Partial<Record<Role, string[]>> = {};
   for (const c of CHAMPIONS) {
     const roles: Partial<Record<Role, GamesWins>> = {};
     c.roles.forEach((role, i) => {
-      const n = noise(`${p}:${c.id}:${role}`);
+      const n = noise(`${seed}:${c.id}:${role}`);
       const share = i === 0 ? 0.04 + n * 0.22 : n < 0.5 ? 0.003 + n * 0.012 : 0.01 + n * 0.05;
       const games = Math.max(1, Math.round(G * share));
-      const wr = 0.45 + noise(`${p}:${c.id}:${role}:wr`) * 0.1;
+      const wr = 0.45 + noise(`${seed}:${c.id}:${role}:wr`) * 0.1;
       roles[role] = [games, Math.round(games * wr)];
       (byRole[role] ??= []).push(c.id);
     });
     champions[c.id] = roles;
-    const b = noise(`${p}:${c.id}:ban`);
+    const b = noise(`${seed}:${c.id}:ban`);
     if (b > 0.25) bans[c.id] = Math.round(G * (b - 0.25) * 0.35);
   }
   const matchups: MetaStats['matchups'] = {};
@@ -1070,37 +1100,47 @@ export async function mockMetaStats(patch?: string | null): Promise<MetaStats | 
         if (a >= b) continue;
         const ga = champions[a]?.[role]?.[0] ?? 0;
         const gb = champions[b]?.[role]?.[0] ?? 0;
-        const games = Math.round(Math.min(ga, gb) * (0.08 + noise(`${p}:${role}:${a}:${b}`) * 0.25));
+        const games = Math.round(Math.min(ga, gb) * (0.08 + noise(`${seed}:${role}:${a}:${b}`) * 0.25));
         if (games < 1) continue;
-        const wins = Math.round(games * (0.38 + noise(`${p}:${role}:${b}:${a}`) * 0.24));
+        const wins = Math.round(games * (0.38 + noise(`${seed}:${role}:${b}:${a}`) * 0.24));
         (out[a] ??= {})[b] = [games, wins];
         (out[b] ??= {})[a] = [games, games - wins];
       }
     }
     matchups[role] = out;
   }
-  return { patch: p, platform: META.platform, games: G, updated_at: info.updated_at, champions, bans, matchups };
+  return { patch: p, platform: META.platform, tier: t, games: G, updated_at: mockTierNewest[t] ?? info.updated_at, champions, bans, matchups };
 }
 
-/** Simulated pass (~2 s): three "budget" passes then two "tour complet". "faux" = wrong password. */
+/**
+ * Simulated pass (~2 s), round-robin on the least filled tier: budget passes, a Riot pause
+ * (riot_limit, 6 s) on the 2nd pass of each cycle, then two "tour complet". "faux" = wrong password.
+ */
 export async function mockCollectMeta(password: string): Promise<CollectResult> {
   await delay(1800 + Math.random() * 600);
   if (password.trim().toLowerCase() === 'faux') throw new ApiError('Mot de passe administrateur incorrect.', 401);
   mockPass++;
-  const complete = mockPass % 5 === 4 || mockPass % 5 === 0;
-  const fresh = complete ? Math.round(Math.random() * 6) : 35 + Math.round(Math.random() * 45);
-  const cur = mockPatches['16.19'];
-  cur.games += fresh;
-  cur.updated_at = new Date().toISOString();
+  const step = mockPass % 6;
+  const complete = step === 5 || step === 0;
+  const limited = step === 2;
+  const tier = META_TIERS.reduce((best, t) => (mockTierGames[t] < mockTierGames[best] ? t : best), META_TIERS[0]);
+  const fresh = limited ? 4 : complete ? Math.round(Math.random() * 6) : 25 + Math.round(Math.random() * 30);
+  const now = new Date().toISOString();
+  mockTierGames[tier] = Math.min(MOCK_TARGET, mockTierGames[tier] + fresh);
+  mockTierNewest[tier] = now;
+  syncPatchTotal();
+  mockPatches[MOCK_PATCH].updated_at = now;
   const run = {
-    stop: complete ? 'tour complet' : 'budget',
-    requests: complete ? 40 + Math.round(Math.random() * 30) : 26,
+    stop: limited ? 'riot_limit' : complete ? 'tour complet' : 'budget',
+    requests: limited ? 9 : complete ? 20 + Math.round(Math.random() * 15) : 11,
     new_matches: fresh,
-    patch: '16.19',
-    games: cur.games,
-    duration_s: complete ? 12.4 : 45,
-    at: cur.updated_at,
+    patch: MOCK_PATCH,
+    games: mockTierGames[tier],
+    duration_s: limited ? 8.2 : complete ? 12.4 : 45,
+    at: now,
     source: 'web' as const,
+    tier,
+    ...(limited ? { retry_after: 6 } : {}),
   };
   mockLastRun = run;
   return { status: 'ok', ...run, patches: patchList() };

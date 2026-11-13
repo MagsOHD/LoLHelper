@@ -44,7 +44,7 @@ import type {
 import { ROLES } from './types';
 import { ApiError, backendRequest, store } from './backend';
 import { getCatalog, profileIconUrl } from './ddragon';
-import { getMetaStats, resetMetaForTests } from './meta';
+import { getAdviceMeta, getMetaStatusCached, resetMetaForTests } from './meta';
 import { emptyRecent, emptyRoles, fetchPlayerData, getAccount, type RiotFields } from './riot';
 import { normalizeProfiles } from './draft';
 
@@ -503,12 +503,14 @@ async function generate(body: GenerateBody): Promise<{ suggestions: CompositionS
   const ids = asArray<string>(body?.player_ids);
   if (ids.length < 1 || ids.length > 5) throw unprocessable('Sélectionnez entre 1 et 5 joueurs.');
   if (new Set(ids).size !== ids.length) throw unprocessable('Un joueur est sélectionné plusieurs fois.');
-  const [docs, { catalog }, meta] = await Promise.all([listPlayerDocs(), getCatalog(), getMetaStats()]);
+  // The per-tier progress is read alongside (tier of the selected friends' median solo rank).
+  const [docs, { catalog }] = await Promise.all([listPlayerDocs(), getCatalog(), getMetaStatusCached()]);
   const rows = ids.map((pid) => {
     const row = docs.find((d) => d.id === pid);
     if (!row) throw notFound(`Joueur introuvable : ${pid}.`);
     return row;
   });
+  const meta = await getAdviceMeta(rows.map((r) => r.rank));
 
   const opts = normalizeOptions(body.options);
   for (const [mapping, what] of [
@@ -558,19 +560,21 @@ async function matchup(body: MatchupBody): Promise<MatchupPlan> {
   validatePicks(catalog, ally, 'Votre composition');
   const enemy = assignEnemyRoles(enemyIn, catalog);
   validatePicks(catalog, enemy, "L'équipe adverse");
-  const [meta, players] = await Promise.all([getMetaStats(), allyPlayers(ally, catalog)]);
+  const docs = await allyDocs(ally);
+  const players = docs.map((doc) => toPlayerInput(doc, catalog));
+  const meta = await getAdviceMeta(docs.map((d) => d.rank));
   const enemy_profiles = normalizeProfiles(body?.enemy_profiles);
   return buildMatchupPlan(ally, enemy, catalog, { meta, players, ...(enemy_profiles.length ? { enemy_profiles } : {}) });
 }
 
-/** PlayerInput of the ally picks' known players (pick order, unknown/deleted ids ignored). */
-async function allyPlayers(ally: Pick[], catalog: ChampionCatalog): Promise<PlayerInput[]> {
+/** Documents of the ally picks' known players (pick order, unknown/deleted ids ignored). */
+async function allyDocs(ally: Pick[]) {
   const ids = unique(ally.map((p) => p.player_id).filter((id): id is string => typeof id === 'string' && id !== ''));
   if (!ids.length) return [];
   const docs = await listPlayerDocs();
   return ids.flatMap((id) => {
     const doc = docs.find((d) => d.id === id);
-    return doc ? [toPlayerInput(doc, catalog)] : [];
+    return doc ? [doc] : [];
   });
 }
 

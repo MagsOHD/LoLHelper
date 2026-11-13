@@ -28,7 +28,7 @@ export const useMeta = () => useQuery({ queryKey: qk.meta, queryFn: api.meta, ..
 export const useChampions = () => useQuery({ queryKey: qk.champions, queryFn: api.champions, ...STATIC });
 export const useArchetypes = () => useQuery({ queryKey: qk.archetypes, queryFn: api.archetypes, ...STATIC });
 export const useThemes = () => useQuery({ queryKey: qk.themes, queryFn: api.themes, ...STATIC });
-export const usePlayers = () => useQuery({ queryKey: qk.players, queryFn: api.listPlayers });
+export const usePlayers = (enabled = true) => useQuery({ queryKey: qk.players, queryFn: api.listPlayers, enabled });
 export const usePlayer = (id: string) => useQuery({ queryKey: qk.player(id), queryFn: () => api.getPlayer(id) });
 export const useTeams = () => useQuery({ queryKey: qk.teams, queryFn: api.listTeams });
 export const useSaved = () => useQuery({ queryKey: qk.saved, queryFn: api.listSaved });

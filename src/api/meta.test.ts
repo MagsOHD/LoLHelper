@@ -9,6 +9,7 @@ import { resetDDragonForTests } from './ddragon';
 import {
   collectMetaOnce,
   fetchMetaStatus,
+  getAdviceMeta,
   getMetaStats,
   getMetaStatsForPatch,
   invalidateMetaStats,
@@ -20,6 +21,7 @@ import {
   type RawMetaStats,
 } from './meta';
 import { ApiError } from './backend';
+import { saveTierOverride } from './metaRank';
 import { failure, fakeCatalog, fakeServer, installWindow, json } from './__fixtures__/fakes';
 
 const RAW: RawMetaStats = {
@@ -149,6 +151,67 @@ describe('meta stats by patch', () => {
   });
 });
 
+describe('meta stats by tier', () => {
+  it('sends &tier= (and &patch=), maps the response tier (old apex names -> Master+), caches per tier', async () => {
+    installWindow('');
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes('ddragon')) return json({}, 503);
+      const tier = /tier=([A-Z_]+)/.exec(u)?.[1];
+      return json({ ...RAW, tier: tier === 'MASTER_PLUS' ? 'CHALLENGER' : tier });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const gold = await getMetaStats(Date.now(), 'GOLD');
+    expect(gold?.tier).toBe('GOLD');
+    expect(await getMetaStats(Date.now(), 'GOLD')).toBe(gold);
+    expect((await getMetaStatsForPatch(null, 'MASTER_PLUS'))?.tier).toBe('MASTER_PLUS');
+    expect((await getMetaStatsForPatch('16.18', 'IRON'))?.tier).toBe('IRON');
+    expect(mapMetaStats(RAW, fakeCatalog())?.tier).toBeUndefined();
+    const urls = calls(fetchMock).map(([u]) => u).filter((u) => u.includes('meta-stats'));
+    expect(urls).toEqual([
+      'api/index.php?r=meta-stats&tier=GOLD',
+      'api/index.php?r=meta-stats&tier=MASTER_PLUS',
+      'api/index.php?r=meta-stats&tier=IRON&patch=16.18',
+    ]);
+  });
+
+  it('normalizes the per-tier progress and window of r=meta-status', async () => {
+    installWindow('');
+    vi.stubGlobal('fetch', vi.fn(async () => json({
+      tiers: [
+        { tier: 'GOLD', patch: '16.22', games: 412, target: 500, oldest: '2026-11-10T08:00:00Z', newest: '2026-11-13T09:00:00Z' },
+        { tier: 'MASTER_PLUS', patch: '16.22', games: 500, target: 500 },
+      ],
+      window: { start: 4, end: 15, open: true },
+    })));
+    const st = await fetchMetaStatus();
+    expect(st.tiers.map((t) => [t.tier, t.games, t.target])).toEqual([['GOLD', 412, 500], ['MASTER_PLUS', 500, 500]]);
+    expect(st.window).toEqual({ start: 4, end: 15, open: true });
+  });
+
+  it('getAdviceMeta: tier of the median rank, override, fallback; server default without progress', async () => {
+    const queries: string[] = [];
+    let tiers: unknown[] = [{ tier: 'SILVER', games: 300 }, { tier: 'GOLD', games: 60 }, { tier: 'MASTER_PLUS', games: 500 }];
+    installWindow('');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = new URL(String(url), 'http://x.test');
+      if (u.hostname.includes('ddragon')) return json({}, 503);
+      if (u.searchParams.get('r') === 'meta-status') return json({ tiers });
+      queries.push(u.searchParams.toString());
+      return json({ ...RAW, tier: u.searchParams.get('tier') ?? undefined });
+    }));
+    const gold = { queue: 'RANKED_SOLO_5x5', tier: 'GOLD', division: 'I', lp: 0, wins: 0, losses: 0 };
+    expect((await getAdviceMeta([gold, null]))?.tier).toBe('SILVER'); // Gold has 60 games
+    saveTierOverride('MASTER_PLUS');
+    expect((await getAdviceMeta([gold]))?.tier).toBe('MASTER_PLUS');
+    saveTierOverride(null);
+    invalidateMetaStats();
+    tiers = [];
+    await getAdviceMeta([]);
+    expect(queries).toEqual(['r=meta-stats&tier=SILVER', 'r=meta-stats&tier=MASTER_PLUS', 'r=meta-stats']);
+  });
+});
+
 describe('meta status / manual collection', () => {
   it('normalizes r=meta-status (patches sorted, defaults when fields are missing)', async () => {
     installWindow('');
@@ -165,7 +228,7 @@ describe('meta status / manual collection', () => {
     expect(st.patches.map((p) => p.patch)).toEqual(['16.19', '16.9']);
 
     vi.stubGlobal('fetch', vi.fn(async () => json({})));
-    expect(await fetchMetaStatus()).toEqual({ collecting: false, admin_enabled: false, meta_enabled: true, last_run: null, patches: [] });
+    expect(await fetchMetaStatus()).toEqual({ collecting: false, admin_enabled: false, meta_enabled: true, last_run: null, patches: [], tiers: [], window: null });
     expect(normalizePatches({ '16.18': { games: 3, updated_at: 'u' } })).toEqual([{ patch: '16.18', games: 3, updated_at: 'u' }]);
   });
 

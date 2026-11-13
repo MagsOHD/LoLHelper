@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api, type DraftEngine } from './client';
 import {
   annotateClash,
@@ -14,14 +14,27 @@ import {
 } from './draft';
 import { DraftSession, type DraftSnapshot } from './draftSession';
 import { EnemyProfileService, requestKey, type ProfileRequest, type ProfileStatus } from './enemyProfile';
-import type { DraftAdvice, DraftState, EnemyPlayerProfile, Player } from './types';
+import type { DraftAdvice, DraftState, EnemyPlayerProfile, Player, Rank } from './types';
+import { useTierOverride } from './metaHooks';
+import { medianTier } from './metaRank';
 import { parseRiotId } from '../lib/format';
 import { planRoster, rosterNote, teamRef, type ClashLookup } from './clash';
 import { clashDirectory } from './clashHooks';
 
-/** Catalog + advisor, loaded once per page load. */
-export function useDraftEngine() {
-  return useQuery({ queryKey: ['draft-engine'], queryFn: api.draftEngine, staleTime: Infinity, gcTime: Infinity });
+/**
+ * Catalog + advisor, loaded once per page load and meta tier: the tier closest to the median solo
+ * rank of the draft's friends (or the one chosen on the Méta page).
+ */
+export function useDraftEngine(ranks: readonly (Rank | null | undefined)[] = []) {
+  const [override] = useTierOverride();
+  const median = medianTier(ranks).tier;
+  return useQuery({
+    queryKey: ['draft-engine', override ?? 'auto', median ?? 'unranked'],
+    queryFn: () => api.draftEngine(ranks),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    placeholderData: keepPreviousData,
+  });
 }
 
 /**

@@ -359,6 +359,34 @@ describe('history and meta context', () => {
     expect(server.metaStatsCalls).toHaveLength(1);
   });
 
+  it('generate and matchup use the tier of the selected friends\' median solo rank (fallback on enough games)', async () => {
+    const tiers = [
+      { tier: 'GOLD', patch: '16.19', games: 500, target: 500 },
+      { tier: 'PLATINUM', patch: '16.19', games: 40, target: 500 },
+      { tier: 'EMERALD', patch: '16.19', games: 320, target: 500 },
+      { tier: 'MASTER_PLUS', patch: '16.19', games: 500, target: 500 },
+    ];
+    setup({ metaStats: { ...RAW_META, tier: 'GOLD' }, metaStatus: { tiers } });
+    const rank = (tier: string, division: string, queue = 'RANKED_SOLO_5x5') => ({ queue, tier, division, lp: 0, wins: 1, losses: 1 });
+    server.db.players.set('a', { ...oldDoc('a', null), rank: rank('GOLD', 'I') });
+    server.db.players.set('b', { ...oldDoc('b', null), rank: rank('PLATINUM', 'II') });
+    server.db.players.set('c', { ...oldDoc('c', null), rank: rank('PLATINUM', 'I') });
+    server.db.players.set('d', { ...oldDoc('d', null), rank: rank('DIAMOND', 'I', 'RANKED_FLEX_SR') });
+
+    await api.generate({ player_ids: ['a', 'b', 'c', 'd'], options: {} });
+    // Median of Gold I / Plat II / Plat I (flex ignored) = Platinum: 40 games -> nearest with ≥ 100, higher on ties.
+    expect(server.metaStatsQueries).toEqual(['r=meta-stats&tier=EMERALD']);
+    expect(lastCall(engine.current.generateCompositions)[3]).toEqual({ meta: { ...EXPECTED_META, tier: 'GOLD' } });
+
+    await api.generate({ player_ids: ['a'], options: {} });
+    expect(server.metaStatsQueries).toEqual(['r=meta-stats&tier=EMERALD', 'r=meta-stats&tier=GOLD']);
+    // Status read once (cached), meta once per tier.
+    expect(server.metaStatusCalls).toHaveLength(1);
+
+    await api.matchup({ enemy: [{ champion_id: 'Ahri', role: 'MID' }], ally: [] });
+    expect(server.metaStatsQueries[server.metaStatsQueries.length - 1]).toBe('r=meta-stats&tier=MASTER_PLUS');
+  });
+
   it('generate still works when meta stats are unavailable or failing', async () => {
     server.db.players.set('old', oldDoc('old', null));
     await api.generate({ player_ids: ['old'], options: {} });

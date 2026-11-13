@@ -1,6 +1,9 @@
 import { NavLink, Route, Routes, Link } from 'react-router-dom';
-import { useMeta } from './api/hooks';
-import { MOCK_MODE } from './api/client';
+import { useMemo } from 'react';
+import { useMeta, usePlayers } from './api/hooks';
+import { getPassword, MOCK_MODE } from './api/client';
+import type { Meta } from './api/types';
+import { tierLabel } from './api/metaRank';
 import { TeamPage } from './pages/TeamPage';
 import { PlayerPage } from './pages/PlayerPage';
 import { CompositionsPage } from './pages/CompositionsPage';
@@ -8,7 +11,7 @@ import { MatchupPage } from './pages/MatchupPage';
 import { SavedPage } from './pages/SavedPage';
 import { DraftPage } from './pages/DraftPage';
 import { MetaPage } from './pages/MetaPage';
-import { useMetaCollectorBridge } from './api/metaHooks';
+import { useAdviceTier, useMetaCollectorBridge, useMetaStatus } from './api/metaHooks';
 import { EmptyState } from './components/ui';
 import { PasswordGate } from './components/PasswordGate';
 
@@ -27,6 +30,24 @@ function Logo() {
       <circle cx="16" cy="16" r="4.2" fill="var(--teal)" />
     </svg>
   );
+}
+
+/** "Méta : patch 16.22 · Or · 412 parties": tier used by the advice for all the friends. */
+function FooterMeta({ app }: { app: Meta }) {
+  const enabled = !app.password_required || Boolean(getPassword());
+  const players = usePlayers(enabled);
+  const ranks = useMemo(() => (players.data ?? []).map((p) => p.rank), [players.data]);
+  const choice = useAdviceTier(ranks, enabled);
+  const status = useMetaStatus(enabled);
+  const summary = app.meta_stats ?? null;
+  const tier = choice?.tier ?? null;
+  const progress = (tier && status.data?.tiers.find((t) => t.tier === tier)) || null;
+  if (!summary && !progress) return null;
+  const nf = (n: number) => n.toLocaleString('fr-FR');
+  const label = progress && tier
+    ? `Méta : patch ${progress.patch || summary?.patch || '—'} · ${tierLabel(tier)} · ${nf(progress.games)} parties`
+    : `Méta : patch ${summary?.patch} · ${nf(summary?.games ?? 0)} parties`;
+  return <Link to="/meta" className="footer__link">{label}</Link>;
 }
 
 export function App() {
@@ -87,9 +108,7 @@ export function App() {
       </main>
       <footer className="footer">
         {meta.data && <span>Patch {meta.data.ddragon_version} · {meta.data.platform.toUpperCase()}</span>}
-        {meta.data?.meta_stats && (
-          <Link to="/meta" className="footer__link">Méta : patch {meta.data.meta_stats.patch} · {meta.data.meta_stats.games.toLocaleString('fr-FR')} parties haut elo</Link>
-        )}
+        {meta.data && <FooterMeta app={meta.data} />}
         {MOCK_MODE && <span className="chip chip--amber">Mode démo (données fictives)</span>}
         <span>Projet non affilié à Riot Games.</span>
       </footer>

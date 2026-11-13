@@ -1,11 +1,21 @@
-// High-elo meta stats collected by the PHP cron (r=meta-stats), mapped to Data Dragon ids.
+// Meta stats collected by the PHP cron per rank tier (r=meta-stats&tier=), mapped to Data Dragon ids.
 // Optional data: any failure resolves to null so composition generation is never blocked.
 import type { ChampionCatalog } from '../engine';
-import type { GamesWins, MetaStats, Role } from './types';
+import type { GamesWins, MetaStats, MetaTier, Rank, Role } from './types';
 import { ApiError, backendRequest, encodeSecretHeader } from './backend';
 import { getCatalog } from './ddragon';
 import { mapPosition } from './riot';
 import { comparePatchDesc } from './metaTier';
+import {
+  chooseAdviceTier,
+  loadTierOverride,
+  normalizeTierProgress,
+  normalizeWindow,
+  toMetaTier,
+  type AdviceTierChoice,
+  type MetaTierProgress,
+  type MetaWindow,
+} from './metaRank';
 
 type RawGamesWins = unknown;
 
@@ -14,6 +24,8 @@ export interface RawMetaStats {
   available?: boolean;
   patch?: string;
   platform?: string;
+  /** Rank group of the stats (absent on servers collecting high elo only). */
+  tier?: string;
   games?: number;
   updated_at?: string;
   champions?: Record<string, Record<string, RawGamesWins>>;
@@ -87,9 +99,11 @@ export function mapMetaStats(raw: RawMetaStats | null | undefined, catalog: KeyC
     if (Object.keys(out).length) matchups[role] = out;
   }
 
+  const tier = toMetaTier(raw.tier);
   return {
     patch: typeof raw.patch === 'string' ? raw.patch : '',
     platform: typeof raw.platform === 'string' ? raw.platform : '',
+    ...(tier ? { tier } : {}),
     games,
     updated_at: typeof raw.updated_at === 'string' ? raw.updated_at : '',
     champions,
@@ -101,72 +115,103 @@ export function mapMetaStats(raw: RawMetaStats | null | undefined, catalog: KeyC
 /** After a failed fetch, wait this long before asking the server again. */
 export const META_RETRY_MS = 5 * 60 * 1000;
 
-let metaPromise: Promise<MetaStats | null> | null = null;
-let failedAt: number | null = null;
+/** Served snapshot per tier ('' = the server's default tier). */
+const defaultCache = new Map<string, { promise: Promise<MetaStats | null>; failedAt: number | null }>();
 const patchCache = new Map<string, Promise<MetaStats | null>>();
 
 /**
  * r=meta-stats sends Cache-Control max-age=300: always bypass the browser HTTP cache, otherwise a
- * reload right after a collection would show the old snapshot. The session cache above dedupes.
+ * reload right after a collection would show the old snapshot. The session caches dedupe.
  */
-function fetchStats(patch?: string): Promise<MetaStats | null> {
+function fetchStats(patch?: string | null, tier?: MetaTier | null): Promise<MetaStats | null> {
+  const params: Record<string, string> = {};
+  if (tier) params.tier = tier;
+  if (patch) params.patch = patch;
   return Promise.all([
-    backendRequest<RawMetaStats>('GET', 'meta-stats', { params: patch ? { patch } : {}, cache: 'no-store' }),
+    backendRequest<RawMetaStats>('GET', 'meta-stats', { params, cache: 'no-store' }),
     getCatalog(),
   ]).then(([raw, { catalog }]) => mapMetaStats(raw, catalog));
 }
 
 /**
- * Meta stats for this session (fetched once, shared promise). Never rejects: null when nothing has
- * been collected, when the route is missing or on any error (retried after META_RETRY_MS).
+ * Meta stats of `tier` for this session (null = the server's default tier; fetched once per tier,
+ * shared promise). Never rejects: null when nothing has been collected, when the route is missing
+ * or on any error (retried after META_RETRY_MS).
  */
-export function getMetaStats(now: number = Date.now()): Promise<MetaStats | null> {
-  if (metaPromise && failedAt !== null && now - failedAt >= META_RETRY_MS) {
-    metaPromise = null;
-    failedAt = null;
-  }
-  if (!metaPromise) {
-    metaPromise = fetchStats().catch(() => {
-      failedAt = now;
+export function getMetaStats(now: number = Date.now(), tier: MetaTier | null = null): Promise<MetaStats | null> {
+  const key = tier ?? '';
+  let entry = defaultCache.get(key);
+  if (entry && entry.failedAt !== null && now - entry.failedAt >= META_RETRY_MS) entry = undefined;
+  if (!entry) {
+    const e: { promise: Promise<MetaStats | null>; failedAt: number | null } = { promise: Promise.resolve(null), failedAt: null };
+    e.promise = fetchStats(null, tier).catch(() => {
+      e.failedAt = now;
       return null;
     });
+    defaultCache.set(key, e);
+    entry = e;
   }
-  return metaPromise;
+  return entry.promise;
 }
 
 export const PATCH_PATTERN = /^\d{1,3}\.\d{1,3}$/;
 
 /**
- * Stats of one kept patch (r=meta-stats&patch=), or the served patch when `patch` is empty (shared
- * with getMetaStats). null when the patch is not kept (404) or empty; other errors reject.
+ * Stats of one kept patch (r=meta-stats&patch=[&tier=]), or the served patch when `patch` is empty
+ * (shared with getMetaStats). null when the patch is not kept (404) or empty; other errors reject.
  */
-export function getMetaStatsForPatch(patch?: string | null): Promise<MetaStats | null> {
-  if (!patch) return getMetaStats();
+export function getMetaStatsForPatch(patch?: string | null, tier: MetaTier | null = null): Promise<MetaStats | null> {
+  if (!patch) return getMetaStats(Date.now(), tier);
   if (!PATCH_PATTERN.test(patch)) return Promise.resolve(null);
-  let p = patchCache.get(patch);
+  const key = `${tier ?? ''}|${patch}`;
+  let p = patchCache.get(key);
   if (!p) {
-    p = fetchStats(patch).catch((err) => {
-      patchCache.delete(patch);
+    p = fetchStats(patch, tier).catch((err) => {
+      patchCache.delete(key);
       if (err instanceof ApiError && err.status === 404) return null;
       throw err;
     });
-    patchCache.set(patch, p);
+    patchCache.set(key, p);
   }
   return p;
 }
 
+// ---- tier used by generation and the draft -----------------------------------------------------
+
+/** Per-tier progress is re-read at most this often by generation/draft (Méta page polls on its own). */
+export const STATUS_TTL_MS = 60_000;
+let statusCache: { promise: Promise<MetaStatus | null>; at: number } | null = null;
+
+/** r=meta-status for the tier choice; null when unavailable (old server, network). Never rejects. */
+export function getMetaStatusCached(now: number = Date.now()): Promise<MetaStatus | null> {
+  if (!statusCache || now - statusCache.at >= STATUS_TTL_MS) {
+    statusCache = { promise: fetchMetaStatus().catch(() => null), at: now };
+  }
+  return statusCache.promise;
+}
+
+/** Tier for these friends' ranks (median solo rank, override, fallback on tiers with enough games). */
+export async function resolveAdviceTier(ranks: readonly (Rank | null | undefined)[]): Promise<AdviceTierChoice> {
+  const status = await getMetaStatusCached();
+  return chooseAdviceTier({ ranks, tiers: status?.tiers ?? [], override: loadTierOverride() });
+}
+
+/** Meta snapshot used in the engine context of generation, matchup and the draft. Never rejects. */
+export async function getAdviceMeta(ranks: readonly (Rank | null | undefined)[]): Promise<MetaStats | null> {
+  const choice = await resolveAdviceTier(ranks);
+  return getMetaStats(Date.now(), choice.tier);
+}
+
 /** Forget every cached snapshot (after a collection): generation, draft and the Meta page refetch. */
 export function invalidateMetaStats(): void {
-  metaPromise = null;
-  failedAt = null;
+  defaultCache.clear();
   patchCache.clear();
+  statusCache = null;
 }
 
 /** Tests only. */
 export function resetMetaForTests(): void {
-  metaPromise = null;
-  failedAt = null;
-  patchCache.clear();
+  invalidateMetaStats();
 }
 
 // ---- collection status / manual collection (r=meta-status, r=meta-collect) --------------------
@@ -193,6 +238,8 @@ export interface MetaRunSummary {
   message?: string;
   /** Seconds before Riot accepts requests again (stop = riot_limit). */
   retry_after?: number;
+  /** Tier the pass collected for, when the server says. */
+  tier?: MetaTier;
 }
 
 export interface MetaStatus {
@@ -205,6 +252,10 @@ export interface MetaStatus {
   last_run: MetaRunSummary | null;
   /** Kept patches, most recent first. */
   patches: MetaPatchInfo[];
+  /** Per-tier progress of the collector (current patch), META_TIERS order; [] on older servers. */
+  tiers: MetaTierProgress[];
+  /** Hours of the automatic collection (null when the server does not say). */
+  window: MetaWindow | null;
 }
 
 export type CollectResult = { status: 'busy' } | ({ status: 'ok'; patches: MetaPatchInfo[] } & MetaRunSummary);
@@ -240,6 +291,8 @@ function normalizeRun(v: unknown): MetaRunSummary | null {
   };
   if (typeof v.retry_after === 'number' && v.retry_after >= 0) run.retry_after = v.retry_after;
   if (v.source === 'cron' || v.source === 'web') run.source = v.source;
+  const tier = toMetaTier(v.tier);
+  if (tier) run.tier = tier;
   if (typeof v.message === 'string' && v.message.trim()) run.message = v.message.trim();
   return run;
 }
@@ -252,6 +305,8 @@ export function normalizeMetaStatus(raw: unknown): MetaStatus {
     meta_enabled: o.meta_enabled !== false,
     last_run: normalizeRun(o.last_run),
     patches: normalizePatches(o.patches),
+    tiers: normalizeTierProgress(o.tiers),
+    window: normalizeWindow(o.window),
   };
 }
 
