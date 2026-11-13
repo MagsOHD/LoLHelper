@@ -62,7 +62,7 @@ function handle_request(string $apiDir): void
 
     // Toutes les autres routes : mot de passe partagé si configuré.
     if ($config['app_password'] !== '') {
-        $given = request_header('X-App-Password') ?? '';
+        $given = request_secret_header('X-App-Password');
         if (!hash_equals($config['app_password'], $given)) {
             throw new HttpError(401, 'Mot de passe requis ou incorrect.');
         }

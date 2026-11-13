@@ -768,7 +768,7 @@ function handle_meta_collect(array $config, string $apiDir): void
     if ($config['admin_password'] === '') {
         throw new HttpError(403, 'Collecte manuelle désactivée : définissez admin_password dans config.php.');
     }
-    if (!hash_equals($config['admin_password'], request_header('X-Admin-Password') ?? '')) {
+    if (!hash_equals($config['admin_password'], request_secret_header('X-Admin-Password'))) {
         throw new HttpError(401, 'Mot de passe administrateur incorrect.');
     }
     $dataDir = resolve_data_dir($config, $apiDir);

@@ -379,6 +379,23 @@ foreach (['missing' => null, 'wrong' => 'nope', 'longer' => ADMIN . 'x', 'prefix
 }
 check(fake_log() === [] && last_run() === $cronRun, 'rejected triggers make no Riot call');
 
+// Mot de passe accentué, entouré d'espaces dans config.php, envoyé par le site en b64:<UTF-8>.
+// Le verrou est tenu : un bon mot de passe répond « busy » sans aucun appel Riot.
+$accent = 'Été mdp ñ';
+write_config($SITE, ['admin_password' => "  $accent  "]);
+$lock = fopen("$META/collect.lock", 'c');
+flock($lock, LOCK_EX);
+$r = req($collectUrl, $admin('b64:' . base64_encode($accent)), 'POST');
+check($r['status'] === 200 && ($r['json']['status'] ?? '') === 'busy', 'accented admin password (b64, config trimmed) accepted', $r['body']);
+$r = req($collectUrl, $admin('b64:' . base64_encode(mb_convert_encoding($accent, 'ISO-8859-1', 'UTF-8'))), 'POST');
+check($r['status'] === 401, 'Latin-1 bytes of the admin password rejected', $r['body']);
+$r = req($collectUrl, $admin('b64:%%%'), 'POST');
+check($r['status'] === 401, 'invalid b64 admin password rejected', $r['body']);
+flock($lock, LOCK_UN);
+fclose($lock);
+check(fake_log() === [], 'password encoding checks make no Riot call');
+write_config($SITE, ['admin_password' => ADMIN]);
+
 // Bon mot de passe : un passage complet (tout est déjà vu -> 5 listes d'ids).
 $cursorBefore = state()['cursor'];
 @unlink($FAKE_LOG);

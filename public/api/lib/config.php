@@ -83,8 +83,8 @@ function load_config(string $apiDir): array
     return [
         'riot_api_key' => is_string($key) ? trim($key) : '',
         'riot_platform' => (is_string($platform) && isset(PLATFORM_REGIONS[$platform])) ? $platform : 'euw1',
-        'app_password' => is_string($password) ? $password : '',
-        'admin_password' => is_string($adminPassword) ? $adminPassword : '',
+        'app_password' => is_string($password) ? trim($password) : '',
+        'admin_password' => is_string($adminPassword) ? trim($adminPassword) : '',
         'cors_origins' => $cleanOrigins,
         'data_dir' => (is_string($dataDir) && $dataDir !== '') ? rtrim($dataDir, '/\\') : null,
         'meta_enabled' => is_bool($metaEnabled) ? $metaEnabled : true,

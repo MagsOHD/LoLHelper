@@ -1,6 +1,17 @@
 // Thin fetch wrapper around the PHP API (public/api/index.php?r=<route>).
 import { loadLocal, saveLocal } from '../lib/storage';
 
+/**
+ * HTTP headers are not UTF-8: passwords go as "b64:<base64 of the UTF-8 bytes>" so accents survive
+ * (the PHP API decodes it and still accepts the raw form).
+ */
+export function encodeSecretHeader(value: string): string {
+  const bytes = new TextEncoder().encode(value.trim());
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return `b64:${btoa(bin)}`;
+}
+
 export class ApiError extends Error {
   status: number;
   /** Seconds to wait before retrying (only set on 429 responses carrying Retry-After). */
@@ -81,7 +92,7 @@ export async function backendRequest<T>(method: Method, route: string, options: 
   const headers: Record<string, string> = { Accept: 'application/json', ...(options.headers ?? {}) };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const password = getPassword();
-  if (password) headers['X-App-Password'] = password;
+  if (password) headers['X-App-Password'] = encodeSecretHeader(password);
 
   let res: Response;
   try {

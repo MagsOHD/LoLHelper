@@ -2,7 +2,7 @@
 // Optional data: any failure resolves to null so composition generation is never blocked.
 import type { ChampionCatalog } from '../engine';
 import type { GamesWins, MetaStats, Role } from './types';
-import { ApiError, backendRequest } from './backend';
+import { ApiError, backendRequest, encodeSecretHeader } from './backend';
 import { getCatalog } from './ddragon';
 import { mapPosition } from './riot';
 import { comparePatchDesc } from './metaTier';
@@ -273,7 +273,7 @@ export function fetchMetaStatus(): Promise<MetaStatus> {
  */
 export function collectMetaOnce(adminPassword: string): Promise<CollectResult> {
   return backendRequest<unknown>('POST', 'meta-collect', {
-    headers: { 'X-Admin-Password': adminPassword },
+    headers: { 'X-Admin-Password': encodeSecretHeader(adminPassword) },
     cache: 'no-store',
     authEvent: (detail) => !/administrat/i.test(detail ?? ''),
   }).then(normalizeCollectResult);

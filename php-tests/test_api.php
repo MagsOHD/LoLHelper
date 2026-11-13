@@ -165,6 +165,8 @@ expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), ''), 400, 'empty body -> 
 expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), "{\"a\":\"\xC3\x28\"}"), 400, 'invalid UTF-8 -> 400');
 $big = '{"x":"' . str_repeat('a', 262144) . '"}';
 expect(req('PUT', api($A, 'r=store/teams/x1'), auth(), $big), 413, 'oversized body -> 413');
+expect(req('GET', api($A, 'r=store/teams'), ['X-App-Password' => 'b64:' . base64_encode(PW)]), 200, 'app password sent as b64 accepted');
+expect(req('GET', api($A, 'r=store/teams'), ['X-App-Password' => 'b64:' . base64_encode(PW . 'x')]), 401, 'wrong b64 app password rejected');
 expect(req('POST', api($A, 'r=store/teams/x1'), auth(), '{}'), 405, 'POST doc -> 405');
 expect(req('PUT', api($A, 'r=store/drafts/team-abc'), auth(), '{"phase":"pick","ally":[]}'), 200, 'PUT draft');
 $r = req('GET', api($A, 'r=store/drafts/team-abc'), auth());
