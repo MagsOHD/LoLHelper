@@ -206,6 +206,8 @@ check($r['status'] === 204, 'preflight 204 (no password needed)', "got {$r['stat
 check(($r['headers']['access-control-allow-origin'] ?? '') === ORIGIN, 'preflight ACAO');
 check(str_contains($r['headers']['access-control-allow-methods'] ?? '', 'DELETE'), 'preflight methods');
 check(str_contains($r['headers']['access-control-allow-headers'] ?? '', 'X-App-Password'), 'preflight headers');
+check(str_contains($r['headers']['access-control-allow-methods'] ?? '', 'POST')
+    && str_contains($r['headers']['access-control-allow-headers'] ?? '', 'X-Admin-Password'), 'preflight allows POST + X-Admin-Password (meta-collect)');
 $r = req('OPTIONS', api($A, 'r=store/players'), ['Origin' => 'https://evil.example']);
 check($r['status'] === 204 && !isset($r['headers']['access-control-allow-origin']), 'preflight other origin: no CORS headers');
 $r = req('GET', api($A, 'r=meta'), ['Origin' => ORIGIN]);

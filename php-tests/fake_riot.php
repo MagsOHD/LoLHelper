@@ -100,7 +100,8 @@ if (preg_match('#^/lol/spectator/v5/active-games/by-summoner/([^/]+)$#', $rest, 
 }
 
 // ---- Collecteur méta : ligues apex + parties classées décrites dans fixtures/meta_matches.json.
-// FAKE_CTRL (fichier JSON écrit par les tests) : {"challenger":"b", "match_429":"<id>", "retry_after":"1"}.
+// FAKE_CTRL (fichier JSON écrit par les tests) :
+//   {"challenger":"b", "match_429":"<id>", "ids_429":"<puuid>", "retry_after":"1"}.
 $ctrlFile = getenv('FAKE_CTRL');
 $ctrl = (is_string($ctrlFile) && is_file($ctrlFile)) ? (json_decode((string) file_get_contents($ctrlFile), true) ?: []) : [];
 
@@ -119,6 +120,10 @@ if (preg_match('#^/lol/match/v5/matches/by-puuid/(meta-player-[^/]+)/ids$#', $re
         && ctype_digit($q['startTime'] ?? 'x') && abs((int) $q['startTime'] - $windowStart) < 120;
     if (!$okQuery) {
         out(400, '{"status":{"message":"bad ids query"}}');
+        return true;
+    }
+    if (($ctrl['ids_429'] ?? '') === $m[1]) {
+        out(429, '{}', ['Retry-After' => (string) ($ctrl['retry_after'] ?? '1')]);
         return true;
     }
     out(200, json_encode($meta['players'][$m[1]] ?? []));

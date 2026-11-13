@@ -74,6 +74,19 @@ function handle_request(string $apiDir): void
         return;
     }
 
+    if ($route === 'meta-status') {
+        require_method(['GET']);
+        handle_meta_status($config, $apiDir);
+        return;
+    }
+
+    if ($route === 'meta-collect') {
+        require_method(['POST']);
+        require_once $apiDir . '/lib/meta_collector.php';
+        handle_meta_collect($config, $apiDir);
+        return;
+    }
+
     if ($route === 'live-draft') {
         handle_live_draft($config, $apiDir);
         return;

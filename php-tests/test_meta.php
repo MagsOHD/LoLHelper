@@ -1,5 +1,6 @@
 <?php
-// Tests du collecteur méta (cron CLI) et de la route meta-stats (lancés par run.sh).
+// Tests du collecteur méta (cron CLI + collecte depuis le site) et des routes meta-stats / meta-status /
+// meta-collect (lancés par run.sh).
 declare(strict_types=1);
 
 $M = getenv('API_M');             // site dans www/lolhelper/ (comme sur OVH), mot de passe, data_dir par défaut
@@ -13,6 +14,7 @@ $FAKE_CTRL = getenv('FAKE_CTRL');
 $RIOT_BASE = getenv('META_RIOT_BASE');
 const PW = 's3cret';
 const KEY = 'RGAPI-test-key-123';
+const ADMIN = 'adm1n-Pa55-word';
 
 $DATA = "$T/m/lolhelper-data";
 $META = "$DATA/meta";
@@ -36,7 +38,7 @@ function check(bool $cond, string $label, string $extra = ''): void
     }
 }
 
-function req(string $url, array $headers = []): array
+function req(string $url, array $headers = [], string $method = 'GET'): array
 {
     $respHeaders = [];
     $h = [];
@@ -45,6 +47,7 @@ function req(string $url, array $headers = []): array
     }
     $ch = curl_init($url);
     curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => $h,
         CURLOPT_TIMEOUT => 30,
@@ -134,6 +137,35 @@ function state(): array
     return json_decode((string) @file_get_contents("$META/state.json"), true) ?: [];
 }
 
+function last_run(): ?array
+{
+    global $META;
+    return json_decode((string) @file_get_contents("$META/last_run.json"), true);
+}
+
+const SUMMARY_KEYS = ['status', 'stop', 'message', 'requests', 'new_matches', 'patch', 'games', 'patches', 'duration_s'];
+
+/** Résumé d'un passage : clés, types, liste des patchs. */
+function summary_shape_ok(mixed $s, bool $withRetry = false): bool
+{
+    if (!is_array($s)) {
+        return false;
+    }
+    $keys = array_values(array_diff(array_keys($s), ['at', 'source']));
+    $expected = $withRetry ? [...SUMMARY_KEYS, 'retry_after'] : SUMMARY_KEYS;
+    if ($keys !== $expected || !is_string($s['stop']) || !is_string($s['message']) || !is_int($s['requests'])
+        || !is_int($s['new_matches']) || !(is_string($s['patch']) || $s['patch'] === null) || !is_int($s['games'])
+        || !is_array($s['patches']) || !(is_int($s['duration_s']) || is_float($s['duration_s']))) {
+        return false;
+    }
+    foreach ($s['patches'] as $p) {
+        if (!is_array($p) || array_keys($p) !== ['patch', 'games', 'updated_at']) {
+            return false;
+        }
+    }
+    return !$withRetry || (is_int($s['retry_after']) && $s['retry_after'] >= 1);
+}
+
 $auth = ['X-App-Password' => PW];
 $riotMatch = static fn (int $n): string => '/europe/lol/match/v5/matches/' . sprintf('EUW1_80000000%02d', $n);
 $riotIds = static fn (string $puuid): string => "/europe/lol/match/v5/matches/by-puuid/$puuid/ids";
@@ -157,6 +189,16 @@ $r = req("$A/api/index.php?r=meta");
 check(array_key_exists('meta_stats', $r['json'] ?? []) && $r['json']['meta_stats'] === null, 'meta A meta_stats null');
 $r = req("$A/api/index.php?r=meta-stats", $auth);
 check($r['status'] === 200 && $r['json'] === ['available' => false, 'games' => 0], 'meta-stats A unavailable');
+$r = req("$M/lolhelper/api/index.php?r=meta-status");
+check($r['status'] === 401, 'meta-status requires the password', "got {$r['status']}");
+$r = req("$M/lolhelper/api/index.php?r=meta-status", $auth);
+check($r['status'] === 200 && $r['json'] === ['collecting' => false, 'last_run' => null, 'patches' => [], 'admin_enabled' => false, 'meta_enabled' => true],
+    'meta-status before any collection', $r['body']);
+check(!is_dir($META), 'meta-status creates no meta dir');
+$r = req("$A/api/index.php?r=meta-status", $auth);
+check($r['status'] === 200 && array_key_exists('last_run', $r['json'] ?? []) && $r['json']['last_run'] === null && ($r['json']['patches'] ?? null) === [] && ($r['json']['admin_enabled'] ?? null) === false,
+    'meta-status A (nothing collected, no admin)', $r['body']);
+check(req("$M/lolhelper/api/index.php?r=meta-status", $auth, 'POST')['status'] === 405, 'meta-status POST -> 405');
 
 // ---------------------------------------------------------------- run 1 : arrêt sur 429
 ctrl(['match_429' => $mid(5), 'retry_after' => '1']);
@@ -175,10 +217,17 @@ check(stats('16.19')['games'] === 1 && stats('16.18')['games'] === 1, 'run1 coun
 check(stats('16.17') === null && !is_file("$META/seen-16.17.bin"), 'only the 2 most recent patches kept on disk');
 check(glob("$META/*.tmp-*") === [], 'no temp files left');
 check(!str_contains((string) @file_get_contents("$META/state.json"), KEY), 'key never stored');
+$lr = last_run();
+check(summary_shape_ok($lr, true) && $lr['status'] === 'ok' && $lr['stop'] === 'riot_limit' && $lr['retry_after'] === 1
+    && $lr['requests'] === 9 && $lr['source'] === 'cron', 'run1 last_run.json written by the CLI (riot_limit, retry_after)', json_encode($lr));
+check(preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/D', (string) ($lr['at'] ?? '')) === 1 && abs(strtotime($lr['at']) - time()) < 30, 'last_run.at ISO 8601 UTC');
+check(!str_contains((string) @file_get_contents("$META/last_run.json"), KEY), 'key never in last_run.json');
 
 // ---------------------------------------------------------------- run 2 : pause Retry-After
 [$code, $out, , $paths] = collect($SITE);
 check($code === 0 && $paths === [] && str_contains($out, 'pause'), 'run2 honours Retry-After (no request)', $out . implode(',', $paths));
+$lr = last_run();
+check(summary_shape_ok($lr, true) && $lr['stop'] === 'riot_limit' && $lr['requests'] === 0, 'run2 last_run: riot_limit pause, 0 requests', json_encode($lr));
 
 // ---------------------------------------------------------------- run 3 : reprise
 ctrl([]);
@@ -197,6 +246,11 @@ check(str_contains($out, 'tour complet'), 'run3 stops after one full pass', $out
 check(stats('16.19')['games'] === 2 && stats('16.18')['games'] === 3, 'run3 counts (16.19: 2, 16.18: 3)', json_encode([stats('16.19')['games'], stats('16.18')['games']]));
 check((state()['cursor'] ?? null) === 1, 'run3 cursor back to start of pass');
 check(filesize("$META/seen-16.19.bin") === 16 && filesize("$META/seen-16.18.bin") === 24, 'seen sets: 8 bytes per counted match');
+$lr = last_run();
+check(summary_shape_ok($lr) && $lr['stop'] === 'tour complet' && $lr['requests'] === 11 && $lr['new_matches'] === 3
+    && $lr['patch'] === '16.19' && $lr['games'] === 2 && $lr['source'] === 'cron', 'run3 last_run summary (CLI)', json_encode($lr));
+check(array_map(static fn (array $p): array => [$p['patch'], $p['games']], $lr['patches'] ?? []) === [['16.19', 2], ['16.18', 3]], 'run3 last_run patches list', json_encode($lr['patches'] ?? null));
+check(preg_match('/ 11 requêtes, 3 nouvelles parties, patch 16\.19 \(2 parties\), [0-9.]+ s, arrêt : tour complet/', $out) === 1, 'CLI log line unchanged', $out);
 $before = [file_get_contents("$META/stats-16.19.json"), file_get_contents("$META/stats-16.18.json")];
 
 // ---------------------------------------------------------------- run 4 : rien de neuf
@@ -291,6 +345,155 @@ write_config($ALT, ['riot_api_key' => '']);
 [$code, $out, , $paths] = collect($ALT);
 check($code === 1 && $paths === [], 'no key -> exit 1, no request', $out);
 
+// ---------------------------------------------------------------- collecte depuis le site (meta-collect)
+$collectUrl = "$M/lolhelper/api/index.php?r=meta-collect";
+$statusUrl = "$M/lolhelper/api/index.php?r=meta-status";
+$admin = static fn (string $pw): array => $auth + ['X-Admin-Password' => $pw];
+$noSecret = static fn (array $r): bool => !str_contains($r['body'], ADMIN) && !str_contains($r['body'], KEY) && !str_contains($r['body'], PW);
+$MSG_ADMIN = 'Mot de passe administrateur incorrect.';
+$cronRun = last_run();
+
+// Config de run.sh : pas d'admin_password -> collecte manuelle désactivée.
+@unlink($FAKE_LOG);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+check($r['status'] === 403 && ($r['json']['detail'] ?? '') === 'Collecte manuelle désactivée : définissez admin_password dans config.php.',
+    'meta-collect disabled without admin_password -> 403', $r['body']);
+$r = req($collectUrl, ['X-Admin-Password' => ADMIN], 'POST');
+check($r['status'] === 401 && ($r['json']['detail'] ?? '') === 'Mot de passe requis ou incorrect.', 'meta-collect requires the app password first', $r['body']);
+$r = req($statusUrl, $auth);
+$j = $r['json'] ?? [];
+check($r['status'] === 200 && array_keys($j) === ['collecting', 'last_run', 'patches', 'admin_enabled', 'meta_enabled'], 'meta-status keys', $r['body']);
+check(($j['collecting'] ?? null) === false && ($j['admin_enabled'] ?? null) === false && ($j['last_run'] ?? null) === $cronRun,
+    'meta-status: idle, admin disabled, last_run from the cron', $r['body']);
+check(array_map(static fn (array $p): array => [$p['patch'], $p['games']], $j['patches'] ?? []) === [['16.19', 4], ['16.18', 3]], 'meta-status patches', $r['body']);
+check(fake_log() === [] && last_run() === $cronRun, 'disabled trigger makes no Riot call, last_run untouched');
+
+write_config($SITE, ['admin_password' => ADMIN]);
+$r = req($statusUrl, $auth);
+check(($r['json']['admin_enabled'] ?? null) === true && $noSecret($r), 'meta-status admin_enabled, no secret', $r['body']);
+$r = req($collectUrl, $admin(ADMIN));
+check($r['status'] === 405 && ($r['headers']['allow'] ?? '') === 'POST', 'meta-collect GET -> 405 Allow: POST', $r['body']);
+foreach (['missing' => null, 'wrong' => 'nope', 'longer' => ADMIN . 'x', 'prefix' => substr(ADMIN, 0, 5), 'app password' => PW] as $label => $pw) {
+    $r = req($collectUrl, $pw === null ? $auth : $admin($pw), 'POST');
+    check($r['status'] === 401 && ($r['json']['detail'] ?? '') === $MSG_ADMIN && $noSecret($r), "meta-collect admin password $label -> 401", $r['body']);
+}
+check(fake_log() === [] && last_run() === $cronRun, 'rejected triggers make no Riot call');
+
+// Bon mot de passe : un passage complet (tout est déjà vu -> 5 listes d'ids).
+$cursorBefore = state()['cursor'];
+@unlink($FAKE_LOG);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+$j = $r['json'] ?? [];
+check($r['status'] === 200 && summary_shape_ok($j), 'meta-collect summary shape', $r['body']);
+check(($j['status'] ?? '') === 'ok' && ($j['stop'] ?? '') === 'tour complet' && ($j['requests'] ?? -1) === 5 && ($j['new_matches'] ?? -1) === 0,
+    'meta-collect full round: 5 requests, 0 new matches', $r['body']);
+check(($j['patch'] ?? '') === '16.19' && ($j['games'] ?? 0) === 4 && count($j['patches'] ?? []) === 2 && ($j['duration_s'] ?? 99) < 10, 'meta-collect patch/games/duration', $r['body']);
+check(count(riot_paths()) === 5 && state()['cursor'] === $cursorBefore, 'meta-collect Riot calls + cursor back to start of round', implode(',', riot_paths()));
+check($noSecret($r), 'meta-collect response has no secret');
+$lr = last_run();
+check(is_array($lr) && ($lr['source'] ?? '') === 'web' && array_diff_key($lr, ['at' => 1, 'source' => 1]) === $j, 'last_run.json written by the web run (= response)', json_encode($lr));
+check(glob("$META/*.tmp-*") === [], 'no temp files after web run');
+$r = req($statusUrl, $auth);
+check(($r['json']['last_run'] ?? null) === $lr && ($r['json']['collecting'] ?? null) === false, 'meta-status shows the web run', $r['body']);
+
+// Verrou tenu (cron en cours) -> busy, rien d'autre.
+$lock = fopen("$META/collect.lock", 'c');
+flock($lock, LOCK_EX);
+@unlink($FAKE_LOG);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+check($r['status'] === 200 && $r['json'] === ['status' => 'busy'], 'meta-collect while locked -> 200 busy', $r['body']);
+check(fake_log() === [] && last_run() === $lr, 'busy: no Riot call, last_run untouched');
+$r = req($statusUrl, $auth);
+check(($r['json']['collecting'] ?? null) === true, 'meta-status collecting while locked', $r['body']);
+flock($lock, LOCK_UN);
+fclose($lock);
+$r = req($statusUrl, $auth);
+check(($r['json']['collecting'] ?? null) === false, 'meta-status idle once released', $r['body']);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+check(($r['json']['status'] ?? '') === 'ok', 'meta-collect runs again once released', $r['body']);
+
+// Budget web : meta_web_budget 1 -> borné à 5 s ; 0,5 req/s -> 3 requêtes (t = 0, 2, 4 s). Le budget cron (60 s) ne compte pas.
+write_config($SITE, ['admin_password' => ADMIN, 'meta_web_budget' => 1, 'meta_rate' => 0.5]);
+@unlink($FAKE_LOG);
+$t0 = microtime(true);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+$dur = microtime(true) - $t0;
+check(($r['json']['stop'] ?? '') === 'budget' && ($r['json']['requests'] ?? 0) === 3 && count(riot_paths()) === 3,
+    'web pass bounded by meta_web_budget (clamped to 5 s) at meta_rate', $r['body']);
+check($dur > 3.5 && $dur < 8.0, 'web pass duration within budget', sprintf('%.2f s', $dur));
+check(($r['json']['duration_s'] ?? 0) >= 3.5 && $r['json']['duration_s'] <= 6.0, 'duration_s reported', $r['body']);
+
+// 429 Riot pendant un passage web, puis pause respectée.
+write_config($SITE, ['admin_password' => ADMIN]);
+$st = state();
+ctrl(['ids_429' => $st['seeds'][$st['cursor']], 'retry_after' => '30']);
+@unlink($FAKE_LOG);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+$j = $r['json'] ?? [];
+check($r['status'] === 200 && summary_shape_ok($j, true) && $j['status'] === 'ok' && $j['stop'] === 'riot_limit' && $j['retry_after'] === 30 && $j['requests'] === 1,
+    'meta-collect Riot 429 -> stop riot_limit + retry_after', $r['body']);
+check((state()['blocked_until'] ?? 0) > time() + 20, '429 pause recorded for the cron too');
+@unlink($FAKE_LOG);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+$j = $r['json'] ?? [];
+check(($j['stop'] ?? '') === 'riot_limit' && ($j['requests'] ?? -1) === 0 && ($j['retry_after'] ?? 0) >= 25 && ($j['retry_after'] ?? 0) <= 30 && fake_log() === [],
+    'meta-collect during the pause: no request, remaining retry_after', $r['body']);
+ctrl([]);
+$st = state();
+$st['blocked_until'] = 0;
+file_put_contents("$META/state.json", json_encode($st));
+
+// Clé refusée / absente, collecte désactivée.
+write_config($SITE, ['admin_password' => ADMIN, 'riot_api_key' => 'RGAPI-wrong']);
+$cursorBefore = state()['cursor'];
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+check($r['status'] === 200 && ($r['json']['stop'] ?? '') === 'riot_key' && ($r['json']['requests'] ?? 0) === 1 && state()['cursor'] === $cursorBefore,
+    'meta-collect rejected Riot key -> stop riot_key, state untouched', $r['body']);
+check(!str_contains($r['body'], 'RGAPI-wrong'), 'key not echoed');
+write_config($SITE, ['admin_password' => ADMIN, 'riot_api_key' => '']);
+@unlink($FAKE_LOG);
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+check($r['status'] === 400 && ($r['json']['detail'] ?? '') === 'Clé API Riot non configurée.' && fake_log() === [], 'meta-collect without Riot key -> 400', $r['body']);
+write_config($SITE, ['admin_password' => ADMIN, 'meta_enabled' => false]);
+$before = last_run();
+$r = req($collectUrl, $admin(ADMIN), 'POST');
+check($r['status'] === 200 && summary_shape_ok($r['json']) && $r['json']['stop'] === 'disabled' && $r['json']['requests'] === 0
+    && $r['json']['patch'] === '16.19' && count($r['json']['patches']) === 2 && fake_log() === [] && last_run() === $before,
+    'meta-collect with meta_enabled=false -> stop disabled, nothing run', $r['body']);
+$r = req($statusUrl, $auth);
+check(($r['json']['meta_enabled'] ?? null) === false, 'meta-status meta_enabled false', $r['body']);
+write_config($SITE, ['admin_password' => ADMIN]);
+
+// Le cron réécrit last_run.json après des passages web.
+write_config($ALT, []);
+[$code, $out] = collect($ALT);
+$lr = last_run();
+check($code === 0 && ($lr['source'] ?? '') === 'cron' && ($lr['stop'] ?? '') === 'tour complet' && summary_shape_ok($lr), 'CLI run after web runs rewrites last_run (source cron)', json_encode($lr) . $out);
+
+// ---------------------------------------------------------------- meta-stats&patch=
+$ms = "$M/lolhelper/api/index.php?r=meta-stats";
+$r = req("$ms&patch=16.18", $auth);
+check($r['status'] === 200 && ($r['json']['patch'] ?? '') === '16.18' && ($r['json']['games'] ?? 0) === 3
+    && ($r['json']['champions']['103']['MID'] ?? null) === [3, 2], 'meta-stats patch=16.18 (older kept patch)', substr($r['body'], 0, 300));
+check(array_keys($r['json'] ?? []) === ['available', 'patch', 'platform', 'games', 'updated_at', 'champions', 'bans', 'matchups'], 'meta-stats patch= payload keys');
+check(($r['headers']['cache-control'] ?? '') === 'private, max-age=300', 'meta-stats patch= Cache-Control');
+$r = req("$ms&patch=16.19", $auth);
+check(($r['json']['patch'] ?? '') === '16.19' && ($r['json']['games'] ?? 0) === 4, 'meta-stats patch=16.19');
+$r = req($ms, $auth);
+check(($r['json']['patch'] ?? '') === '16.19', 'meta-stats default unchanged');
+$r = req("$ms&patch=16.17", $auth);
+check($r['status'] === 404 && str_starts_with($r['json']['detail'] ?? '', 'Patch non disponible'), 'meta-stats patch not kept -> 404', $r['body']);
+foreach (['abc', '16.18.1', '16', '', '16.18%0A', '..%2F16.18', '1234.1'] as $bad) {
+    $r = req("$ms&patch=$bad", $auth);
+    check($r['status'] === 400 && ($r['json']['detail'] ?? '') === 'Patch invalide (format attendu : 16.19).', "meta-stats patch=$bad -> 400", $r['body']);
+}
+$r = req("$M/lolhelper/api/index.php?r=meta-stats&patch[]=16.18", $auth);
+check($r['status'] === 400, 'meta-stats patch[] -> 400', $r['body']);
+$r = req("$ms&patch=16.18");
+check($r['status'] === 401, 'meta-stats patch= requires the password');
+$r = req("$A/api/index.php?r=meta-stats&patch=16.18", $auth);
+check($r['status'] === 404, 'meta-stats patch= on a site with nothing collected -> 404', $r['body']);
+
 // ---------------------------------------------------------------- fonctions pures
 define('LOLHELPER_API', true);
 $api = "$SITE/api";
@@ -300,6 +503,16 @@ require "$api/lib/storage.php";
 require "$api/lib/riot.php";
 require "$api/lib/meta.php";
 require "$api/lib/meta_collector.php";
+
+// Configuration : bornes de meta_web_budget, admin_password.
+foreach ([[1, 5], [500, 120], [60, 60], [30.7, 30], ['abc', 45], [null, 45]] as [$in, $want]) {
+    write_config($ALT, $in === null ? [] : ['meta_web_budget' => $in]);
+    check(load_config("$ALT/api")['meta_web_budget'] === $want, 'meta_web_budget ' . var_export($in, true) . " -> $want");
+}
+write_config($ALT, ['admin_password' => ['x']]);
+check(load_config("$ALT/api")['admin_password'] === '', 'admin_password non-string -> disabled');
+write_config($ALT, []);
+check(load_config("$ALT/api")['admin_password'] === '' && load_config("$SITE/api")['admin_password'] === ADMIN, 'admin_password default empty / read');
 
 $pk = static fn (array $g): array => array_map(static fn (int $n): array => ['games' => $n, 'updated_at' => 'x'], $g);
 check(meta_pick_patch([], 300) === null, 'pick: nothing');
