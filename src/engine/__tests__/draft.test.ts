@@ -92,7 +92,7 @@ const MID_POOL: [string, number][] = [
 describe('recommendDraft basics', () => {
   it('returns nothing useful for an empty draft and null enemy analysis without enemy pick', () => {
     const res = recommendDraft([], draft([]), catalog);
-    expect(res).toEqual({ players: [], bans: [], enemy: null });
+    expect(res).toEqual({ players: [], bans: [], enemy: null, predictions: [], pick_order: [], enemy_players: [] });
     const one = recommendDraft([friend('Theo', ['MID'], MID_POOL)], draft([ally('Theo')]), catalog);
     expect(one.enemy).toBeNull();
     expect(one.players).toHaveLength(1);

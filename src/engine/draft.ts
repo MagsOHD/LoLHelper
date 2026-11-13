@@ -1048,5 +1048,5 @@ export function recommendDraftRaw(
     meta: context.meta,
     players: players ?? [],
   });
-  return { players: advice, bans: bansOut, enemy: enemyOut };
+  return { players: advice, bans: bansOut, enemy: enemyOut, predictions: [], pick_order: [], enemy_players: [] };
 }

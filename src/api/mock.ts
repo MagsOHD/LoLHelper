@@ -506,7 +506,7 @@ export function mockDraftAdvice(players: PlayerInput[], input: DraftInput): Draf
         damage_profile: { AD: 0.75, AP: 0.25 },
       }
     : null;
-  return { players: advice, bans, enemy };
+  return { players: advice, bans, enemy, predictions: [], pick_order: [], enemy_players: [] };
 }
 
 function notFound(what: string): never {
