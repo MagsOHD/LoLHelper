@@ -5,8 +5,10 @@
  * À lancer UNIQUEMENT en ligne de commande, par une tâche planifiée OVH (toutes les heures) :
  *   Commande à exécuter : www/lolhelper/api/cron/collect-meta.php   (chemin depuis la racine FTP)
  *   Langage : PHP 8.1 ou plus récent.
- * Chaque passage travaille au plus meta_time_budget secondes à meta_rate requêtes/s puis s'arrête ;
- * le suivant reprend où il s'était arrêté. Réglages : config.php (voir config.example.php).
+ * Chaque passage travaille au plus meta_time_budget secondes puis s'arrête ; le suivant reprend où il
+ * s'était arrêté. Rythme : jusqu'à 60 % de chaque fenêtre de la limite de la clé Riot (lue dans les
+ * réponses, partagée avec le site), plafonné par meta_rate s'il est numérique. Réglages : config.php
+ * (voir config.example.php).
  * Données écrites dans <dossier de données>/meta/ (par défaut ~/lolhelper-data/meta, hors de www/).
  */
 declare(strict_types=1);

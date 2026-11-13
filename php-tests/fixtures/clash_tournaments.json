@@ -1,0 +1,20 @@
+[
+  {
+    "id": 2001,
+    "themeId": 7,
+    "nameKey": "bilgewater",
+    "nameKeySecondary": "day_2",
+    "schedule": [
+      {"id": 3001, "registrationTime": 1763139600000, "startTime": 1763146800000, "cancelled": false}
+    ]
+  },
+  {
+    "id": 2002,
+    "themeId": 7,
+    "nameKey": "bilgewater",
+    "nameKeySecondary": "day_3",
+    "schedule": [
+      {"id": 3002, "registrationTime": 1763226000000, "startTime": 1763233200000, "cancelled": false}
+    ]
+  }
+]

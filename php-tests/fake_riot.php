@@ -11,25 +11,59 @@ if (is_string($log) && $log !== '') {
     file_put_contents($log, $uri . "\n", FILE_APPEND | LOCK_EX);
 }
 
+// FAKE_CTRL (fichier JSON écrit par les tests), lu à chaque requête :
+//   {"challenger":"b", "match_429":"<id>", "ids_429":"<puuid>", "retry_after":"1",
+//    "app_limit":"20:1,100:120", "app_count":"3:1,41:120", "app_count_left":1, "app_count_host":"europe",
+//    "tournaments_status":503}
+$ctrlFile = getenv('FAKE_CTRL');
+$ctrl = (is_string($ctrlFile) && is_file($ctrlFile)) ? (json_decode((string) file_get_contents($ctrlFile), true) ?: []) : [];
+
+/**
+ * En-têtes de limites Riot émis sur toutes les réponses. Compte par défaut 1:1,1:120 ; « app_count »
+ * le remplace (pour l'hôte « app_count_host » s'il est donné), « app_count_left » réponses durant si présent.
+ */
+function rate_headers(string $host): array
+{
+    global $ctrl, $ctrlFile;
+    $count = '1:1,1:120';
+    $forHost = !isset($ctrl['app_count_host']) || $ctrl['app_count_host'] === $host;
+    if (isset($ctrl['app_count']) && $forHost) {
+        if (!isset($ctrl['app_count_left'])) {
+            $count = $ctrl['app_count'];
+        } elseif ($ctrl['app_count_left'] > 0) {
+            $count = $ctrl['app_count'];
+            $ctrl['app_count_left']--;
+            file_put_contents($ctrlFile, json_encode($ctrl), LOCK_EX);
+        }
+    }
+    return [
+        'X-App-Rate-Limit' => $ctrl['app_limit'] ?? '20:1,100:120',
+        'X-App-Rate-Limit-Count' => $count,
+        'X-Method-Rate-Limit' => '2000:10',
+        'X-Method-Rate-Limit-Count' => '1:10',
+    ];
+}
+
 function out(int $status, string $body, array $headers = []): void
 {
+    global $host;
     http_response_code($status);
     header('Content-Type: application/json;charset=utf-8');
-    foreach ($headers as $k => $v) {
+    foreach (rate_headers((string) $host) + $headers as $k => $v) {
         header("$k: $v");
     }
     echo $body;
-}
-
-if ($token !== $expectedKey) {
-    out(401, '{"status":{"message":"Unauthorized","status_code":401}}');
-    return true;
 }
 
 $path = parse_url($uri, PHP_URL_PATH);
 $segments = explode('/', ltrim($path, '/'));
 $host = array_shift($segments);
 $rest = '/' . implode('/', $segments);
+
+if ($token !== $expectedKey) {
+    out(401, '{"status":{"message":"Unauthorized","status_code":401}}');
+    return true;
+}
 
 // Erreurs à la demande, déclenchées par la valeur du dernier segment décodé.
 $last = rawurldecode((string) end($segments));
@@ -39,6 +73,7 @@ $special = [
     'Forbid' => [403, [], '{"status":{"status_code":403}}'],
     'Limited' => [429, ['Retry-After' => '7'], '{"status":{"status_code":429}}'],
     'LimitedNoRA' => [429, [], '{"status":{"status_code":429}}'],
+    'LimitedApp' => [429, ['Retry-After' => '5', 'X-Rate-Limit-Type' => 'application'], '{"status":{"status_code":429}}'],
     'Boom' => [503, [], 'oops'],
 ];
 
@@ -99,11 +134,81 @@ if (preg_match('#^/lol/spectator/v5/active-games/by-summoner/([^/]+)$#', $rest, 
     return true;
 }
 
+// ---- Clash-v1 (hôte de la plateforme).
+if (preg_match('#^/lol/clash/v1/players/by-puuid/([^/]+)$#', $rest, $m)) {
+    $puuid = rawurldecode($m[1]);
+    $errors = [
+        'missing' => [404, [], '{"status":{"status_code":404}}'],
+        'limited' => [429, ['Retry-After' => '5'], '{"status":{"status_code":429}}'],
+        'badkey' => [403, [], '{"status":{"status_code":403}}'],
+        'boom' => [500, [], 'err'],
+    ];
+    foreach ($errors as $prefix => [$s, $h, $b]) {
+        if (str_starts_with($puuid, $prefix)) {
+            out($s, $b, $h);
+            return true;
+        }
+    }
+    if (str_starts_with($puuid, 'nobody')) {
+        out(200, '[]');
+        return true;
+    }
+    $players = json_decode(file_get_contents("$fixtures/clash_player.json"), true);
+    $players[0]['puuid'] = $puuid;
+    $players[0]['_host'] = $host;
+    out(200, json_encode($players, JSON_UNESCAPED_UNICODE));
+    return true;
+}
+
+if (preg_match('#^/lol/clash/v1/(teams|tournaments/by-team)/([^/]+)$#', $rest, $m)) {
+    $teamId = rawurldecode($m[2]);
+    if (isset($special[$teamId])) {
+        [$s, $h, $b] = $special[$teamId];
+        out($s, $b, $h);
+        return true;
+    }
+    if ($m[1] === 'teams') {
+        $doc = json_decode(file_get_contents("$fixtures/clash_team.json"), true);
+        $doc['id'] = $teamId;
+    } else {
+        $doc = json_decode(file_get_contents("$fixtures/clash_tournaments.json"), true)[0];
+        $doc['_team'] = $teamId;
+    }
+    $doc['_host'] = $host;
+    out(200, json_encode($doc, JSON_UNESCAPED_UNICODE));
+    return true;
+}
+
+if ($rest === '/lol/clash/v1/tournaments') {
+    $st = $ctrl['tournaments_status'] ?? 200;
+    if ($st !== 200) {
+        out((int) $st, '{"status":{"status_code":' . (int) $st . '}}', $st === 429 ? ['Retry-After' => '4'] : []);
+        return true;
+    }
+    $list = json_decode(file_get_contents("$fixtures/clash_tournaments.json"), true);
+    $list[0]['_host'] = $host;
+    out(200, json_encode($list, JSON_UNESCAPED_UNICODE));
+    return true;
+}
+
+// ---- Match-v5 timeline (hôte de la région).
+if (preg_match('#^/lol/match/v5/matches/([A-Z0-9_]+)/timeline$#', $rest, $m)) {
+    $id = $m[1];
+    if ($id === 'EUW1_7000000001') {
+        out(200, file_get_contents("$fixtures/timeline_EUW1_7000000001.json"));
+    } elseif ($id === 'EUW1_429') {
+        out(429, '{}', ['Retry-After' => '3']);
+    } elseif ($id === 'EUW1_401') {
+        out(401, '{}');
+    } elseif ($id === 'EUW1_500') {
+        out(500, '{}');
+    } else {
+        out(404, '{"status":{"status_code":404}}');
+    }
+    return true;
+}
+
 // ---- Collecteur méta : ligues apex + parties classées décrites dans fixtures/meta_matches.json.
-// FAKE_CTRL (fichier JSON écrit par les tests) :
-//   {"challenger":"b", "match_429":"<id>", "ids_429":"<puuid>", "retry_after":"1"}.
-$ctrlFile = getenv('FAKE_CTRL');
-$ctrl = (is_string($ctrlFile) && is_file($ctrlFile)) ? (json_decode((string) file_get_contents($ctrlFile), true) ?: []) : [];
 
 if (preg_match('#^/lol/league/v4/(challenger|grandmaster|master)leagues/by-queue/RANKED_SOLO_5x5$#', $rest, $m)) {
     $file = "$fixtures/meta_league_{$m[1]}" . ($m[1] === 'challenger' && ($ctrl['challenger'] ?? '') === 'b' ? '_b' : '') . '.json';

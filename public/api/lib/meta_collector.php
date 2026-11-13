@@ -336,6 +336,8 @@ final class MetaCollector
     private int $networkErrors = 0;
     private string $platform;
     private string $region;
+    /** Dossier de données (riot_limits.json), parent du dossier méta. */
+    private string $limitsDir;
     /** @var array<string,mixed> */
     private array $state = [];
     /** @var array<string, array{stats:array, seen:MetaSeenSet, dirty:bool}> patch => seau chargé */
@@ -350,6 +352,7 @@ final class MetaCollector
         $this->start = $start ?? microtime(true);
         $this->platform = $config['riot_platform'];
         $this->region = PLATFORM_REGIONS[$this->platform];
+        $this->limitsDir = dirname($metaDir);
     }
 
     /** Lance une collecte (cron) ; renvoie le code de sortie du script. */
@@ -632,24 +635,24 @@ final class MetaCollector
     }
 
     /**
-     * Un appel Riot rythmé par meta_rate et borné par meta_time_budget.
+     * Un appel Riot borné par meta_time_budget. La garde partagée des limites (riot_limits.php) ne le laisse
+     * partir que sous 60 % de chaque fenêtre de la clé : sinon le collecteur dort jusqu'à ce que la fenêtre
+     * se libère (dans son budget de temps), pour laisser la place aux joueurs. meta_rate numérique > 0
+     * plafonne en plus le rythme (compatibilité des anciennes configs).
      * @return array{0:int, 1:mixed} statut + JSON décodé (null si invalide ou erreur)
      */
     private function get(string $url): array
     {
         $rate = $this->config['meta_rate'];
-        $budget = $this->config['meta_time_budget'];
-        $now = microtime(true);
-        $wait = $rate > 0 ? $this->lastRequest + 1.0 / $rate - $now : 0.0;
-        if ($now + max(0.0, $wait) - $this->start >= $budget) {
-            throw new MetaStop('budget de temps atteint', stop: 'budget');
+        $pacing = ($rate !== null && $rate > 0) ? $this->lastRequest + 1.0 / $rate - microtime(true) : 0.0;
+        $this->sleepWithinBudget($pacing, 'budget de temps atteint');
+        while (($wait = riot_gate_acquire($this->limitsDir, $url, RIOT_COLLECTOR_SHARE_PCT, $sentAt = microtime(true))) > 0) {
+            $this->sleepWithinBudget($wait + 0.02, 'budget de temps atteint (attente de la limite de la clé Riot)');
         }
-        if ($wait > 0) {
-            usleep((int) ($wait * 1e6));
-        }
-        $this->lastRequest = microtime(true);
+        $this->lastRequest = $sentAt;
         $this->requests++;
-        [$status, $body, $retryAfter] = riot_http_get($this->config['riot_api_key'], $url);
+        [$status, $body, $retryAfter, $rateHeaders] = riot_http_get($this->config['riot_api_key'], $url);
+        riot_limits_record($this->limitsDir, $url, $sentAt, $status, $rateHeaders, $retryAfter);
 
         if ($status === 401 || $status === 403) {
             throw new MetaStop("clé API Riot refusée (HTTP $status) : renouvelle-la dans config.php", 1, 'riot_key');
@@ -674,6 +677,17 @@ final class MetaCollector
             return [200, json_decode($body, true, 64, JSON_THROW_ON_ERROR)];
         } catch (JsonException $e) {
             return [200, null];
+        }
+    }
+
+    /** Dort $wait secondes, sauf si cela dépasse le budget de temps (arrêt propre « budget »). */
+    private function sleepWithinBudget(float $wait, string $reason): void
+    {
+        if (microtime(true) + max(0.0, $wait) - $this->start >= $this->config['meta_time_budget']) {
+            throw new MetaStop($reason, stop: 'budget');
+        }
+        if ($wait > 0) {
+            usleep((int) ($wait * 1e6));
         }
     }
 

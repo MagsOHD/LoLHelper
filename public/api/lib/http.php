@@ -116,7 +116,7 @@ function apply_cors(array $allowedOrigins): void
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, X-App-Password, X-Admin-Password');
-    header('Access-Control-Expose-Headers: Retry-After');
+    header('Access-Control-Expose-Headers: Retry-After, X-App-Rate-Limit, X-App-Rate-Limit-Count, X-Cache');
     header('Access-Control-Max-Age: 600');
 }
 
