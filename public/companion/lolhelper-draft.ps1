@@ -133,6 +133,18 @@ function Get-SafePuuid($Value) {
     return ''
 }
 
+<#
+  puuid d'un adversaire tel que le client League l'affiche (champ "puuid" de l'entrée theirTeam), ou "".
+  Le client ne le remplit que lorsque l'équipe adverse est visible (Clash, tournoi, partie personnalisée) ;
+  en classée/normale il est vide. Jamais déduit d'un autre champ ou d'un autre endpoint.
+#>
+function Get-RevealedEnemyPuuid($Entry) {
+    if ($null -eq $Entry) { return '' }
+    $v = $Entry.puuid
+    if (-not ($v -is [string]) -or $v -eq '') { return '' }
+    return (Get-SafePuuid $v)
+}
+
 function Get-UtcTimestamp {
     return (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
 }
@@ -217,7 +229,9 @@ function ConvertTo-DraftPhase([string]$TimerPhase) {
 
 <#
   Session de sélection des champions (LCU /lol-champ-select/v1/session) -> CompanionPayload.
-  Ne garde AUCUNE donnée d'identité des adversaires (seulement cellule + champion).
+  Adversaires : cellule + champion, et leur puuid UNIQUEMENT si le client League le fournit lui-même
+  (Clash, tournoi, partie personnalisée). En classée/normale le client le masque (puuid vide) : on
+  envoie alors "" ; aucune autre donnée (summonerId, pseudo, obfuscatedPuuid...) n'est jamais utilisée.
   Retourne $null si la session n'est pas exploitable (spectateur, phase inconnue).
 #>
 function ConvertTo-CompanionPayload {
@@ -254,9 +268,10 @@ function ConvertTo-CompanionPayload {
     foreach ($m in @($Session.theirTeam)) {
         if ($null -eq $m) { continue }
         if ($theirTeam.Count -ge 5) { break }
-        # Volontairement : ni puuid, ni summonerId, ni pseudo des adversaires.
+        # Volontairement : ni summonerId, ni pseudo, ni identifiant masqué des adversaires.
         $theirTeam.Add([ordered]@{
                 cell         = Get-IntOrDefault $m.cellId 0
+                puuid        = Get-RevealedEnemyPuuid $m
                 champion_key = Get-ChampionKey $m.championId
             })
     }

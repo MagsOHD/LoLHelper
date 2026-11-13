@@ -44,22 +44,27 @@
   "their_team": [
     {
       "cell": 5,
+      "puuid": "",
       "champion_key": 122
     },
     {
       "cell": 6,
+      "puuid": "",
       "champion_key": 0
     },
     {
       "cell": 7,
+      "puuid": "",
       "champion_key": 0
     },
     {
       "cell": 8,
+      "puuid": "",
       "champion_key": 0
     },
     {
       "cell": 9,
+      "puuid": "",
       "champion_key": 0
     }
   ],

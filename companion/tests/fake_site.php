@@ -82,7 +82,10 @@ if (!is_array($p) || array_is_list($p)) {
         $errors[] = 'their_team';
     } else {
         foreach ($p['their_team'] as $m) {
-            if (!is_array($m) || $keys($m) !== 'cell,champion_key' || !$isInt($m['cell'], 0, 20) || !$isInt($m['champion_key'], 0, 2000)) {
+            // puuid adverse : "" (classée/normale) ou puuid fourni par le client (Clash, personnalisée).
+            if (!is_array($m) || $keys($m) !== 'cell,puuid,champion_key' || !$isInt($m['cell'], 0, 20)
+                || !is_string($m['puuid']) || ($m['puuid'] !== '' && preg_match('/^[A-Za-z0-9_-]{40,100}$/D', $m['puuid']) !== 1)
+                || !$isInt($m['champion_key'], 0, 2000)) {
                 $errors[] = 'their_team entry ' . json_encode($m);
             }
         }

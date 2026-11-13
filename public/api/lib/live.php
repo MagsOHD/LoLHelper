@@ -100,6 +100,19 @@ function live_optional(stdClass $o, string $name, mixed $default): mixed
     return property_exists($o, $name) ? $o->$name : $default;
 }
 
+/** puuid facultatif d'une cellule (alliée ou adverse) : absent/null -> "", sinon "" ou un puuid Riot valide. */
+function live_slot_puuid(stdClass $slot, string $path): string
+{
+    $puuid = live_optional($slot, 'puuid', '');
+    if ($puuid === null) {
+        $puuid = '';
+    }
+    if (!is_string($puuid) || ($puuid !== '' && preg_match(RIOT_PUUID_PATTERN, $puuid) !== 1)) {
+        live_invalid($path . '.puuid');
+    }
+    return $puuid;
+}
+
 /** @return list<int> */
 function live_key_list(mixed $v, string $path, int $max): array
 {
@@ -112,7 +125,8 @@ function live_key_list(mixed $v, string $path, int $max): array
 
 /**
  * Valide le CompanionPayload et renvoie sa forme canonique (champs inconnus ignorés : en particulier, rien
- * d'autre que la cellule et le champion n'est conservé pour l'équipe adverse).
+ * d'autre que la cellule, le puuid et le champion n'est conservé pour l'équipe adverse ; ce puuid est ""
+ * sauf quand le client League affiche lui-même les adversaires — Clash, tournoi, partie personnalisée).
  */
 function live_validate_payload(stdClass $p): stdClass
 {
@@ -138,16 +152,9 @@ function live_validate_payload(stdClass $p): stdClass
     foreach (live_list(live_optional($p, 'my_team', []), 'my_team', LIVE_MAX_TEAM) as $i => $raw) {
         $path = 'my_team[' . $i . ']';
         $slot = live_object($raw, $path);
-        $slotPuuid = live_optional($slot, 'puuid', '');
-        if ($slotPuuid === null) {
-            $slotPuuid = '';
-        }
-        if (!is_string($slotPuuid) || ($slotPuuid !== '' && preg_match(RIOT_PUUID_PATTERN, $slotPuuid) !== 1)) {
-            live_invalid($path . '.puuid');
-        }
         $myTeam[] = [
             'cell' => live_int(live_required($slot, 'cell', $path . '.'), $path . '.cell', 0, LIVE_CELL_MAX),
-            'puuid' => $slotPuuid,
+            'puuid' => live_slot_puuid($slot, $path),
             'champion_key' => live_champion_key(live_optional($slot, 'champion_key', 0), $path . '.champion_key'),
             'intent_key' => live_champion_key(live_optional($slot, 'intent_key', 0), $path . '.intent_key'),
             'position' => live_enum(live_optional($slot, 'position', ''), $path . '.position', LIVE_POSITIONS),
@@ -160,6 +167,7 @@ function live_validate_payload(stdClass $p): stdClass
         $slot = live_object($raw, $path);
         $theirTeam[] = [
             'cell' => live_int(live_required($slot, 'cell', $path . '.'), $path . '.cell', 0, LIVE_CELL_MAX),
+            'puuid' => live_slot_puuid($slot, $path),
             'champion_key' => live_champion_key(live_optional($slot, 'champion_key', 0), $path . '.champion_key'),
         ];
     }

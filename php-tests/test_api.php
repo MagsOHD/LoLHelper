@@ -358,8 +358,8 @@ function companion(array $over = []): array
             ['cell' => 4, 'puuid' => '', 'champion_key' => 0, 'intent_key' => 0, 'position' => ''],
         ],
         'their_team' => [
-            ['cell' => 5, 'champion_key' => 238],
-            ['cell' => 6, 'champion_key' => 0],
+            ['cell' => 5, 'puuid' => '', 'champion_key' => 238],
+            ['cell' => 6, 'puuid' => '', 'champion_key' => 0],
         ],
         'bans' => ['mine' => [55, 0], 'theirs' => [238]],
         'actions' => [
@@ -425,8 +425,14 @@ expect(push($A, companion(['puuid' => strrev(PUUID)])), 404, 'live unknown puuid
 check(!is_file($liveFile) || !str_contains((string) file_get_contents($liveFile), strrev(PUUID)), 'unknown puuid not stored');
 
 @unlink($FAKE_LOG);
+// Clash / personnalisée : le client révèle le puuid adverse -> conservé ; pseudo et autres champs ignorés.
 $extra = companion([
-    'their_team' => [['cell' => 5, 'champion_key' => 238, 'puuid' => PUUID2, 'summonerName' => 'Ennemi', 'gameName' => 'Spy']],
+    'their_team' => [
+        ['cell' => 5, 'champion_key' => 238, 'puuid' => PUUID2, 'summonerName' => 'Ennemi', 'gameName' => 'Spy', 'summonerId' => 990005],
+        ['cell' => 6, 'champion_key' => 0, 'puuid' => '', 'obfuscatedPuuid' => strrev(PUUID2)],
+        ['cell' => 7, 'champion_key' => 64],
+        ['cell' => 8, 'champion_key' => 0, 'puuid' => null],
+    ],
     'evil' => str_repeat('x', 1000),
 ]);
 $r = push($A, $extra);
@@ -435,7 +441,8 @@ check($r['json'] === ['ok' => true, 'player_id' => 'p-1'], 'live PUT response', 
 check(fake_log() === [], 'live PUT makes no Riot call');
 check(is_file($liveFile) && glob("$T/a/data/*.tmp-*") === [], 'live stored in data_dir, no temp files');
 $stored = (string) @file_get_contents($liveFile);
-check(!str_contains($stored, 'Ennemi') && !str_contains($stored, 'Spy') && !str_contains($stored, 'evil'), 'unknown fields dropped (no enemy identity)', $stored);
+check(!str_contains($stored, 'Ennemi') && !str_contains($stored, 'Spy') && !str_contains($stored, 'evil')
+    && !str_contains($stored, '990005') && !str_contains($stored, strrev(PUUID2)), 'unknown fields dropped (only revealed enemy puuid kept)', $stored);
 
 $r = req('GET', api($A, 'r=live-draft&players=p-1'), auth());
 expect($r, 200, 'live GET');
@@ -444,7 +451,12 @@ check(is_array($live) && $live['player_id'] === 'p-1' && $live['phase'] === 'ban
 check(is_array($live) && !array_key_exists('id', $live), 'live GET hides internal id');
 check(preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/', $live['received_at'] ?? '') === 1
     && abs(strtotime($live['received_at']) - time()) < 30, 'received_at = server time ISO', $live['received_at'] ?? '');
-check(($live['their_team'] ?? null) === [['cell' => 5, 'champion_key' => 238]], 'their_team canonical', json_encode($live['their_team'] ?? null));
+check(($live['their_team'] ?? null) === [
+    ['cell' => 5, 'puuid' => PUUID2, 'champion_key' => 238],
+    ['cell' => 6, 'puuid' => '', 'champion_key' => 0],
+    ['cell' => 7, 'puuid' => '', 'champion_key' => 64],
+    ['cell' => 8, 'puuid' => '', 'champion_key' => 0],
+], 'their_team canonical (revealed puuid kept, absent/null -> "")', json_encode($live['their_team'] ?? null));
 check(($live['my_team'][3]['champion_key'] ?? null) === 2000 && ($live['my_team'][4]['position'] ?? null) === '', 'my_team kept');
 check(($live['bans'] ?? null) === ['mine' => [55, 0], 'theirs' => [238]] && count($live['actions'] ?? []) === 2, 'bans/actions kept');
 check(($live['timer_remaining_ms'] ?? null) === 21000 && ($live['sent_at'] ?? null) === '2026-11-10T20:00:00Z' && ($live['queue_id'] ?? null) === 420, 'scalars kept');
@@ -475,6 +487,10 @@ $bad = [
     'ally puuid bad' => companion(['my_team' => $slot(['puuid' => 'x/y'])]),
     'their_team 6' => companion(['their_team' => $team6]),
     'their_team key bool' => companion(['their_team' => [['cell' => 5, 'champion_key' => true]]]),
+    'enemy puuid short' => companion(['their_team' => [['cell' => 5, 'puuid' => 'SECRET-ENEMY-PUUID-5', 'champion_key' => 0]]]),
+    'enemy puuid traversal' => companion(['their_team' => [['cell' => 5, 'puuid' => '../' . substr(PUUID2, 3), 'champion_key' => 0]]]),
+    'enemy puuid int' => companion(['their_team' => [['cell' => 5, 'puuid' => 990005, 'champion_key' => 0]]]),
+    'enemy puuid object' => companion(['their_team' => [['cell' => 5, 'puuid' => ['x' => 1], 'champion_key' => 0]]]),
     'bans list' => companion(['bans' => [1, 2]]),
     'bans mine 6' => companion(['bans' => ['mine' => [1, 2, 3, 4, 5, 6], 'theirs' => []]]),
     'bans theirs bad key' => companion(['bans' => ['mine' => [], 'theirs' => [3000]]]),
@@ -525,7 +541,10 @@ check(($l2['phase'] ?? '') === 'none' && $l2['my_team'] === [] && $l2['bans'] ==
 check(str_contains($r['body'], '"bans":{"mine":[],"theirs":[]}') && str_contains($r['body'], '"my_team":[]'), 'empty lists/objects JSON shape', $r['body']);
 $r = push($A, companion(['puuid' => PUUID2, 'timer_remaining_ms' => -150.4, 'local_cell' => -1]));
 check($r['status'] === 200, 'negative timer / local_cell -1 accepted', $r['body']);
-check((req('GET', api($A, 'r=live-draft&players=p-2'), auth())['json']['live']['timer_remaining_ms'] ?? null) === 0, 'negative timer clamped to 0');
+$l2 = req('GET', api($A, 'r=live-draft&players=p-2'), auth())['json']['live'] ?? [];
+check(($l2['timer_remaining_ms'] ?? null) === 0, 'negative timer clamped to 0');
+check(($l2['their_team'] ?? null) === [['cell' => 5, 'puuid' => '', 'champion_key' => 238], ['cell' => 6, 'puuid' => '', 'champion_key' => 0]],
+    'ranked: enemy puuid "" stored as ""', json_encode($l2['their_team'] ?? null));
 
 set_received($liveFile, 'live-p-1', iso_ago(60));
 set_received($liveFile, 'live-p-2', iso_ago(120));

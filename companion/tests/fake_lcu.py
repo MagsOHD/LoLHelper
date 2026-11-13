@@ -2,8 +2,8 @@
 """Faux client League (LCU) pour les tests du compagnon.
 
 HTTPS auto-signé sur 127.0.0.1:<port libre>, authentification Basic riot:<token>,
-scénario chronométré (fichier JSON) qui fait évoluer gameflow-phase et la session de
-sélection des champions. Écrit le lockfile une fois prêt et journalise chaque requête
+scénario chronométré (fichier JSON) qui fait évoluer gameflow-phase, la session de
+sélection des champions et (facultatif, clé "gameflow_session") la session de jeu (file). Écrit le lockfile une fois prêt et journalise chaque requête
 (méthode, chemin, authentification correcte) en JSONL.
 
 Usage : fake_lcu.py --scenario s.json --fixtures dir --lockfile f --cert c --key k --log l --token t
@@ -27,7 +27,7 @@ with open(args.scenario, encoding="utf-8") as fh:
     STEPS = json.load(fh)
 FIXTURES = {}
 for step in STEPS:
-    for key in ("session", "summoner"):
+    for key in ("session", "summoner", "gameflow_session"):
         name = step.get(key)
         if isinstance(name, str) and name not in FIXTURES:
             with open(os.path.join(args.fixtures, name), encoding="utf-8") as fh:
@@ -86,7 +86,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/lol-gameflow/v1/gameflow-phase":
             return self._send(200, step.get("gameflow", "None"))
         if self.path == "/lol-gameflow/v1/session":
-            return self._send(200, GAMEFLOW_SESSION)
+            name = step.get("gameflow_session")
+            return self._send(200, FIXTURES[name] if name else GAMEFLOW_SESSION)
         if self.path == "/lol-champ-select/v1/session":
             name = step.get("session")
             if not name:

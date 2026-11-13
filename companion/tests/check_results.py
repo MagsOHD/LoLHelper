@@ -31,9 +31,25 @@ expected = ["planning", "ban_pick", "finalization", "game_starting", "none",
 check("séquence des envois", phases == expected, phases)
 check("payloads valides (contrat)", all(not p["errors"] for p in puts), [p["errors"] for p in puts if p["errors"]])
 check("puuid local", all(p["body"]["puuid"] == puuid for p in puts))
-check("queue_id 420 (gameflow session)", all(p["body"]["queue_id"] == 420 for p in puts))
+queues = [p["body"]["queue_id"] for p in puts]
+check("queue_id 420 puis 700 (gameflow session, Clash)", queues == [420] * 7 + [700] * 2, queues)
 raw = "".join(p["raw"] for p in puts)
-check("aucune identité adverse", "SECRET" not in raw and "obf-enemy" not in raw and "99000" not in raw)
+check("aucune identité adverse hors puuid révélé",
+      all(s not in raw for s in ("SECRET", "obf-enemy", "99000", "88000", "VisibleEnemy", "CLASH")))
+
+# Classée : le client masque les adversaires -> puuid "" partout.
+ranked = [p["body"] for p in puts[:7]]
+check("classée : their_team.puuid vide",
+      all(e.get("puuid") == "" for b in ranked for e in b["their_team"]),
+      [b["their_team"] for b in ranked])
+# Clash : le client affiche l'équipe adverse -> puuid du LCU, tel quel, rien d'autre.
+with open(fixtures + "/session-revealed-banpick.json", encoding="utf-8") as fh:
+    revealed = json.load(fh)
+want = [{"cell": m["cellId"], "puuid": m["puuid"], "champion_key": m["championId"]} for m in revealed["theirTeam"]]
+rv = puts[7]["body"] if len(puts) > 7 else {}
+check("Clash : their_team = cellule + puuid du client + champion", rv.get("their_team") == want, rv.get("their_team"))
+check("Clash : puuid adverses seulement dans l'envoi révélé",
+      all(m["puuid"] not in p["raw"] for m in revealed["theirTeam"] for i, p in enumerate(puts) if i != 7))
 
 with open(fixtures + "/expected-banpick.json", encoding="utf-8") as fh:
     exp = json.load(fh)

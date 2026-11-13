@@ -31,8 +31,37 @@ foreach ($f in @('session-planning.json', 'session-banpick.json', 'session-final
     $o = ConvertFrom-Json $json
     foreach ($e in @($o.their_team)) {
         $names = @($e.PSObject.Properties | ForEach-Object { $_.Name }) -join ','
-        Check "their_team = cell,champion_key ($f)" ($names -eq 'cell,champion_key') $names
+        Check "their_team = cell,puuid,champion_key ($f)" ($names -eq 'cell,puuid,champion_key') $names
+        Check "classée : puuid adverse vide ($f)" ($e.puuid -eq '') $e.puuid
     }
+}
+
+# --- Adversaires révélés par le client (Clash / tournoi / personnalisée) ---
+$rs = Load 'session-revealed-banpick.json'
+$rj = ConvertTo-PayloadJson (ConvertTo-CompanionPayload -Session $rs -Puuid $local -QueueId 700)
+$r = ConvertFrom-Json $rj
+Check 'révélés : 5 adversaires' (@($r.their_team).Count -eq 5)
+for ($i = 0; $i -lt 5; $i++) {
+    Check "révélés : puuid du client ($i)" ($r.their_team[$i].puuid -eq $rs.theirTeam[$i].puuid -and $r.their_team[$i].cell -eq $rs.theirTeam[$i].cellId) $rj
+}
+Check 'révélés : ni pseudo ni summonerId' ($rj -notmatch 'VisibleEnemy' -and $rj -notmatch 'CLASH' -and $rj -notmatch '88000' -and $rj -notmatch 'gameName') $rj
+Check 'révélés : le reste inchangé' ((ConvertTo-PayloadJson $r.my_team) -eq (ConvertTo-PayloadJson (ConvertFrom-Json (ConvertTo-PayloadJson $p)).my_team))
+
+# puuid adverse : uniquement le champ puuid du client, non vide et au format Riot ; jamais un autre champ.
+$okPuuid = 'revealedEnemyX-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+$enemyCases = @(
+    @{ Name = 'puuid valide'; Json = '{"cellId":5,"puuid":"' + $okPuuid + '"}'; Want = $okPuuid }
+    @{ Name = 'puuid vide (classée)'; Json = '{"cellId":5,"puuid":"","obfuscatedPuuid":"' + $okPuuid + '","summonerId":990005,"gameName":"' + $okPuuid + '"}'; Want = '' }
+    @{ Name = 'puuid absent'; Json = '{"cellId":5,"obfuscatedPuuid":"' + $okPuuid + '"}'; Want = '' }
+    @{ Name = 'puuid null'; Json = '{"cellId":5,"puuid":null}'; Want = '' }
+    @{ Name = 'puuid nombre'; Json = '{"cellId":5,"puuid":12345678901234567890123456789012345678901234567890}'; Want = '' }
+    @{ Name = 'puuid masqué non conforme'; Json = '{"cellId":5,"puuid":"SECRET-ENEMY-PUUID-5"}'; Want = '' }
+    @{ Name = 'puuid avec espaces'; Json = '{"cellId":5,"puuid":" ' + $okPuuid + ' "}'; Want = '' }
+)
+foreach ($c in $enemyCases) {
+    $sess = ConvertFrom-Json ('{"localPlayerCellId":0,"timer":{"phase":"BAN_PICK"},"myTeam":[],"theirTeam":[' + $c.Json + ']}')
+    $got = (ConvertTo-CompanionPayload -Session $sess -Puuid $local).their_team[0].puuid
+    Check "their_team : $($c.Name)" ($got -eq $c.Want) "-> '$got'"
 }
 
 # --- Phases ---
@@ -65,7 +94,7 @@ $mj = ConvertTo-PayloadJson $m
 Check 'tableau à 1 élément' ($mj -match '"my_team":\[\{' -and $mj -match '"their_team":\[\{' -and $mj -match '"actions":\[\{' -and $mj -match '"mine":\[1\]' -and $mj -match '"theirs":\[\]') $mj
 Check 'bornes champion' ($m.my_team[0].champion_key -eq 0 -and $m.my_team[0].intent_key -eq 0 -and $m.their_team[0].champion_key -eq 266)
 Check 'position minuscule' ($m.my_team[0].position -eq 'middle')
-Check 'puuid invalide vidé' ($m.my_team[0].puuid -eq '')
+Check 'puuid invalide vidé' ($m.my_team[0].puuid -eq '' -and $m.their_team[0].puuid -eq '')
 Check 'chrono >= 0' ($m.timer_remaining_ms -eq 0)
 $mini.myTeam[0].assignedPosition = 'fill'
 Check 'position inconnue vide' ((ConvertTo-CompanionPayload -Session $mini -Puuid $local).my_team[0].position -eq '')
