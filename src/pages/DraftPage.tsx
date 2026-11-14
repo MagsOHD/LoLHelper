@@ -52,7 +52,12 @@ function SaveState({ snap }: { snap: DraftSnapshot }) {
 
 function DraftView({ initial, title, subtitle, players }: { initial: DraftState; title: string; subtitle: string; players: Player[] }) {
   const meta = useMeta();
-  const engine = useDraftEngine();
+  // Meta tier of the advice: closest to the median solo rank of the draft's friends.
+  const friendRanks = useMemo(
+    () => initial.player_ids.map((pid) => players.find((p) => p.id === pid)?.rank ?? null),
+    [initial.player_ids, players],
+  );
+  const engine = useDraftEngine(friendRanks);
   const { session, snap } = useDraftSession(initial, players, engine.data);
   const draft = snap?.draft;
   const { advice, error: adviceError } = useDraftAdvice(draft, players, engine.data);

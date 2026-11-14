@@ -18,6 +18,8 @@ import type {
   GamePlan,
   GenerateBody,
   ManualPoolEntry,
+  MetaTier,
+  Rank,
   MatchupBody,
   MatchupPlan,
   Meta,
@@ -37,7 +39,7 @@ import { getCatalog } from './ddragon';
 import {
   collectMetaOnce,
   fetchMetaStatus,
-  getMetaStats,
+  getAdviceMeta,
   getMetaStatsForPatch,
   invalidateMetaStats,
   type CollectResult,
@@ -58,8 +60,9 @@ export interface DraftEngine {
   advise(players: PlayerInput[], draft: DraftInput): DraftAdvice;
 }
 
-async function realDraftEngine(): Promise<DraftEngine> {
-  const [{ catalog }, meta] = await Promise.all([getCatalog(), getMetaStats()]);
+/** `ranks`: the draft's friends, picking the meta tier (median solo rank, override, fallback). */
+async function realDraftEngine(ranks: readonly (Rank | null | undefined)[]): Promise<DraftEngine> {
+  const [{ catalog }, meta] = await Promise.all([getCatalog(), getAdviceMeta(ranks)]);
   return { catalog, advise: (players, draft) => recommendDraft(players, draft, catalog, { meta }) };
 }
 
@@ -92,9 +95,9 @@ export const api = {
   /** One bounded collection pass on the server (header X-Admin-Password). */
   collectMeta: (adminPassword: string): Promise<CollectResult> =>
     MOCK_MODE ? import('./mock').then((m) => m.mockCollectMeta(adminPassword)) : collectMetaOnce(adminPassword),
-  /** Stats of a kept patch, or of the served one when `patch` is empty; null when nothing collected. */
-  metaStats: (patch?: string | null): Promise<MetaStats | null> =>
-    MOCK_MODE ? import('./mock').then((m) => m.mockMetaStats(patch)) : getMetaStatsForPatch(patch),
+  /** Stats of a kept patch (or the served one when `patch` is empty) for `tier` (null = server default). */
+  metaStats: (patch?: string | null, tier: MetaTier | null = null): Promise<MetaStats | null> =>
+    MOCK_MODE ? import('./mock').then((m) => m.mockMetaStats(patch, tier)) : getMetaStatsForPatch(patch, tier),
   /** Drops cached meta (stats + r=meta summary) so generation, draft and pages use fresh data. */
   invalidateMeta: (): void => {
     invalidateMetaStats();
@@ -148,7 +151,9 @@ export const api = {
     MOCK_MODE
       ? mock('POST', '/draft/detect', { friends })
       : getCatalog().then(({ catalog }) => detectActiveGame(friends, catalog, options)).then((r) => r?.game ?? null),
-  draftEngine: (): Promise<DraftEngine> => (MOCK_MODE ? mockDraftEngine() : realDraftEngine()),
+  /** Catalog + advisor using the meta of the tier chosen for these friends' ranks. */
+  draftEngine: (ranks: readonly (Rank | null | undefined)[] = []): Promise<DraftEngine> =>
+    MOCK_MODE ? mockDraftEngine() : realDraftEngine(ranks),
   /** One enemy profile (Riot calls through the shared limiter); use EnemyProfileService for dedupe/cache. */
   enemyProfile: (req: ProfileRequest, onProgress?: (p: ProfileProgress) => void): Promise<EnemyPlayerProfile> =>
     MOCK_MODE

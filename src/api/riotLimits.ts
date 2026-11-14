@@ -70,6 +70,15 @@ export function formatKeyUsage(l: RiotKeyLimits, browserShare: number = BROWSER_
   return `${usage}Le site répond « limite atteinte » au-delà de ${pct(l.user_share)} ; chaque navigateur vise ${pct(browserShare)} au plus.`;
 }
 
+/** React Query key of r=riot-limits (refreshed after each collection pass). */
+export const RIOT_LIMITS_KEY = ['riot-limits'] as const;
+/** Poll of the key limits while a collection runs (this tab's loop or the server's cron). */
+export const LIMITS_POLL_MS = 15_000;
+
+export function limitsRefetchInterval(collecting: boolean): number | false {
+  return collecting ? LIMITS_POLL_MS : false;
+}
+
 /** Limits -> limiter format. */
 export const toLimits = (l: RiotKeyLimits): Limits => l.app.map((w) => [w.limit, w.window * 1000] as const);
 

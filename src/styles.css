@@ -881,6 +881,44 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .collect__stats { margin: 0; display: grid; gap: 6px 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); }
 .collect__stats dt { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .collect__stats dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.collect__countdown { font-variant-numeric: tabular-nums; }
+
+/* Rank levels of the meta: progress per tier (radio cards) + tier used by the advice. */
+.rtier { display: flex; flex-direction: column; gap: 14px; border-top: 3px solid var(--gold); }
+.rtier__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.rtier__title { font-size: 1rem; }
+.rtier__window { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0 6px; font-size: 0.84rem; color: var(--text-2); }
+.rtier__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.rtier__window.is-open .rtier__dot { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.rtier__window-state { color: var(--muted); }
+.rtier__legend-hint { font-weight: 400; color: var(--muted); }
+.rtier__grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 560px) { .rtier__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1040px) { .rtier__grid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.rtier__opt {
+  position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 10px; cursor: pointer;
+  border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2);
+}
+.rtier__opt:hover { border-color: var(--border-strong); }
+.rtier__opt.is-on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); box-shadow: inset 0 0 0 1px var(--gold); }
+.rtier__opt:has(.rtier__radio:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rtier__radio { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.rtier__top { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.rtier__name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rtier__opt.is-on .rtier__name { color: var(--gold); }
+.rtier__badge {
+  flex: none; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--teal); border: 1px solid color-mix(in srgb, var(--teal) 50%, transparent); border-radius: 999px; padding: 0 6px;
+}
+.rtier__bar { display: block; height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+.rtier__bar > span { display: block; height: 100%; border-radius: inherit; background: var(--teal); }
+.rtier__opt.is-few .rtier__bar > span { background: var(--amber); }
+.rtier__count { font-size: 0.85rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.rtier__date { font-size: 0.74rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rtier__advice { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: flex-start; border-top: 1px solid var(--border); padding-top: 12px; }
+.rtier__advice-field { flex: 0 1 260px; min-width: min(100%, 200px); }
+.rtier__advice-hint { flex: 1 1 320px; margin: 0; max-width: 80ch; }
+@media (min-width: 720px) { .rtier__advice-hint { padding-top: 22px; } }
 
 .tier__tabs { scrollbar-width: none; }
 .tier__tab { display: inline-flex; align-items: center; gap: 6px; flex: 1 0 auto; justify-content: center; }

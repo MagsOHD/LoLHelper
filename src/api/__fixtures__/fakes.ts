@@ -130,6 +130,8 @@ export interface FakeServerOptions {
   metaStats?: Record<string, unknown> | number;
   /** `meta_stats` summary returned by r=meta. */
   metaSummary?: Record<string, unknown> | null;
+  /** r=meta-status payload; absent = route unknown (404). */
+  metaStatus?: Record<string, unknown>;
 }
 
 /**
@@ -152,6 +154,9 @@ export function fakeServer(opts: FakeServerOptions = {}) {
   };
   const riotCalls: string[] = [];
   const metaStatsCalls: string[] = [];
+  /** Query string of each r=meta-stats call ("r=meta-stats&tier=GOLD"). */
+  const metaStatsQueries: string[] = [];
+  const metaStatusCalls: string[] = [];
   const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input), 'http://site.test');
     if (url.hostname === 'ddragon.leagueoflegends.com') return json({ detail: 'offline' }, 503);
@@ -172,8 +177,13 @@ export function fakeServer(opts: FakeServerOptions = {}) {
     if (opts.password && decodeSecret(headers['X-App-Password']) !== opts.password) {
       return json({ detail: 'Mot de passe requis ou incorrect.' }, 401);
     }
+    if (route === 'meta-status' && opts.metaStatus !== undefined) {
+      metaStatusCalls.push(route);
+      return json(opts.metaStatus);
+    }
     if (route === 'meta-stats' && opts.metaStats !== undefined) {
       metaStatsCalls.push(route);
+      metaStatsQueries.push(url.searchParams.toString());
       return typeof opts.metaStats === 'number'
         ? json({ detail: 'Erreur.' }, opts.metaStats)
         : json(opts.metaStats);
@@ -217,7 +227,7 @@ export function fakeServer(opts: FakeServerOptions = {}) {
     return json({ detail: 'Route inconnue.' }, 404);
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { fetchMock, db, riotCalls, metaStatsCalls };
+  return { fetchMock, db, riotCalls, metaStatsCalls, metaStatsQueries, metaStatusCalls };
 }
 
 /** Awaits a promise expected to reject with an ApiError and returns that error. */

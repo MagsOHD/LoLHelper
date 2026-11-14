@@ -137,9 +137,15 @@ export interface PlayerInput {
 export type GamesWins = [number, number];
 
 /** Aggregated high-elo stats for one patch, champion keys already mapped to Data Dragon ids. */
+/** Rank groups the meta is collected for ("MASTER_PLUS" = Master, Grandmaster, Challenger). */
+export type MetaTier = 'IRON' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'EMERALD' | 'DIAMOND' | 'MASTER_PLUS';
+export const META_TIERS: MetaTier[] = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER_PLUS'];
+
 export interface MetaStats {
   patch: string;
   platform: string;
+  /** Rank group of these stats; absent for data collected before per-tier collection. */
+  tier?: MetaTier | null;
   games: number; // matches aggregated
   updated_at: string;
   /** champion_id -> role -> [games, wins] */

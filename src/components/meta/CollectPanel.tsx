@@ -5,6 +5,7 @@ import { stopLabel, type CollectProgress } from '../../api/metaCollect';
 import { loadAdminPassword, metaCollector, saveAdminPassword } from '../../api/metaHooks';
 import { formatDate } from '../../lib/format';
 import { formatKeyLimits, formatKeyUsage, type RiotKeyLimits } from '../../api/riotLimits';
+import { tierLabel } from '../../api/metaRank';
 import { ErrorMessage, Skeleton, Spinner } from '../ui';
 import { fmtInt } from './format';
 
@@ -26,7 +27,7 @@ function LastRun({ run }: { run: NonNullable<MetaStatus['last_run']> }) {
   const who = run.source === 'web' ? 'manuelle' : run.source === 'cron' ? 'automatique' : '';
   return (
     <p className="hint">
-      Dernière passe{who ? ` ${who}` : ''} : {formatDate(run.at)} · {fmtInt(run.new_matches)} nouvelles parties ·{' '}
+      Dernière passe{who ? ` ${who}` : ''} : {formatDate(run.at)}{run.tier ? ` · ${tierLabel(run.tier)}` : ''} · {fmtInt(run.new_matches)} nouvelles parties ·{' '}
       {fmtInt(run.requests)} requêtes · arrêt : {stopLabel(run.stop, run.retry_after)}
     </p>
   );
@@ -42,11 +43,15 @@ function Progress({ p }: { p: CollectProgress }) {
       <p className="collect__line">
         {active && <Spinner label="Collecte en cours" />}
         {p.phase === 'done' && <span aria-hidden="true" className="ok">✓</span>}
-        <span>
-          {p.phase === 'waiting' && wait !== null
-            ? `Une collecte tourne déjà sur le serveur (cron horaire ou autre onglet). Nouvel essai dans ${wait} s…`
-            : p.message}
-        </span>
+        {p.phase === 'waiting' && wait !== null ? (
+          <span>
+            {p.wait_reason === 'riot_limit'
+              ? 'Limite de requêtes Riot atteinte : pause, la collecte reprend dans '
+              : 'Une collecte tourne déjà sur le serveur (cron ou autre onglet). Nouvel essai dans '}
+            {/* Ticking countdown kept out of the live region (announced once with the sentence). */}
+            <span role="timer" aria-live="off" className="collect__countdown">{wait} s</span>…
+          </span>
+        ) : <span>{p.message}</span>}
       </p>
       {(active || p.passes > 0) && <dl className="collect__stats">
         <div><dt>Passes</dt><dd>{fmtInt(p.passes)}</dd></div>
@@ -109,7 +114,9 @@ export function CollectPanel({ status, statusError, statusLoading, progress, def
   };
 
   const summary = active
-    ? progress.phase === 'waiting' ? 'en attente du serveur…' : progress.phase === 'stopping' ? 'arrêt en cours…' : `passe ${progress.passes + 1} en cours…`
+    ? progress.phase === 'waiting'
+      ? progress.wait_reason === 'riot_limit' ? 'pause demandée par Riot…' : 'en attente du serveur…'
+      : progress.phase === 'stopping' ? 'arrêt en cours…' : `passe ${progress.passes + 1} en cours…`
     : status?.collecting ? 'collecte automatique en cours sur le serveur'
       : status?.last_run ? `dernière passe : ${formatDate(status.last_run.at)}` : '';
 
@@ -138,7 +145,7 @@ export function CollectPanel({ status, statusError, statusLoading, progress, def
       <>
         <p className="notice">
           Collecte manuelle désactivée : définissez <code>admin_password</code> dans <code>config.php</code> sur l’hébergement
-          (différent du mot de passe partagé du site). La collecte automatique toutes les heures n’est pas concernée.
+          (différent du mot de passe partagé du site). La collecte automatique{status.window ? ` (entre ${status.window.start} h et ${status.window.end} h)` : ''} n’est pas concernée.
         </p>
         {status.last_run && <LastRun run={status.last_run} />}
       </>
@@ -147,9 +154,10 @@ export function CollectPanel({ status, statusError, statusLoading, progress, def
     body = (
       <>
         <p className="hint">
-          Chaque passe dure au plus ~45 s sur le serveur. Les passes s’enchaînent jusqu’à « Arrêter », deux tours complets
-          de suite ou une erreur. Tu peux changer de page : la collecte continue dans cet onglet. La collecte cède la place
-          aux joueurs : elle ralentit d’elle-même quand la clé est très sollicitée.
+          Chaque passe dure au plus ~45 s sur le serveur et fait avancer les niveaux à tour de rôle. Les passes s’enchaînent
+          jusqu’à « Arrêter », deux tours complets de suite ou une erreur ; quand Riot demande une pause, la collecte attend
+          puis reprend. Tu peux changer de page : la collecte continue dans cet onglet. Elle cède la place aux joueurs et
+          ralentit d’elle-même quand la clé est très sollicitée. Le bouton marche aussi hors de la plage automatique.
         </p>
         {status.collecting && !active && (
           <p className="notice" role="status">Une collecte automatique tourne en ce moment sur le serveur : « Lancer » attendra qu’elle se termine.</p>

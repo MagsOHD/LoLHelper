@@ -666,7 +666,7 @@ expect($r, 200, 'riot-limits');
 $j = $r['json'] ?? [];
 check(array_keys($j) === ['app', 'collector_share', 'user_share', 'host', 'detected', 'meta_rate'], 'riot-limits keys', $r['body']);
 check(($j['collector_share'] ?? null) === 0.6 && ($j['user_share'] ?? null) === 0.95, 'riot-limits shares 0.6 / 0.95', $r['body']);
-check(($j['host'] ?? null) === 'europe' && ($j['detected'] ?? null) === true && array_key_exists('meta_rate', $j) && $j['meta_rate'] === null, 'riot-limits: busiest host, detected, meta_rate auto', $r['body']);
+check(($j['host'] ?? null) === 'europe' && ($j['detected'] ?? null) === true && array_key_exists('meta_rate', $j) && $j['meta_rate'] === 0.25, 'riot-limits: busiest host, detected, meta_rate default 0.25', $r['body']);
 $app = $j['app'] ?? [];
 check(count($app) === 2 && array_keys($app[0]) === ['limit', 'window', 'count', 'at']
     && $app[0]['limit'] === 20 && $app[0]['window'] === 1 && $app[0]['count'] >= 0 && $app[0]['count'] <= 3

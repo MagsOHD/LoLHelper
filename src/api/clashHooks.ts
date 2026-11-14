@@ -12,6 +12,7 @@ import {
   upcomingTournaments,
 } from './clash';
 import type { DraftSession } from './draftSession';
+import { limitsRefetchInterval, RIOT_LIMITS_KEY } from './riotLimits';
 import type { ClashPosition, ClashTeam, ClashTournament, DraftState, Player, Role } from './types';
 
 /** Shared by the draft (enemy rosters, our team) and the tournaments card. */
@@ -34,8 +35,21 @@ export function useUpcomingClash(platform: string, enabled: boolean): { list: Cl
   return { list, isPending: enabled && q.isPending, error: q.error };
 }
 
-export function useRiotLimits(enabled = true) {
-  return useQuery({ queryKey: ['riot-limits'], queryFn: api.riotLimits, enabled, staleTime: 60_000, retry: false });
+/**
+ * Key limits line of the Méta page: re-read every 15 s while `collecting` (this tab's loop or the
+ * server's cron), after each pass (useMetaCollectorBridge) and whenever the page gets focus.
+ */
+export function useRiotLimits(enabled = true, collecting = false) {
+  return useQuery({
+    queryKey: RIOT_LIMITS_KEY,
+    queryFn: api.riotLimits,
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+    refetchInterval: limitsRefetchInterval(collecting),
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
+  });
 }
 
 // ---- our Clash team -----------------------------------------------------------------------------

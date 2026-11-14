@@ -96,11 +96,14 @@ c'est ce qui permet à l'appli de marcher dans un sous-dossier sans configuratio
 
 ## 7. Collecte de la méta (bouton et/ou tâche planifiée)
 
-La méta (taux de victoire par champion et par rôle, bans, duels de lane) est calculée à partir
-de parties classées Challenger, Grandmaster et Master de votre serveur, récupérées avec votre clé Riot.
+La méta (taux de victoire par champion et par rôle, bans, duels de lane) est calculée **par niveau**
+(Fer, Bronze, Argent, Or, Platine, Émeraude, Diamant, Master+) à partir de parties classées solo de
+votre serveur, récupérées avec votre clé Riot. Pour chaque niveau, le site garde les 500 dernières
+parties du patch (`meta_games_per_tier`) : les plus récentes remplacent les plus anciennes.
 Il faut une clé Riot configurée (étape 1). Les données sont communes à tous les joueurs du site :
 une seule collecte sert tout le monde, et elles restent sur le serveur (les deux derniers patchs).
-L'onglet **Méta** du site les affiche : tier list par rôle, taux de victoire/pick/ban, duels de lane.
+L'onglet **Méta** du site les affiche par niveau ; les compositions et la draft utilisent le niveau
+le plus proche du rang de vos joueurs (modifiable sur la page Méta).
 
 ### Lancer la collecte depuis le site (bouton)
 
@@ -127,21 +130,22 @@ Espace client OVH → *Web Cloud* → *Hébergements* → votre hébergement →
 | Commande à exécuter | `www/lolhelper/api/cron/collect-meta.php` |
 | Langage | PHP 8.1 ou plus récent (le même qu'à l'étape 3) |
 | Activation | Activée |
-| Fréquence | Toutes les heures |
+| Fréquence | Toutes les heures (le script ne travaille qu'entre 4 h et 15 h et s'arrête aussitôt en dehors) |
 | Alerte e-mail | au choix (utile les premiers jours) |
 
-Chaque passage dure au plus 25 minutes et n'utilise qu'une partie du quota de la clé (0,6 requête
-par seconde, soit environ 900 requêtes par passage, pour une limite de la clé à 100 requêtes par
-2 minutes), afin de laisser de la place aux synchronisations de vos amis. Comptez quelques heures
-pour atteindre quelques centaines de parties sur le patch en cours ; avant cela, l'appli
-fonctionne normalement sans méta. Le bas de page affiche ensuite
-« Méta : patch … · N parties haut elo ».
+La collecte automatique ne tourne qu'entre **4 h et 15 h** (heure de Paris, `meta_hours`), à
+**une requête toutes les 4 secondes** (`meta_rate` = 0,25), et ne dépasse jamais 60 % de la limite
+de la clé : elle cède la place aux synchronisations de vos amis et attend quand Riot demande de
+patienter. Sur une journée, cela fait environ 9 900 requêtes, de quoi remplir les 8 niveaux en un
+à deux jours. Avant cela, l'appli fonctionne normalement avec les niveaux déjà remplis. Le bas de
+page affiche ensuite « Méta : patch … · Or · N parties ».
 
 Réglages optionnels dans `api/config.php` (voir `config.example.php`) : `meta_tiers`,
-`meta_time_budget`, `meta_rate`, `meta_min_games`, `meta_enabled`. Sans ces lignes, les valeurs
-par défaut s'appliquent (Challenger + Grandmaster + Master, 25 min, 0,6 requête/s). Si votre
-`config.php` a été copié d'une ancienne version de `config.example.php`, il contient encore
-`0.5`, `600` et deux paliers : supprimez ces lignes ou mettez-les à jour.
+`meta_games_per_tier`, `meta_hours`, `timezone`, `meta_rate`, `meta_time_budget`, `meta_enabled`.
+**Si votre `config.php` vient d'une ancienne version**, supprimez les lignes `meta_rate`,
+`meta_time_budget` et `meta_tiers` pour profiter des nouvelles valeurs par défaut (`'meta_rate' =>
+'auto'` en particulier garde l'ancien rythme rapide). Les parties déjà collectées sont conservées
+et rangées dans le niveau Master+.
 
 Si votre nom de domaine pointe directement sur `www/lolhelper/` (et non sur `www/`), renseignez
 `'data_dir'` avec un chemin absolu dans `config.php`, pour que le site et la tâche planifiée
