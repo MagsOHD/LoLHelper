@@ -12,9 +12,12 @@ if (is_string($log) && $log !== '') {
 }
 
 // FAKE_CTRL (fichier JSON écrit par les tests), lu à chaque requête :
-//   {"challenger":"b", "match_429":"<id>", "ids_429":"<puuid>", "retry_after":"1",
+//   {"challenger":"b", "match_429":"<id>", "ids_429":"<puuid>", "retry_after":"1", "limited_left":1,
 //    "app_limit":"20:1,100:120", "app_count":"3:1,41:120", "app_count_left":1, "app_count_host":"europe",
-//    "tournaments_status":503}
+//    "tournaments_status":503,
+//    "entries_per_page":2, "entries_empty_from_page":2, "gen_ids":4, "gen_patch":"16.19.1.1",
+//    "gen_base":{"IRON":1763000000}}
+// limited_left : nombre de 429 match_429/ids_429 encore à renvoyer (absent = toujours), puis réponses normales.
 $ctrlFile = getenv('FAKE_CTRL');
 $ctrl = (is_string($ctrlFile) && is_file($ctrlFile)) ? (json_decode((string) file_get_contents($ctrlFile), true) ?: []) : [];
 
@@ -42,6 +45,44 @@ function rate_headers(string $host): array
         'X-Method-Rate-Limit' => '2000:10',
         'X-Method-Rate-Limit-Count' => '1:10',
     ];
+}
+
+/** match_429 / ids_429 : encore un 429 à renvoyer ? (décompte limited_left s'il est présent) */
+function limited_now(): bool
+{
+    global $ctrl, $ctrlFile;
+    if (!isset($ctrl['limited_left'])) {
+        return true;
+    }
+    if ($ctrl['limited_left'] <= 0) {
+        return false;
+    }
+    $ctrl['limited_left']--;
+    file_put_contents($ctrlFile, json_encode($ctrl), LOCK_EX);
+    return true;
+}
+
+// ---- Joueurs et parties générés pour les niveaux Fer à Diamant (collecteur méta par niveau).
+const GEN_TIERS = ['IRON' => 1, 'BRONZE' => 2, 'SILVER' => 3, 'GOLD' => 4, 'PLATINUM' => 5, 'EMERALD' => 6, 'DIAMOND' => 7];
+const GEN_DIVS = ['I' => 1, 'II' => 2, 'III' => 3, 'IV' => 4];
+
+function gen_puuid(string $tier, string $div, int $page, int $k): string
+{
+    return sprintf('meta-gen-%s-%s-p%d-%02d-abcdefghijklmnopqrstuvwxyz0123', $tier, $div, $page, $k);
+}
+
+/** Instant de création (s) d'une partie générée : gen_base[niveau] + m × 600 + (division × 10 + joueur) × 7. */
+function gen_created(string $tier, int $div, int $k, int $m): int
+{
+    global $ctrl;
+    $base = $ctrl['gen_base'][$tier] ?? (time() - 3600);
+    return (int) $base + $m * 600 + ($div * 10 + $k) * 7;
+}
+
+/** Numéro 9 T D P KK MM d'une partie générée. */
+function gen_number(int $tierIdx, int $div, int $page, int $k, int $m): int
+{
+    return (int) sprintf('9%d%d%d%02d%02d', $tierIdx, $div, $page, $k, $m);
 }
 
 function out(int $status, string $body, array $headers = []): void
@@ -210,6 +251,59 @@ if (preg_match('#^/lol/match/v5/matches/([A-Z0-9_]+)/timeline$#', $rest, $m)) {
 
 // ---- Collecteur méta : ligues apex + parties classées décrites dans fixtures/meta_matches.json.
 
+if (preg_match('#^/lol/league/v4/entries/RANKED_SOLO_5x5/([A-Z]+)/(I|II|III|IV)$#', $rest, $m) && isset(GEN_TIERS[$m[1]])) {
+    parse_str((string) parse_url($uri, PHP_URL_QUERY), $q);
+    $page = (int) ($q['page'] ?? '1');
+    $list = [];
+    if ($page >= 1 && $page < ($ctrl['entries_empty_from_page'] ?? 99)) {
+        $list[] = ['leagueId' => 'x', 'queueType' => 'RANKED_SOLO_5x5', 'tier' => $m[1], 'rank' => $m[2], 'leaguePoints' => 1];
+        for ($k = 0; $k < ($ctrl['entries_per_page'] ?? 2); $k++) {
+            $list[] = ['leagueId' => 'x', 'puuid' => gen_puuid($m[1], $m[2], $page, $k), 'queueType' => 'RANKED_SOLO_5x5',
+                'tier' => $m[1], 'rank' => $m[2], 'leaguePoints' => 50 + $k, 'wins' => 10, 'losses' => 10];
+        }
+    }
+    out(200, json_encode($list));
+    return true;
+}
+
+if (preg_match('#^/lol/match/v5/matches/by-puuid/meta-gen-([A-Z]+)-(I|II|III|IV)-p([0-9])-([0-9]{2})-[a-z0-9]+/ids$#', $rest, $m)) {
+    parse_str((string) parse_url($uri, PHP_URL_QUERY), $q);
+    $start = (int) ($q['startTime'] ?? 0);
+    $ids = [];
+    for ($i = ($ctrl['gen_ids'] ?? 4) - 1; $i >= 0; $i--) { // les plus récentes d'abord, comme Riot
+        if (gen_created($m[1], GEN_DIVS[$m[2]], (int) $m[4], $i) >= $start) {
+            $ids[] = 'EUW1_' . gen_number(GEN_TIERS[$m[1]], GEN_DIVS[$m[2]], (int) $m[3], (int) $m[4], $i);
+        }
+    }
+    out(200, json_encode(array_slice($ids, 0, (int) ($q['count'] ?? 20))));
+    return true;
+}
+
+if (preg_match('#^/lol/match/v5/matches/EUW1_(9([1-7])([1-4])([0-9])([0-9]{2})([0-9]{2}))$#', $rest, $m)) {
+    $n = (int) $m[1];
+    $tier = array_search((int) $m[2], GEN_TIERS, true);
+    $participants = [];
+    $positions = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
+    $win = $n % 2 === 1 ? 100 : 200;
+    foreach ([100, 200] as $team) {
+        for ($i = 0; $i < 5; $i++) {
+            $champ = $team === 100 ? 1 + ($n * 7 + $i * 31) % 160 : 200 + ($n * 11 + $i * 17) % 160;
+            $participants[] = ['puuid' => "gen-$n-$team-$i", 'championId' => $champ, 'teamPosition' => $positions[$i],
+                'teamId' => $team, 'win' => $team === $win];
+        }
+    }
+    $created = gen_created($tier, (int) $m[3], (int) $m[5], (int) $m[6]);
+    out(200, json_encode([
+        'metadata' => ['matchId' => "EUW1_$n"],
+        'info' => [
+            'gameCreation' => $created * 1000, 'gameDuration' => 1800, 'gameEndTimestamp' => ($created + 1800) * 1000,
+            'gameVersion' => $ctrl['gen_patch'] ?? '16.19.1.1', 'queueId' => 420, 'participants' => $participants,
+            'teams' => [['teamId' => 100, 'bans' => [['championId' => 1 + $n % 50]]], ['teamId' => 200, 'bans' => []]],
+        ],
+    ]));
+    return true;
+}
+
 if (preg_match('#^/lol/league/v4/(challenger|grandmaster|master)leagues/by-queue/RANKED_SOLO_5x5$#', $rest, $m)) {
     $file = "$fixtures/meta_league_{$m[1]}" . ($m[1] === 'challenger' && ($ctrl['challenger'] ?? '') === 'b' ? '_b' : '') . '.json';
     is_file($file) ? out(200, file_get_contents($file)) : out(404, '{}');
@@ -220,14 +314,15 @@ $meta = json_decode(file_get_contents("$fixtures/meta_matches.json"), true);
 
 if (preg_match('#^/lol/match/v5/matches/by-puuid/(meta-player-[^/]+)/ids$#', $rest, $m)) {
     parse_str((string) parse_url($uri, PHP_URL_QUERY), $q);
+    // startTime : au plus 3 jours en arrière (plus tard si le tampon du niveau est plein).
     $windowStart = time() - 3 * 86400;
     $okQuery = ($q['queue'] ?? '') === '420' && ($q['type'] ?? '') === 'ranked' && ($q['count'] ?? '') === '20'
-        && ctype_digit($q['startTime'] ?? 'x') && abs((int) $q['startTime'] - $windowStart) < 120;
+        && ctype_digit($q['startTime'] ?? 'x') && (int) $q['startTime'] > $windowStart - 120 && (int) $q['startTime'] <= time();
     if (!$okQuery) {
         out(400, '{"status":{"message":"bad ids query"}}');
         return true;
     }
-    if (($ctrl['ids_429'] ?? '') === $m[1]) {
+    if (($ctrl['ids_429'] ?? '') === $m[1] && limited_now()) {
         out(429, '{}', ['Retry-After' => (string) ($ctrl['retry_after'] ?? '1')]);
         return true;
     }
@@ -237,7 +332,7 @@ if (preg_match('#^/lol/match/v5/matches/by-puuid/(meta-player-[^/]+)/ids$#', $re
 
 if (preg_match('#^/lol/match/v5/matches/(EUW1_80[0-9]+)$#', $rest, $m)) {
     $id = $m[1];
-    if (($ctrl['match_429'] ?? '') === $id) {
+    if (($ctrl['match_429'] ?? '') === $id && limited_now()) {
         out(429, '{}', ['Retry-After' => (string) ($ctrl['retry_after'] ?? '1')]);
         return true;
     }
@@ -275,7 +370,7 @@ if (preg_match('#^/lol/match/v5/matches/(EUW1_80[0-9]+)$#', $rest, $m)) {
     out(200, json_encode([
         'metadata' => ['dataVersion' => '2', 'matchId' => $id, 'participants' => $puuids],
         'info' => [
-            'gameCreation' => 1760000000000, 'gameDuration' => $spec['dur'], 'gameEndTimestamp' => 1760000000000 + $spec['dur'] * 1000,
+            'gameCreation' => (1760000000 + (int) substr($id, -2)) * 1000, 'gameDuration' => $spec['dur'], 'gameEndTimestamp' => 1760000000000 + $spec['dur'] * 1000,
             'gameVersion' => $spec['v'], 'queueId' => $spec['q'], 'mapId' => 11, 'platformId' => 'EUW1',
             'participants' => $participants, 'teams' => $teams,
         ],

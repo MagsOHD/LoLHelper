@@ -98,6 +98,7 @@ function riot_method_family(string $path): string
         '#^/riot/account/v1/accounts/by-riot-id/#' => 'account-v1.by-riot-id',
         '#^/lol/summoner/v4/summoners/by-puuid/#' => 'summoner-v4.by-puuid',
         '#^/lol/league/v4/entries/by-puuid/#' => 'league-v4.entries-by-puuid',
+        '#^/lol/league/v4/entries/[A-Z0-9_]+/[A-Z]+/[IV]+$#D' => 'league-v4.entries',
         '#^/lol/league/v4/challengerleagues/#' => 'league-v4.challenger',
         '#^/lol/league/v4/grandmasterleagues/#' => 'league-v4.grandmaster',
         '#^/lol/league/v4/masterleagues/#' => 'league-v4.master',

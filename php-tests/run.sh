@@ -43,7 +43,7 @@ return [
     'riot_api_key' => '$KEY',
     'riot_platform' => 'euw1',
     'app_password' => 's3cret',
-    'meta_tiers' => ['CHALLENGER', 'GRANDMASTER', 'IRON'],
+    'meta_tiers' => ['CHALLENGER', 'GRANDMASTER'],
     'meta_rate' => 0,
     'meta_time_budget' => 60,
     'meta_min_games' => 3,
@@ -81,7 +81,9 @@ start() { # port docroot [env...] [router]
 
 FAKE_KEY="$KEY" ROUTER="$HERE/fake_riot.php" start "$PF" "$HERE" FAKE_KEY="$KEY" FAKE_LOG="$FAKE_LOG" FAKE_CTRL="$FAKE_CTRL"
 start "$PA" "$T/a/www" LOLHELPER_RIOT_BASE="http://127.0.0.1:$PF"
-start "$PB" "$T/b/www" LOLHELPER_RIOT_BASE="http://127.0.0.1:$PF"
+# b : horloge de test figée hors de la plage horaire de la collecte (15 janvier 2026, 02:00 à Paris).
+B_NOW="$("$PHP" -r 'echo (new DateTime("2026-01-15 02:00", new DateTimeZone("Europe/Paris")))->getTimestamp();')"
+start "$PB" "$T/b/www" LOLHELPER_RIOT_BASE="http://127.0.0.1:$PF" LOLHELPER_TEST_NOW="$B_NOW"
 start "$PC" "$T/c/www" LOLHELPER_RIOT_BASE="http://127.0.0.1:1"
 start "$PM" "$T/m/www" LOLHELPER_RIOT_BASE="http://127.0.0.1:$PF"
 
@@ -99,7 +101,7 @@ API_A="http://127.0.0.1:$PA" API_B="http://127.0.0.1:$PB" API_C="http://127.0.0.
 status=$?
 
 echo "== Meta collector (CLI) + meta-stats tests"
-API_M="http://127.0.0.1:$PM" API_A="http://127.0.0.1:$PA" TEST_TMP="$T" PHP_BIN="$PHP" \
+API_M="http://127.0.0.1:$PM" API_A="http://127.0.0.1:$PA" API_B="http://127.0.0.1:$PB" B_NOW="$B_NOW" TEST_TMP="$T" PHP_BIN="$PHP" \
   META_SITE="$T/m/www/lolhelper" META_ALT_SITE="$T/m2/www/lolhelper" META_RIOT_BASE="http://127.0.0.1:$PF" \
   "$PHP" "$HERE/test_meta.php"
 meta_status=$?

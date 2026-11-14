@@ -13,17 +13,32 @@ return [
                                    // (à renseigner si le domaine pointe vers un sous-dossier de www/,
                                    // pour que le cron et le site utilisent le même dossier)
 
-    // Statistiques méta haut elo, collectées par la tâche planifiée api/cron/collect-meta.php.
-    'meta_enabled' => true,                         // false = le cron ne fait plus rien
-    'meta_tiers' => ['CHALLENGER', 'GRANDMASTER', 'MASTER'],  // paliers suivis
-    'meta_time_budget' => 1500,    // secondes de travail max par passage du cron (1 à 3300), 25 min
-    'meta_rate' => 'auto',         // 'auto' (ou ligne absente) : pas de rythme fixe, la collecte suit la limite
-                                   // de la clé lue dans les réponses Riot (riot_limits.json du dossier de données)
-                                   // et s'arrête d'appeler à 60 % de chaque fenêtre pour laisser la place aux
-                                   // joueurs (eux sont servis jusqu'à 95 %). Un nombre (ex. 0.6, anciennes
-                                   // configs) plafonne en plus la collecte à ce nombre de requêtes par seconde ;
-                                   // supprimer la ligne ou mettre 'auto' pour passer en automatique.
+    // Statistiques méta par niveau de classement, collectées par la tâche planifiée api/cron/collect-meta.php
+    // (toutes les heures) et par le bouton « Lancer » de la page Méta.
+    'meta_enabled' => true,        // false = le cron ne fait plus rien
+    'meta_tiers' => ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER_PLUS'],
+                                   // niveaux suivis (ligne absente = les 8), servis à tour de rôle.
+                                   // MASTER_PLUS = Master, Grandmaster et Challenger. Anciennes valeurs
+                                   // 'CHALLENGER', 'GRANDMASTER', 'MASTER' acceptées : elles deviennent MASTER_PLUS
+                                   // (en ne lisant que ces ligues-là pour trouver les joueurs).
+    'meta_games_per_tier' => 500,  // parties gardées par niveau et par patch (50 à 5000) : les plus récentes du
+                                   // patch ; une nouvelle partie remplace la plus ancienne. Un niveau dont les
+                                   // 500 parties datent toutes des dernières 24 h est mis de côté jusqu'au lendemain.
+    'meta_hours' => '04-15',       // plage horaire de la collecte automatique (cron), heure locale : de 4 h
+                                   // (inclus) à 15 h (exclu). '22-06' passe minuit, '00-24' = toute la journée.
+                                   // En dehors, le cron s'arrête aussitôt ; le bouton du site marche à toute heure.
+    'timezone' => 'Europe/Paris',  // fuseau horaire de meta_hours (nom IANA : 'Europe/Paris', 'UTC'…)
+    'meta_time_budget' => 3300,    // secondes de travail max par passage du cron (1 à 3300, 55 min), sans
+                                   // jamais dépasser la fin de la plage horaire
+    'meta_rate' => 0.25,           // requêtes Riot par seconde au plus pour la collecte (ligne absente = 0.25,
+                                   // soit une requête toutes les 4 s) ; en plus, la collecte s'arrête d'appeler
+                                   // à 60 % de chaque fenêtre de la limite de la clé (riot_limits.json du dossier
+                                   // de données) pour laisser la place aux joueurs (servis jusqu'à 95 %).
+                                   // 'auto' = pas de rythme fixe, seulement la règle des 60 % (plus rapide, mais
+                                   // la clé de développement atteint vite ses limites). Sur un refus de Riot (429),
+                                   // la collecte attend le délai demandé (Retry-After, 5 à 60 s) puis reprend.
     'meta_web_budget' => 45,       // secondes de travail max par clic sur « Lancer » depuis le site (5 à 120) ;
                                    // rester sous la limite d'exécution PHP de l'hébergeur
-    'meta_min_games' => 300,       // parties nécessaires pour servir le nouveau patch plutôt que le précédent
+    'meta_min_games' => 300,       // parties d'un niveau nécessaires pour servir le nouveau patch plutôt que le
+                                   // précédent
 ];

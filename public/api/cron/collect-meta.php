@@ -1,14 +1,15 @@
 <?php
 /**
- * LoLHelper — collecteur des statistiques méta haut elo (Challenger/Grandmaster, classé solo).
+ * LoLHelper — collecteur des statistiques méta par niveau de classement (Fer à Master+, classé solo).
  *
  * À lancer UNIQUEMENT en ligne de commande, par une tâche planifiée OVH (toutes les heures) :
  *   Commande à exécuter : www/lolhelper/api/cron/collect-meta.php   (chemin depuis la racine FTP)
  *   Langage : PHP 8.1 ou plus récent.
- * Chaque passage travaille au plus meta_time_budget secondes puis s'arrête ; le suivant reprend où il
- * s'était arrêté. Rythme : jusqu'à 60 % de chaque fenêtre de la limite de la clé Riot (lue dans les
- * réponses, partagée avec le site), plafonné par meta_rate s'il est numérique. Réglages : config.php
- * (voir config.example.php).
+ * Ne travaille que dans la plage horaire meta_hours (par défaut 04h–15h, heure de Paris) : en dehors, le
+ * script s'arrête aussitôt. Chaque passage travaille au plus meta_time_budget secondes, sans dépasser la fin
+ * de la plage, puis s'arrête ; le suivant reprend où il s'était arrêté. Rythme : meta_rate requêtes/s au plus
+ * (0,25 par défaut) et jamais plus de 60 % de chaque fenêtre de la limite de la clé Riot (lue dans les
+ * réponses, partagée avec le site). Réglages : config.php (voir config.example.php).
  * Données écrites dans <dossier de données>/meta/ (par défaut ~/lolhelper-data/meta, hors de www/).
  */
 declare(strict_types=1);
@@ -45,6 +46,15 @@ $main = static function (string $apiDir, float $start): int {
     if (!$config['meta_enabled']) {
         error_log('lolhelper meta: collecte désactivée (meta_enabled = false)');
         return 0;
+    }
+    // Plage horaire de la collecte automatique (le bouton du site n'y est pas soumis).
+    $window = meta_window($config);
+    if (!$window['open']) {
+        error_log('lolhelper meta: hors plage horaire (' . meta_hours_label($config['meta_hours']) . '), rien à faire');
+        return 0;
+    }
+    if ($window['remaining'] !== null) {
+        $config['meta_time_budget'] = max(1, min($config['meta_time_budget'], $window['remaining']));
     }
     if ($config['riot_api_key'] === '') {
         error_log('lolhelper meta: clé API Riot non configurée (config.php)');
