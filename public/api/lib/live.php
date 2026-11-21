@@ -8,10 +8,18 @@ if (!defined('LOLHELPER_API')) {
 
 /*
  * Draft en direct : données envoyées par le programme compagnon (sélection des champions du client LoL).
- *   PUT r=live-draft                   corps = CompanionPayload, validé strictement puis réécrit sous forme
- *                                      canonique (seuls les champs connus sont conservés) ;
+ *   PUT r=live-draft                   corps = CompanionPayload (v1 ou v2), validé strictement puis réécrit
+ *                                      sous forme canonique (seuls les champs connus sont conservés) ;
  *   GET r=live-draft&players=<id>,<id> document le plus récent reçu il y a moins de 15 minutes.
  * Stockage : collection interne « live » (jamais exposée par store/…), un document live-<playerId> par joueur.
+ *
+ * v2 : le client League (LCU) fournit des puuid « bruts » (UUID), différents des puuid chiffrés de l'API
+ * Riot enregistrés pour les joueurs du site : on reconnaît donc les joueurs par identifiant Riot
+ * (riot_id = {game_name, tag_line}, comparaison insensible à la casse). Le joueur local par son riot_id
+ * (puis, à défaut, par égalité exacte du puuid) ; chaque allié reçoit player_id quand son riot_id (affiché
+ * par le client) est celui d'un joueur du site, puis son riot_id et son puuid sont supprimés avant
+ * stockage : le nom d'un coéquipier qui n'est pas un de nos joueurs n'est jamais conservé. Adversaires :
+ * le riot_id affiché par le client (Clash, tournoi, personnalisée) est conservé, le puuid brut supprimé.
  */
 
 const LIVE_COLLECTION = 'live';
@@ -31,7 +39,21 @@ const LIVE_ACTION_TYPES = ['ban', 'pick'];
 const LIVE_SENT_AT_PATTERN = '/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$/D';
 const LIVE_RECEIVED_AT_PATTERN = '/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/D';
 
+const LIVE_VERSIONS = [1, 2];
+// puuid tel que le client League le fournit (v2 : UUID ou autre) ; RIOT_PUUID_PATTERN reste la règle des
+// vrais appels à l'API Riot (et des payloads v1).
+const LIVE_LCU_PUUID_PATTERN = '/^[A-Za-z0-9_-]{8,100}$/D';
+const LIVE_RIOT_ID_MAX_GAME_NAME = 32;
+const LIVE_RIOT_ID_MAX_TAG_LINE = 8;
+// Contrôle (Cc), format/invisibles (Cf), séparateurs de ligne/paragraphe, « # » : interdits dans un riot_id.
+const LIVE_RIOT_ID_FORBIDDEN = '/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}#]/u';
+
 const LIVE_MSG_UNKNOWN_PLAYER = "Ce compte Riot n'est pas dans la liste des joueurs du site.";
+
+function live_msg_unknown_riot_id(array $riotId): string
+{
+    return 'Le compte ' . $riotId['game_name'] . '#' . $riotId['tag_line'] . " n'est pas dans la liste des joueurs du site.";
+}
 
 function live_invalid(string $field): never
 {
@@ -100,17 +122,60 @@ function live_optional(stdClass $o, string $name, mixed $default): mixed
     return property_exists($o, $name) ? $o->$name : $default;
 }
 
-/** puuid facultatif d'une cellule (alliée ou adverse) : absent/null -> "", sinon "" ou un puuid Riot valide. */
-function live_slot_puuid(stdClass $slot, string $path): string
+/**
+ * puuid facultatif d'une cellule (alliée ou adverse) : absent/null -> "", sinon "" ou un puuid valide
+ * ($pattern : RIOT_PUUID_PATTERN en v1, LIVE_LCU_PUUID_PATTERN en v2).
+ */
+function live_slot_puuid(stdClass $slot, string $path, string $pattern = RIOT_PUUID_PATTERN): string
 {
     $puuid = live_optional($slot, 'puuid', '');
     if ($puuid === null) {
         $puuid = '';
     }
-    if (!is_string($puuid) || ($puuid !== '' && preg_match(RIOT_PUUID_PATTERN, $puuid) !== 1)) {
+    if (!is_string($puuid) || ($puuid !== '' && preg_match($pattern, $puuid) !== 1)) {
         live_invalid($path . '.puuid');
     }
     return $puuid;
+}
+
+/** Nombre de caractères d'une chaîne UTF-8 valide (sans dépendre de mbstring). */
+function live_strlen(string $s): int
+{
+    return function_exists('mb_strlen') ? mb_strlen($s, 'UTF-8') : (int) preg_match_all('/./us', $s);
+}
+
+/** Forme de comparaison d'un nom ou d'un tag : sans espaces autour, en minuscules (Unicode si possible). */
+function live_fold(string $s): string
+{
+    $s = trim($s);
+    return function_exists('mb_strtolower') ? mb_strtolower($s, 'UTF-8') : strtolower($s);
+}
+
+/** Une partie d'identifiant Riot : texte UTF-8 sans caractère interdit, non vide une fois les espaces autour retirés. */
+function live_riot_id_part(mixed $v, string $path, int $max): string
+{
+    if (!is_string($v) || strlen($v) > 4 * $max + 16 || preg_match('//u', $v) !== 1
+        || preg_match(LIVE_RIOT_ID_FORBIDDEN, $v) === 1) {
+        live_invalid($path);
+    }
+    $v = trim($v, ' '); // les caractères de contrôle (NUL, tabulation...) sont refusés, pas retirés
+    if ($v === '' || live_strlen($v) > $max) {
+        live_invalid($path);
+    }
+    return $v;
+}
+
+/** riot_id {game_name, tag_line} validé, ou null (valeur null). @return array{game_name:string,tag_line:string}|null */
+function live_riot_id(mixed $v, string $path): ?array
+{
+    if ($v === null) {
+        return null;
+    }
+    $o = live_object($v, $path);
+    return [
+        'game_name' => live_riot_id_part(live_required($o, 'game_name', $path . '.'), $path . '.game_name', LIVE_RIOT_ID_MAX_GAME_NAME),
+        'tag_line' => live_riot_id_part(live_required($o, 'tag_line', $path . '.'), $path . '.tag_line', LIVE_RIOT_ID_MAX_TAG_LINE),
+    ];
 }
 
 /** @return list<int> */
@@ -124,18 +189,31 @@ function live_key_list(mixed $v, string $path, int $max): array
 }
 
 /**
- * Valide le CompanionPayload et renvoie sa forme canonique (champs inconnus ignorés : en particulier, rien
- * d'autre que la cellule, le puuid et le champion n'est conservé pour l'équipe adverse ; ce puuid est ""
- * sauf quand le client League affiche lui-même les adversaires — Clash, tournoi, partie personnalisée).
+ * Valide le CompanionPayload (v1 ou v2) et renvoie sa forme canonique (champs inconnus ignorés).
+ * v1 : puuid au format de l'API Riot ; équipe adverse = cellule, puuid ("" sauf Clash/tournoi/personnalisée)
+ *      et champion.
+ * v2 : puuid du client League (LIVE_LCU_PUUID_PATTERN, ou "") + riot_id du joueur local (obligatoire,
+ *      null seulement avec un puuid) ; my_team garde provisoirement riot_id/puuid pour la reconnaissance des
+ *      amis (live_map_allies les supprime) ; équipe adverse = cellule, riot_id affiché et champion.
  */
 function live_validate_payload(stdClass $p): stdClass
 {
-    if (live_required($p, 'version', '') !== 1) {
+    $version = live_required($p, 'version', '');
+    if (!is_int($version) || !in_array($version, LIVE_VERSIONS, true)) {
         live_invalid('version');
     }
+    $v2 = $version === 2;
+    $puuidPattern = $v2 ? LIVE_LCU_PUUID_PATTERN : RIOT_PUUID_PATTERN;
     $puuid = live_required($p, 'puuid', '');
-    if (!is_string($puuid) || preg_match(RIOT_PUUID_PATTERN, $puuid) !== 1) {
+    if (!is_string($puuid) || (($puuid !== '' || !$v2) && preg_match($puuidPattern, $puuid) !== 1)) {
         live_invalid('puuid');
+    }
+    $riotId = null;
+    if ($v2) {
+        $riotId = live_riot_id(live_required($p, 'riot_id', ''), 'riot_id');
+        if ($riotId === null && $puuid === '') {
+            live_invalid('riot_id');
+        }
     }
     $phase = live_enum(live_required($p, 'phase', ''), 'phase', LIVE_PHASES);
 
@@ -154,7 +232,8 @@ function live_validate_payload(stdClass $p): stdClass
         $slot = live_object($raw, $path);
         $myTeam[] = [
             'cell' => live_int(live_required($slot, 'cell', $path . '.'), $path . '.cell', 0, LIVE_CELL_MAX),
-            'puuid' => live_slot_puuid($slot, $path),
+            'puuid' => live_slot_puuid($slot, $path, $puuidPattern),
+            'riot_id' => $v2 ? live_riot_id(live_optional($slot, 'riot_id', null), $path . '.riot_id') : null,
             'champion_key' => live_champion_key(live_optional($slot, 'champion_key', 0), $path . '.champion_key'),
             'intent_key' => live_champion_key(live_optional($slot, 'intent_key', 0), $path . '.intent_key'),
             'position' => live_enum(live_optional($slot, 'position', ''), $path . '.position', LIVE_POSITIONS),
@@ -165,11 +244,21 @@ function live_validate_payload(stdClass $p): stdClass
     foreach (live_list(live_optional($p, 'their_team', []), 'their_team', LIVE_MAX_TEAM) as $i => $raw) {
         $path = 'their_team[' . $i . ']';
         $slot = live_object($raw, $path);
-        $theirTeam[] = [
-            'cell' => live_int(live_required($slot, 'cell', $path . '.'), $path . '.cell', 0, LIVE_CELL_MAX),
-            'puuid' => live_slot_puuid($slot, $path),
-            'champion_key' => live_champion_key(live_optional($slot, 'champion_key', 0), $path . '.champion_key'),
-        ];
+        $cell = live_int(live_required($slot, 'cell', $path . '.'), $path . '.cell', 0, LIVE_CELL_MAX);
+        $enemyPuuid = live_slot_puuid($slot, $path, $puuidPattern);
+        $championKey = live_champion_key(live_optional($slot, 'champion_key', 0), $path . '.champion_key');
+        if ($v2) {
+            // Le puuid brut du client ne sert à rien pour l'API Riot : seul le nom affiché par le client est gardé.
+            $entry = ['cell' => $cell];
+            $enemyRiotId = live_riot_id(live_optional($slot, 'riot_id', null), $path . '.riot_id');
+            if ($enemyRiotId !== null) {
+                $entry['riot_id'] = $enemyRiotId;
+            }
+            $entry['champion_key'] = $championKey;
+            $theirTeam[] = $entry;
+        } else {
+            $theirTeam[] = ['cell' => $cell, 'puuid' => $enemyPuuid, 'champion_key' => $championKey];
+        }
     }
 
     $bansRaw = live_optional($p, 'bans', null);
@@ -208,9 +297,14 @@ function live_validate_payload(stdClass $p): stdClass
         live_invalid('sent_at');
     }
 
-    return (object) [
-        'version' => 1,
+    $out = [
+        'version' => $version,
         'puuid' => $puuid,
+    ];
+    if ($v2) {
+        $out['riot_id'] = $riotId;
+    }
+    return (object) ($out + [
         'phase' => $phase,
         'queue_id' => $queueId,
         'local_cell' => $localCell,
@@ -220,7 +314,7 @@ function live_validate_payload(stdClass $p): stdClass
         'actions' => $actions,
         'timer_remaining_ms' => $timer,
         'sent_at' => $sentAt,
-    ];
+    ]);
 }
 
 /** Horodatage serveur ISO 8601 UTC à la milliseconde (ordre lexicographique = ordre chronologique). */
@@ -266,22 +360,105 @@ function handle_live_draft(array $config, string $apiDir): void
     }
 }
 
+/** Joueurs du site utilisables (identifiant valide). @return list<stdClass> */
+function live_players(DocumentStore $store): array
+{
+    $out = [];
+    foreach ($store->all('players') as $player) {
+        $id = $player->id ?? null;
+        if (is_string($id) && DocumentStore::isValidId($id)) {
+            $out[] = $player;
+        }
+    }
+    return $out;
+}
+
+/** @param list<stdClass> $players @param array{game_name:string,tag_line:string}|null $riotId */
+function live_player_by_riot_id(array $players, ?array $riotId): ?string
+{
+    if ($riotId === null) {
+        return null;
+    }
+    $gn = live_fold($riotId['game_name']);
+    $tl = live_fold($riotId['tag_line']);
+    foreach ($players as $player) {
+        $pgn = $player->game_name ?? null;
+        $ptl = $player->tag_line ?? null;
+        if (is_string($pgn) && is_string($ptl) && live_fold($pgn) === $gn && live_fold(ltrim(trim($ptl), '#')) === $tl) {
+            return $player->id;
+        }
+    }
+    return null;
+}
+
+/** Égalité exacte du puuid (v1, et secours v2). @param list<stdClass> $players */
+function live_player_by_puuid(array $players, string $puuid): ?string
+{
+    if ($puuid === '') {
+        return null;
+    }
+    foreach ($players as $player) {
+        if (($player->puuid ?? null) === $puuid) {
+            return $player->id;
+        }
+    }
+    return null;
+}
+
+/**
+ * player_id de chaque allié (cellule locale -> joueur local ; sinon riot_id en v2, puuid en v1), chaque
+ * joueur au plus une fois. v2 : riot_id et puuid des alliés supprimés (seul player_id est conservé).
+ * @param list<stdClass> $players
+ * @return list<array<string,mixed>>
+ */
+function live_map_allies(stdClass $payload, array $players, string $localId): array
+{
+    $v2 = $payload->version === 2;
+    $ids = [];
+    $used = [];
+    foreach ($payload->my_team as $i => $slot) {
+        if ($payload->local_cell !== null && $slot['cell'] === $payload->local_cell && !isset($used[$localId])) {
+            $ids[$i] = $localId;
+            $used[$localId] = true;
+        }
+    }
+    foreach ($payload->my_team as $i => $slot) {
+        if (isset($ids[$i])) {
+            continue;
+        }
+        $id = $v2 ? live_player_by_riot_id($players, $slot['riot_id']) : live_player_by_puuid($players, $slot['puuid']);
+        if ($id !== null && !isset($used[$id])) {
+            $ids[$i] = $id;
+            $used[$id] = true;
+        }
+    }
+    $out = [];
+    foreach ($payload->my_team as $i => $slot) {
+        $entry = ['cell' => $slot['cell'], 'player_id' => $ids[$i] ?? null];
+        if (!$v2) {
+            $entry['puuid'] = $slot['puuid'];
+        }
+        $out[] = $entry + [
+            'champion_key' => $slot['champion_key'],
+            'intent_key' => $slot['intent_key'],
+            'position' => $slot['position'],
+        ];
+    }
+    return $out;
+}
+
 function live_put(DocumentStore $store): void
 {
     $payload = live_validate_payload(read_json_object());
+    $players = live_players($store);
 
-    $playerId = null;
-    foreach ($store->all('players') as $player) {
-        $id = $player->id ?? null;
-        if (($player->puuid ?? null) === $payload->puuid && is_string($id) && DocumentStore::isValidId($id)) {
-            $playerId = $id;
-            break;
-        }
-    }
+    $riotId = $payload->riot_id ?? null;
+    $playerId = live_player_by_riot_id($players, $riotId) ?? live_player_by_puuid($players, $payload->puuid);
     if ($playerId === null) {
-        throw new HttpError(404, LIVE_MSG_UNKNOWN_PLAYER);
+        throw new HttpError(404, $riotId !== null ? live_msg_unknown_riot_id($riotId) : LIVE_MSG_UNKNOWN_PLAYER);
     }
 
+    $payload->my_team = live_map_allies($payload, $players, $playerId);
     $payload->player_id = $playerId;
     $payload->received_at = live_now_iso();
     $store->put(LIVE_COLLECTION, 'live-' . $playerId, $payload);

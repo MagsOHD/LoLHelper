@@ -230,11 +230,13 @@ export function RiotProgress({ statuses }: { statuses: ProfileStatus[] }) {
 }
 
 /** "Repérage des adversaires": up to 5 Riot IDs, fetched in the background and shared with the team. */
-export function ScoutingPanel({ profiles, clash = [], clashNotes = [], statuses, insights, platforms, defaultPlatform, enabled, onScout, onRemove, onRetry }: {
+export function ScoutingPanel({ profiles, clash = [], clashNotes = [], clientNotes = [], statuses, insights, platforms, defaultPlatform, enabled, onScout, onRemove, onRetry }: {
   profiles: EnemyPlayerProfile[];
   /** Members added from an enemy Clash roster (source "clash"). */
   clash?: EnemyPlayerProfile[];
   clashNotes?: string[];
+  /** Enemies shown by the client that stay anonymous (unknown Riot ID, lookup failed). */
+  clientNotes?: string[];
   statuses: ProfileStatus[];
   insights: EnemyPlayerInsight[];
   platforms: string[];
@@ -300,6 +302,7 @@ export function ScoutingPanel({ profiles, clash = [], clashNotes = [], statuses,
       )}
       <div aria-live="polite">
         {error && <p id={`${id}-err`} className="small estatus__err" role="alert">{error}</p>}
+        {clientNotes.map((n) => <p key={n} className="hint">{n}</p>)}
       </div>
       {(pending.length > 0 || profiles.length > 0) && (
         <ul className="scouting__list">

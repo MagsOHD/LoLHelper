@@ -8,6 +8,7 @@ import {
   inferPhase,
   isLiveFresh,
   LIVE_MAX_AGE_MS,
+  liveEnemyRiotIds,
   loadDraft,
   mapCompanionPayload,
   mergeCompanion,
@@ -124,6 +125,74 @@ describe('CompanionPayload -> slots', () => {
     expect(cov.ally).toEqual([true, true, true, true, true]);
     expect(cov.enemy).toEqual([true, true, true, false, false]);
     expect(coverageOf(null)).toBeNull();
+  });
+});
+
+describe('CompanionPayload v2 -> slots', () => {
+  const LCU_UUID = '0d8f6a3e-1c2b-4a5d-9e8f-7a6b5c4d3e2f';
+  const API_PUUID = 'kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k';
+  const v2 = (over: Partial<LiveDraft> = {}): LiveDraft => payload({
+    version: 2,
+    puuid: LCU_UUID,
+    riot_id: { game_name: 'Moi', tag_line: 'EUW' },
+    my_team: [
+      { cell: 2, player_id: null, champion_key: 103, intent_key: 0, position: 'middle' }, // local cell
+      { cell: 0, player_id: 'p2', champion_key: 86, intent_key: 0, position: 'top' },
+      { cell: 1, player_id: null, puuid: 'puuid-2', champion_key: 0, intent_key: 64, position: 'jungle' }, // raw puuid ignored in v2
+      { cell: 3, player_id: 'not-a-friend', champion_key: 0, intent_key: 0, position: 'bottom' },
+      { cell: 4, champion_key: 412, intent_key: 0, position: 'utility' },
+    ],
+    ...over,
+  });
+
+  it('allies from the server player_id, the local cell is the owner, raw puuids never match', () => {
+    const m = mapCompanionPayload(v2(), catalog, FRIENDS);
+    expect(m.owner_player_id).toBe('p1');
+    expect(m.ally.map((s) => s.player_id)).toEqual(['p2', null, 'p1', null, null]);
+    expect(m.ally[0]).toEqual({ player_id: 'p2', champion_id: 'Garen', role: 'TOP', locked: true });
+    // Same friend twice: first cell wins.
+    const dup = mapCompanionPayload(v2({ my_team: [{ cell: 0, player_id: 'p2', champion_key: 0 }, { cell: 1, player_id: 'p2', champion_key: 0 }] }), catalog, FRIENDS);
+    expect(dup.ally.map((s) => s.player_id)).toEqual(['p2', null]);
+    // A v2 owner whose (raw) puuid equals a friend's puuid is not matched by it.
+    const raw = mapCompanionPayload(v2({ puuid: 'puuid-2', player_id: 'p1', local_cell: 9 }), catalog, FRIENDS);
+    expect(raw.ally.map((s) => s.player_id)).toEqual(['p2', null, null, null, null]);
+  });
+
+  it('enemies: only Riot IDs shown by the client, resolved to the Riot API puuid; never a raw puuid', () => {
+    const resolver = vi.fn((id: { game_name: string; tag_line: string }) => (id.game_name === 'Ombre' ? API_PUUID : null));
+    const p = v2({
+      their_team: [
+        { cell: 6, puuid: LCU_UUID, champion_key: 122, riot_id: { game_name: 'Ombre', tag_line: 'EUW' } },
+        { cell: 5, puuid: 'ab12cd34-0000-1111-2222-333344445555', champion_key: 99 }, // ranked: hidden name
+        { cell: 7, champion_key: 0, riot_id: { game_name: 'Inconnu', tag_line: 'EUW' } },
+        { cell: 8, champion_key: 0, riot_id: null },
+      ],
+    });
+    const m = mapCompanionPayload(p, catalog, FRIENDS, resolver);
+    expect(m.enemy).toEqual([
+      { champion_id: 'Lux', role: null, locked: true },
+      { champion_id: 'Darius', role: null, locked: true, puuid: API_PUUID, riot_id: 'Ombre#EUW' },
+      { champion_id: null, role: null, locked: false, riot_id: 'Inconnu#EUW' },
+      { champion_id: null, role: null, locked: false },
+    ]);
+    expect(resolver).toHaveBeenCalledTimes(2); // entries without riot_id are never looked up
+    expect(liveEnemyRiotIds(p)).toEqual([{ game_name: 'Ombre', tag_line: 'EUW' }, { game_name: 'Inconnu', tag_line: 'EUW' }]);
+    expect(liveEnemyRiotIds(null)).toEqual([]);
+    // Stored slot: the resolved puuid only (no name).
+    const merged = mergeCompanion(emptyDraft('team-t1', ['p1'], 't1', NOW), m);
+    expect(merged.enemy[1]).toEqual({ champion_id: 'Darius', role: null, locked: true, puuid: API_PUUID });
+    expect(merged.enemy.some((s) => 'riot_id' in s)).toBe(false);
+    expect(merged.enemy[0].puuid).toBeUndefined();
+  });
+
+  it('v1 documents (no player_id) keep the puuid matching', () => {
+    const m = mapCompanionPayload(payload(), catalog, FRIENDS);
+    expect(m.ally.map((s) => s.player_id)).toEqual(['p2', null, 'p1', null, null]);
+    const noOwner = mapCompanionPayload({ ...payload(), player_id: undefined as never }, catalog, FRIENDS);
+    expect(noOwner.owner_player_id).toBe('p1');
+    // A v1 document with player_id entries (server already upgraded) uses them.
+    const mixed = mapCompanionPayload(payload({ my_team: [{ cell: 0, player_id: 'p3', puuid: 'puuid-2', champion_key: 0 }] }), catalog, FRIENDS);
+    expect(mixed.ally[0].player_id).toBe('p3');
   });
 });
 

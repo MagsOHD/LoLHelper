@@ -38,8 +38,11 @@ openssl req -x509 -newkey rsa:2048 -nodes -subj "/CN=127.0.0.1" -days 1 \
   -keyout "$W/key.pem" -out "$W/cert.pem" >/dev/null 2>&1
 
 PUUID="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["puuid"])' "$HERE/fixtures/current-summoner.json")"
+# Le site connaît les joueurs par identifiant Riot (comparaison insensible à la casse) ; le puuid de
+# l'API Riot qu'il stocke n'a rien à voir avec le puuid (UUID) du client League.
+RIOT_PUUID='kX9v2bQx3Lr7nT0pWq8sYz1aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1k'
 PASSWORD='s3cret-pass'
-mkdir -p "$W/site" "$W/config"
+mkdir -p "$W/site" "$W/config" "$W/tmp"
 SITE_PORT="$(free_port)"
 if [ "${SITE:-fake}" = "real" ]; then
   # Vraie API PHP (copie de public/) ; le joueur est créé via store/players.
@@ -49,15 +52,18 @@ if [ "${SITE:-fake}" = "real" ]; then
     "$PASSWORD" "$W/data" > "$W/www/api/config.php"
   php -S "127.0.0.1:$SITE_PORT" -t "$W/www" >"$W/php.log" 2>&1 &
 else
-  FAKE_SITE_DIR="$W/site" FAKE_SITE_PASSWORD="$PASSWORD" FAKE_SITE_PUUIDS="$PUUID" \
+  FAKE_SITE_DIR="$W/site" FAKE_SITE_PASSWORD="$PASSWORD" FAKE_SITE_RIOT_IDS="moi#euw" \
     php -S "127.0.0.1:$SITE_PORT" "$HERE/fake_site.php" >"$W/php.log" 2>&1 &
 fi
 PIDS+=($!)
 for _ in $(seq 50); do curl -s -o /dev/null "http://127.0.0.1:$SITE_PORT/api/index.php?r=meta" && break; sleep 0.1; done
 if [ "${SITE:-fake}" = "real" ]; then
   curl -sf -X PUT -H "X-App-Password: $PASSWORD" -H 'Content-Type: application/json' \
-    --data "{\"id\":\"p1\",\"name\":\"Moi\",\"puuid\":\"$PUUID\"}" \
+    --data "{\"id\":\"p1\",\"game_name\":\"MOI\",\"tag_line\":\"euw\",\"puuid\":\"$RIOT_PUUID\"}" \
     "http://127.0.0.1:$SITE_PORT/api/index.php?r=store/players/p1" >/dev/null
+  curl -sf -X PUT -H "X-App-Password: $PASSWORD" -H 'Content-Type: application/json' \
+    --data '{"id":"p2","game_name":"Ami Élégant","tag_line":"EUW","puuid":null}' \
+    "http://127.0.0.1:$SITE_PORT/api/index.php?r=store/players/p2" >/dev/null
 fi
 
 LOCKFILE="$W/lockfile"
@@ -69,11 +75,11 @@ start_lcu() { # $1 = n° du scénario, $2 = jeton
   for _ in $(seq 50); do [ -s "$LOCKFILE" ] && break; sleep 0.1; done
 }
 
-echo "== Intégration (environ 75 s)"
+echo "== Intégration (environ 80 s)"
 # Adresse saisie avec une barre finale et un fragment (#/team/x) : normalisée par l'assistant.
 printf 'http://127.0.0.1:%s/#/team/x\nmauvais\n%s\n' "$SITE_PORT" "$PASSWORD" | \
-  "$PWSH" -NoProfile -File "$SCRIPT" -ConfigPath "$W/config/LoLHelper/config.json" \
-    -LockfilePath "$LOCKFILE" -MaxRunSeconds 68 >"$W/companion.log" 2>&1 &
+  TEMP="$W/tmp" "$PWSH" -NoProfile -File "$SCRIPT" -ConfigPath "$W/config/LoLHelper/config.json" \
+    -LockfilePath "$LOCKFILE" -MaxRunSeconds 74 -Diagnostic -NoRiotIdWarnSeconds 1 >"$W/companion.log" 2>&1 &
 COMP_PID=$!
 PIDS+=($COMP_PID)
 
@@ -95,6 +101,7 @@ if [ "${SITE:-fake}" = "real" ]; then
   if sed -n '/Ctrl+C/,$p' "$W/companion.log" | grep -Eqi "refus|HTTP 4|injoignable"; then echo "ECHEC : envoi refusé par l'API"; exit 1; fi
   curl -sf -H "X-App-Password: $PASSWORD" "http://127.0.0.1:$SITE_PORT/api/index.php?r=live-draft&players=p1" | \
     python3 -c 'import json,sys; d=json.load(sys.stdin)["live"]; assert d["phase"]=="none" and d["player_id"]=="p1", d; print("ok   vraie API : 9 envois acceptés, dernier état none pour p1")'
+  python3 "$HERE/check_results.py" "$W" "$HERE/fixtures" "$PUUID" "$PASSWORD" real
 else
   python3 "$HERE/check_results.py" "$W" "$HERE/fixtures" "$PUUID" "$PASSWORD"
 fi

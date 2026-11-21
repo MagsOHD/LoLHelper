@@ -22,6 +22,9 @@ import type {
 import { ROLES } from './types';
 import { backendRequest, store } from './backend';
 import { compactRecent, PROFILE_MASTERY_COUNT } from './enemyProfile';
+import { riotIdKey, riotIdOf, riotIdText, type CompanionRiotId } from './riotIdResolver';
+
+export type { CompanionRiotId } from './riotIdResolver';
 
 export const DRAFT_SIZE = 5;
 export const MAX_BANS = 5;
@@ -33,7 +36,12 @@ export type CompanionPosition = 'top' | 'jungle' | 'middle' | 'bottom' | 'utilit
 
 export interface CompanionAllyCell {
   cell: number;
+  /** v1 only: matched against the friends' puuids. Raw LCU value since v2 (dropped by the server). */
   puuid?: string;
+  /** v2, set by the server: the friend in this cell (the local player's cell included). */
+  player_id?: string | null;
+  /** v2 payload only (the server drops it before storing): name shown by the client. */
+  riot_id?: CompanionRiotId | null;
   champion_key: number;
   intent_key?: number;
   position?: CompanionPosition | string;
@@ -41,8 +49,10 @@ export interface CompanionAllyCell {
 
 export interface CompanionEnemyCell {
   cell: number;
-  /** Only when the client itself shows the enemy (Clash, tournament, custom game); "" otherwise. */
+  /** Raw LCU puuid (not a Riot API puuid): always ignored. */
   puuid?: string;
+  /** v2: only when the client itself shows the enemy (Clash, tournament, custom game). */
+  riot_id?: CompanionRiotId | null;
   champion_key: number;
 }
 
@@ -57,7 +67,10 @@ export interface CompanionAction {
 
 export interface CompanionPayload {
   version: number;
+  /** Raw LCU puuid of the local player (v2; not a Riot API puuid). */
   puuid: string;
+  /** v2: the local player's Riot ID. */
+  riot_id?: CompanionRiotId | null;
   phase: CompanionPhase;
   queue_id?: number;
   local_cell?: number;
@@ -117,12 +130,32 @@ export function isLiveFresh(live: LiveDraft | null | undefined, now: number = Da
   return now - t < LIVE_MAX_AGE_MS;
 }
 
+/**
+ * Enemy slot seen by the companion: `puuid` = the Riot API puuid resolved from the Riot ID the
+ * client shows; `riot_id` ("Nom#TAG") is kept in the mapping only (never stored in the slot).
+ */
+export interface LiveEnemySlot extends DraftEnemySlot {
+  riot_id?: string;
+}
+
+/** Resolved Riot API puuid of a Riot ID shown by the client (null while unknown). */
+export type EnemyResolver = (id: CompanionRiotId) => string | null;
+
+/** Visible Riot IDs of the enemy team (Clash/custom), in cell order, ≤ 5. */
+export function liveEnemyRiotIds(payload: CompanionPayload | null | undefined): CompanionRiotId[] {
+  if (!payload) return [];
+  return asArray<CompanionEnemyCell>(payload.their_team).filter(isObject)
+    .sort((a, b) => int(a.cell) - int(b.cell)).slice(0, DRAFT_SIZE)
+    .map((e) => riotIdOf(e.riot_id))
+    .filter((x): x is CompanionRiotId => !!x);
+}
+
 /** What the companion knows, mapped to Data Dragon ids and site players. */
 export interface LiveMapping {
   phase: DraftPhase;
   side: 'blue' | 'red' | null;
   ally: DraftAllySlot[];
-  enemy: DraftEnemySlot[];
+  enemy: LiveEnemySlot[];
   ally_bans: string[];
   enemy_bans: string[];
   /** Site player whose PC runs the companion. */
@@ -147,8 +180,23 @@ function phaseOf(p: CompanionPayload): DraftPhase {
   }
 }
 
-/** CompanionPayload -> slots (numeric keys -> ids via catalog.byKey; friends matched by puuid). */
-export function mapCompanionPayload(payload: CompanionPayload & { player_id?: string }, catalog: KeyCatalog, friends: FriendRef[]): LiveMapping {
+/** v1 document: no per-entry player_id (allies matched by puuid). */
+function isLegacy(payload: CompanionPayload, myTeam: CompanionAllyCell[]): boolean {
+  return int(payload.version) < 2 && !myTeam.some((m) => typeof m.player_id === 'string' && m.player_id);
+}
+
+/**
+ * CompanionPayload -> slots (numeric keys -> ids via catalog.byKey). Allies: the server-provided
+ * `player_id` (v2; the local cell is the owner), friends matched by puuid for v1 documents only.
+ * Enemies: identified only through the Riot ID the client shows, resolved by `resolveEnemy`;
+ * raw LCU puuids are ignored.
+ */
+export function mapCompanionPayload(
+  payload: CompanionPayload & { player_id?: string },
+  catalog: KeyCatalog,
+  friends: FriendRef[],
+  resolveEnemy?: EnemyResolver,
+): LiveMapping {
   const champ = (key: unknown): string | null => {
     const k = int(key);
     return k > 0 ? catalog.byKey(k)?.id ?? null : null;
@@ -159,16 +207,29 @@ export function mapCompanionPayload(payload: CompanionPayload & { player_id?: st
   const phase = phaseOf(payload);
   const draftOver = phase === 'finalization' || phase === 'ended';
   const byPuuid = new Map(friends.filter((f) => f.puuid).map((f) => [f.puuid as string, f.id]));
+  const friendIds = new Set(friends.map((f) => f.id));
+  const owner = typeof payload.player_id === 'string' ? payload.player_id : '';
+  const hasLocalCell = typeof payload.local_cell === 'number' && Number.isFinite(payload.local_cell);
 
   const myTeam = asArray<CompanionAllyCell>(payload.my_team).filter(isObject)
     .sort((a, b) => int(a.cell) - int(b.cell)).slice(0, DRAFT_SIZE);
+  const legacy = isLegacy(payload, myTeam);
+  const playerOf = (m: CompanionAllyCell, cell: number): string | null => {
+    const local = hasLocalCell && cell === int(payload.local_cell);
+    if (!legacy) {
+      if (local && owner) return owner;
+      const id = typeof m.player_id === 'string' ? m.player_id : '';
+      return id && friendIds.has(id) ? id : null;
+    }
+    const puuid = (typeof m.puuid === 'string' && m.puuid) || (local ? payload.puuid : '');
+    return (puuid ? byPuuid.get(puuid) : undefined) ?? (local && owner ? owner : null);
+  };
   const used = new Set<string>();
   const ally: DraftAllySlot[] = myTeam.map((m) => {
     const cell = int(m.cell);
     const picked = champ(m.champion_key);
     const intent = champ(m.intent_key);
-    const puuid = (typeof m.puuid === 'string' && m.puuid) || (cell === int(payload.local_cell) ? payload.puuid : '');
-    let player_id = puuid ? byPuuid.get(puuid) ?? null : null;
+    let player_id = playerOf(m, cell);
     if (player_id && used.has(player_id)) player_id = null;
     if (player_id) used.add(player_id);
     const locked = Boolean(picked) && (hasPickActions ? completedPick(cell) : draftOver);
@@ -177,14 +238,16 @@ export function mapCompanionPayload(payload: CompanionPayload & { player_id?: st
 
   const theirTeam = asArray<CompanionEnemyCell>(payload.their_team).filter(isObject)
     .sort((a, b) => int(a.cell) - int(b.cell)).slice(0, DRAFT_SIZE);
-  const enemy: DraftEnemySlot[] = theirTeam.map((e) => {
+  const enemy: LiveEnemySlot[] = theirTeam.map((e) => {
     const id = champ(e.champion_key);
-    const puuid = validPuuid(e.puuid);
+    const riotId = riotIdOf(e.riot_id);
+    const puuid = riotId && resolveEnemy ? validPuuid(resolveEnemy(riotId)) : null;
     return {
       champion_id: id,
       role: null,
       locked: Boolean(id) && (hasPickActions ? completedPick(int(e.cell)) : true),
       ...(puuid ? { puuid } : {}),
+      ...(riotId ? { riot_id: riotIdText(riotId) } : {}),
     };
   });
 
@@ -201,7 +264,7 @@ export function mapCompanionPayload(payload: CompanionPayload & { player_id?: st
     enemy,
     ally_bans: banIds([...asArray<number>(bans.mine), ...fromActions(true)]),
     enemy_bans: banIds([...asArray<number>(bans.theirs), ...fromActions(false)]),
-    owner_player_id: payload.player_id ?? byPuuid.get(payload.puuid) ?? '',
+    owner_player_id: owner || (legacy ? byPuuid.get(payload.puuid) ?? '' : ''),
   };
 }
 
@@ -413,11 +476,16 @@ export function mergeCompanion(base: DraftState, live: LiveMapping, held: Iterab
     const pid = ally[i].player_id;
     if (pid && matched.has(pid) && !heldSet.has(`ally.${i}`)) ally[i] = { ...ally[i], player_id: null };
   }
+  // A Riot ID not resolved in this browser yet keeps the puuid of a known profile with that Riot ID
+  // (resolved by a friend's browser): no flip-flop of the shared slot.
+  const byRiotId = new Map<string, string>();
+  for (const p of base.enemy_profiles ?? []) if (p.riot_id && !byRiotId.has(riotIdKey(p.riot_id))) byRiotId.set(riotIdKey(p.riot_id), p.puuid);
   const enemy = base.enemy.map((b, i) => {
     const c = live.enemy[i];
     if (!c || heldSet.has(`enemy.${i}`)) return b;
     const role = c.champion_id && c.champion_id === b.champion_id ? b.role ?? null : null;
-    return { champion_id: c.champion_id ?? null, role, locked: c.locked, ...(c.puuid ? { puuid: c.puuid } : {}) };
+    const puuid = c.puuid || (c.riot_id ? byRiotId.get(riotIdKey(c.riot_id)) : undefined);
+    return { champion_id: c.champion_id ?? null, role, locked: c.locked, ...(puuid ? { puuid } : {}) };
   });
   return {
     ...base,

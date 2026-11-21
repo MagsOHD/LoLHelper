@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api, type DraftEngine } from './client';
 import {
   annotateClash,
+  liveEnemyRiotIds,
   mapCompanionPayload,
   MAX_ENEMY_PROFILES,
   MAX_SCOUTED,
@@ -20,6 +21,20 @@ import { medianTier } from './metaRank';
 import { parseRiotId } from '../lib/format';
 import { planRoster, rosterNote, teamRef, type ClashLookup } from './clash';
 import { clashDirectory } from './clashHooks';
+import { RiotIdResolver, riotIdText } from './riotIdResolver';
+
+/**
+ * One resolver per page load: Riot IDs shown by the client (Clash/custom enemies) -> Riot API
+ * puuids, one riot/account call per Riot ID (shared limiter, capped per session).
+ */
+export const riotIdResolver = new RiotIdResolver((gameName, tagLine, platform) => api.riotAccount(gameName, tagLine, platform));
+
+export interface DraftSessionOptions {
+  /** Server used to resolve the enemies' Riot IDs (the draft's friends' server, else the site's). */
+  platform?: string;
+  /** Riot key configured: enemies shown by the client are identified (else they stay anonymous). */
+  resolveEnemies?: boolean;
+}
 
 /**
  * Catalog + advisor, loaded once per page load and meta tier: the tier closest to the median solo
@@ -41,7 +56,9 @@ export function useDraftEngine(ranks: readonly (Rank | null | undefined)[] = [])
  * Shared draft session for `initial.id` (re-created when the id or the friends change).
  * Returns null until the first render effect ran.
  */
-export function useDraftSession(initial: DraftState, players: Player[] | undefined, engine: DraftEngine | undefined) {
+export function useDraftSession(initial: DraftState, players: Player[] | undefined, engine: DraftEngine | undefined, options: DraftSessionOptions = {}) {
+  const platform = options.platform || 'euw1';
+  const resolveEnemies = options.resolveEnemies !== false;
   const [session, setSession] = useState<DraftSession | null>(null);
   const [snap, setSnap] = useState<DraftSnapshot | null>(null);
   const key = `${initial.id}|${initial.player_ids.join(',')}`;
@@ -59,7 +76,15 @@ export function useDraftSession(initial: DraftState, players: Player[] | undefin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  // Companion data: needs the catalog (numeric keys) and the players' puuids.
+  // Riot IDs already known from the shared profiles cost no call.
+  const profiles = snap?.draft.enemy_profiles;
+  useEffect(() => {
+    riotIdResolver.seed(profiles);
+  }, [profiles]);
+
+  // Companion data: needs the catalog (numeric keys) and the players (v1 puuid matching); re-mapped
+  // whenever an enemy Riot ID gets resolved.
+  const resolved = useSyncExternalStore(riotIdResolver.subscribe, riotIdResolver.getVersion, riotIdResolver.getVersion);
   useEffect(() => {
     if (!session) return;
     if (!engine || !players) {
@@ -67,8 +92,24 @@ export function useDraftSession(initial: DraftState, players: Player[] | undefin
       return;
     }
     const friends = players.map((p) => ({ id: p.id, puuid: p.puuid }));
-    session.setMapper((live) => mapCompanionPayload(live, engine.catalog, friends));
-  }, [session, engine, players]);
+    session.setMapper((live) => mapCompanionPayload(live, engine.catalog, friends, (id) => riotIdResolver.peek(id)));
+  }, [session, engine, players, resolved]);
+
+  // Enemies shown by the client (Clash/custom): Riot ID -> Riot API puuid (cached, once per Riot ID).
+  const live = snap?.liveFresh ? snap.live : null;
+  const enemyIds = useMemo(() => liveEnemyRiotIds(live), [live]);
+  const enemyKey = enemyIds.map(riotIdText).join('|');
+  useEffect(() => {
+    if (!resolveEnemies) return;
+    for (const id of enemyIds) void riotIdResolver.resolve(id, platform);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enemyKey, live, platform, resolveEnemies]);
+  /** French notes about enemies that stay anonymous (unknown Riot ID, lookup failed). */
+  const enemyNotes = useMemo(
+    () => (resolveEnemies ? riotIdResolver.notesFor(enemyIds) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enemyKey, resolved, resolveEnemies],
+  );
 
   // Companion data is looked for among the friends of the draft (and friends placed in slots).
   const slotIds = snap ? snap.draft.ally.map((s) => s.player_id).filter((x): x is string => !!x) : [];
@@ -77,7 +118,7 @@ export function useDraftSession(initial: DraftState, players: Player[] | undefin
     session?.setLivePlayers(liveKey ? liveKey.split(',') : []);
   }, [session, liveKey]);
 
-  return { session, snap };
+  return { session, snap, enemyNotes };
 }
 
 /** Advice recomputed locally whenever the draft (or the players) change. */
@@ -194,8 +235,12 @@ export function useEnemyProfiles(session: DraftSession | null, draft: DraftState
     const inGame = draft.phase === 'in_game';
     // During champion select only the client can reveal a puuid (Clash/custom); once the game has
     // started the slots carry the spectator puuids (source "game").
+    // Client puuids are resolved from the Riot ID the client shows: that Riot ID is displayed.
     for (const s of inGame ? [] : draft.enemy) {
-      if (s.puuid) reqs.push({ source: 'client', platform, puuid: s.puuid, champion_id: s.champion_id ?? null, role: s.role ?? null });
+      if (s.puuid) {
+        const riot_id = riotIdResolver.riotIdFor(s.puuid);
+        reqs.push({ source: 'client', platform, puuid: s.puuid, ...(riot_id ? { riot_id } : {}), champion_id: s.champion_id ?? null, role: s.role ?? null });
+      }
     }
     if (inGame) {
       for (const a of draft.enemy_accounts ?? []) {

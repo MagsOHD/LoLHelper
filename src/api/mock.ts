@@ -397,24 +397,29 @@ function mockLive(ids: string[]): LiveDraft | null {
   } catch {
     flag = null;
   }
-  // "1" = ranked (enemies anonymous), "clash" = the client reveals the enemy players.
+  // "1" = ranked (enemies anonymous), "clash" = the client shows the enemy players' Riot IDs.
   const clash = flag === 'clash';
   if ((flag !== '1' && !clash) || !ids.includes('p1')) return null;
-  const reveal = (puuid: string) => (clash ? puuid : '');
+  const reveal = (key: string) => {
+    if (!clash) return {};
+    const [game_name, tag_line] = DISPLAY_ID[key].split('#');
+    return { riot_id: { game_name, tag_line } };
+  };
   const now = new Date().toISOString();
+  // Stored document v2: allies carry the server-resolved player_id, enemies only their visible Riot ID.
   return {
-    version: 1, puuid: 'puuid-1', phase: 'ban_pick', queue_id: clash ? 700 : 420, local_cell: 2,
+    version: 2, puuid: '0d8f6a3e-1c2b-4a5d-9e8f-7a6b5c4d3e2f', phase: 'ban_pick', queue_id: clash ? 700 : 420, local_cell: 2,
     my_team: [
-      { cell: 0, puuid: 'puuid-2', champion_key: 54, intent_key: 0, position: 'top' },
-      { cell: 1, puuid: '', champion_key: 113, intent_key: 0, position: 'jungle' },
-      { cell: 2, puuid: '', champion_key: 61, intent_key: 0, position: 'middle' },
-      { cell: 3, puuid: '', champion_key: 0, intent_key: 51, position: 'bottom' },
-      { cell: 4, puuid: '', champion_key: 0, intent_key: 0, position: 'utility' },
+      { cell: 0, player_id: 'p2', champion_key: 54, intent_key: 0, position: 'top' },
+      { cell: 1, player_id: null, champion_key: 113, intent_key: 0, position: 'jungle' },
+      { cell: 2, player_id: 'p1', champion_key: 61, intent_key: 0, position: 'middle' },
+      { cell: 3, player_id: null, champion_key: 0, intent_key: 51, position: 'bottom' },
+      { cell: 4, player_id: null, champion_key: 0, intent_key: 0, position: 'utility' },
     ],
     their_team: [
-      { cell: 5, puuid: reveal('enemy-Zed'), champion_key: 238 }, { cell: 6, puuid: reveal('enemy-Darius'), champion_key: 122 },
-      { cell: 7, puuid: reveal('enemy-Leona'), champion_key: 89 },
-      { cell: 8, puuid: reveal('enemy-Sejuani'), champion_key: 0 }, { cell: 9, puuid: reveal('enemy-Jinx'), champion_key: 0 },
+      { cell: 5, champion_key: 238, ...reveal('ombredumid#euw') }, { cell: 6, champion_key: 122, ...reveal('hache rouge#1337') },
+      { cell: 7, champion_key: 89, ...reveal('aube#sun') },
+      { cell: 8, champion_key: 0, ...reveal('glace#frj') }, { cell: 9, champion_key: 0, ...reveal('gâchette#zau') },
     ],
     bans: { mine: [17, 119, 875], theirs: [412, 145] },
     actions: [
@@ -673,13 +678,24 @@ export async function mockEnemyProfile(req: ProfileRequest, onProgress?: (p: Pro
   }
   const key = req.puuid ? DEMO_BY_PUUID.get(req.puuid) ?? null : (req.riot_id ?? '').toLowerCase();
   const demo = key ? DEMO_PLAYERS[key] : undefined;
-  // Client-revealed players: no Riot ID (the client only gives the puuid).
-  const display = req.source === 'client' ? null : req.riot_id ?? null;
-  const p = demo ? profileOf(key, demo, req.source, count, display ?? DISPLAY_ID[key ?? ''] ?? null) : profileOf(null, genericPlayer(req.riot_id ?? req.puuid ?? 'x'), req.source, count, display);
-  if (req.source === 'client') p.riot_id = null;
+  // Client-revealed players: only the Riot ID the client shows (resolved before the profile).
+  const display = req.riot_id ?? null;
+  const p = demo ? profileOf(key, demo, req.source, count, req.source === 'client' ? display : display ?? DISPLAY_ID[key ?? ''] ?? null) : profileOf(null, genericPlayer(req.riot_id ?? req.puuid ?? 'x'), req.source, count, display);
+  if (req.source === 'client') p.riot_id = display;
   if (req.puuid) p.puuid = req.puuid;
   const clash = req.clash_team !== undefined ? { clash_team: req.clash_team, clash_position: req.clash_team ? req.clash_position ?? null : null } : {};
   return { ...p, ...clash, champion_id: req.champion_id ?? null, role: req.role ?? null, fetched_at: new Date().toISOString() };
+}
+
+/** riot/account (demo): the demo enemies, any other name gets a stable fake puuid, "ghost#…" is unknown. */
+export async function mockAccount(gameName: string, tagLine: string): Promise<{ puuid: string; gameName: string; tagLine: string }> {
+  await delay(120);
+  const key = `${gameName}#${tagLine}`.toLowerCase();
+  if (/^ghost#/.test(key)) throw new ApiError(`Riot ID introuvable : ${gameName}#${tagLine}. Vérifiez l'orthographe et le tag.`, 404);
+  const demo = DEMO_PLAYERS[key];
+  const display = DISPLAY_ID[key] ?? `${gameName}#${tagLine}`;
+  const [name, tag] = display.split('#');
+  return { puuid: demo?.puuid ?? `mock-${hash(key).toString(36)}`, gameName: name, tagLine: tag };
 }
 
 // ---- Clash + key limits (demo) -------------------------------------------------------------------
