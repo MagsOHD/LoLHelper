@@ -1,41 +1,53 @@
 {
-  "version": 1,
-  "puuid": "aLocalPuuid-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_01",
+  "version": 2,
+  "puuid": "306d7e00-ed52-5d9b-9b9a-52f301a9b060",
+  "riot_id": {
+    "game_name": "Moi",
+    "tag_line": "EUW"
+  },
   "phase": "ban_pick",
   "queue_id": 420,
   "local_cell": 2,
   "my_team": [
     {
       "cell": 0,
-      "puuid": "",
+      "puuid": "0caf1d2d-6c17-5af5-8416-59df62cc3ff6",
       "champion_key": 86,
       "intent_key": 0,
       "position": "top"
     },
     {
       "cell": 1,
-      "puuid": "",
+      "puuid": "9cf36c74-03fb-5770-b069-e5e65d8fd5aa",
       "champion_key": 0,
       "intent_key": 0,
       "position": "jungle"
     },
     {
       "cell": 2,
-      "puuid": "aLocalPuuid-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_01",
+      "puuid": "306d7e00-ed52-5d9b-9b9a-52f301a9b060",
+      "riot_id": {
+        "game_name": "Moi",
+        "tag_line": "EUW"
+      },
       "champion_key": 0,
       "intent_key": 103,
       "position": "middle"
     },
     {
       "cell": 3,
-      "puuid": "allyPuuid2-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_012",
+      "puuid": "7ccd0e1c-c614-5b2d-b9ec-a057b69d07f7",
+      "riot_id": {
+        "game_name": "Ami Élégant",
+        "tag_line": "EUW"
+      },
       "champion_key": 0,
       "intent_key": 222,
       "position": "bottom"
     },
     {
       "cell": 4,
-      "puuid": "",
+      "puuid": "75b91374-a6e0-5568-a8d3-8915d50aa9d3",
       "champion_key": 0,
       "intent_key": 0,
       "position": "utility"

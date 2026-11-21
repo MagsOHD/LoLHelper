@@ -1,13 +1,15 @@
 <?php
 // Faux site LoLHelper pour les tests du compagnon (routeur `php -S`).
 // Variables d'environnement : FAKE_SITE_DIR (journal puts.jsonl + requests.jsonl),
-// FAKE_SITE_PASSWORD, FAKE_SITE_PUUIDS (puuids connus, séparés par des virgules).
-// Reproduit le contrat de la route PUT r=live-draft (validation stricte du CompanionPayload).
+// FAKE_SITE_PASSWORD, FAKE_SITE_RIOT_IDS (identifiants Riot connus « nom#tag », séparés par des virgules).
+// Reproduit le contrat de la route PUT r=live-draft (validation stricte du CompanionPayload v2 envoyé
+// par le compagnon : puuid du client tel quel, riot_id du joueur local, riot_id des autres seulement
+// quand le client les affiche).
 declare(strict_types=1);
 
 $dir = getenv('FAKE_SITE_DIR') ?: sys_get_temp_dir();
 $password = (string) getenv('FAKE_SITE_PASSWORD');
-$known = array_filter(explode(',', (string) getenv('FAKE_SITE_PUUIDS')));
+$known = array_map('mb_strtolower', array_filter(explode(',', (string) getenv('FAKE_SITE_RIOT_IDS'))));
 
 function out(int $status, array $body): void
 {
@@ -57,15 +59,25 @@ $errors = [];
 $isInt = static fn($v, int $min, int $max): bool => is_int($v) && $v >= $min && $v <= $max;
 $isList = static fn($v, int $max): bool => is_array($v) && array_is_list($v) && count($v) <= $max;
 $keys = static fn(array $a): string => implode(',', array_keys($a));
+$lcuPuuid = static fn($v): bool => is_string($v) && ($v === '' || preg_match('/^[A-Za-z0-9_-]{8,100}$/D', $v) === 1);
+$riotId = static fn($v): bool => is_array($v) && implode(',', array_keys($v)) === 'game_name,tag_line'
+    && is_string($v['game_name']) && is_string($v['tag_line'])
+    && preg_match('/^[^\p{C}#]{1,32}$/uD', $v['game_name']) === 1 && preg_match('/^[^\p{C}#]{1,8}$/uD', $v['tag_line']) === 1;
+// riot_id facultatif, juste après puuid : $base = clés sans riot_id.
+$slotKeys = static function (array $m, string $base) use ($keys, $riotId): bool {
+    if ($keys($m) === $base) return true;
+    return $keys($m) === str_replace('puuid,', 'puuid,riot_id,', $base) && $riotId($m['riot_id']);
+};
 
 if (!is_array($p) || array_is_list($p)) {
     $errors[] = 'not an object';
 } else {
-    if ($keys($p) !== 'version,puuid,phase,queue_id,local_cell,my_team,their_team,bans,actions,timer_remaining_ms,sent_at') {
+    if ($keys($p) !== 'version,puuid,riot_id,phase,queue_id,local_cell,my_team,their_team,bans,actions,timer_remaining_ms,sent_at') {
         $errors[] = 'keys: ' . $keys($p);
     }
-    if (($p['version'] ?? null) !== 1) $errors[] = 'version';
-    if (!is_string($p['puuid'] ?? null) || preg_match('/^[A-Za-z0-9_-]{1,100}$/D', $p['puuid']) !== 1) $errors[] = 'puuid';
+    if (($p['version'] ?? null) !== 2) $errors[] = 'version';
+    if (!$lcuPuuid($p['puuid'] ?? null)) $errors[] = 'puuid';
+    if (!$riotId($p['riot_id'] ?? null)) $errors[] = 'riot_id';
     if (!in_array($p['phase'] ?? null, ['planning', 'ban_pick', 'finalization', 'game_starting', 'none'], true)) $errors[] = 'phase';
     if (!$isInt($p['queue_id'] ?? null, 0, 100000)) $errors[] = 'queue_id';
     if (!$isInt($p['local_cell'] ?? null, -1, 20)) $errors[] = 'local_cell';
@@ -75,8 +87,8 @@ if (!is_array($p) || array_is_list($p)) {
         $errors[] = 'my_team';
     } else {
         foreach ($p['my_team'] as $m) {
-            if (!is_array($m) || $keys($m) !== 'cell,puuid,champion_key,intent_key,position'
-                || !$isInt($m['cell'], 0, 20) || !is_string($m['puuid']) || strlen($m['puuid']) > 100
+            if (!is_array($m) || !$slotKeys($m, 'cell,puuid,champion_key,intent_key,position')
+                || !$isInt($m['cell'], 0, 20) || !$lcuPuuid($m['puuid'])
                 || !$isInt($m['champion_key'], 0, 2000) || !$isInt($m['intent_key'], 0, 2000)
                 || !in_array($m['position'], ['top', 'jungle', 'middle', 'bottom', 'utility', ''], true)) {
                 $errors[] = 'my_team entry ' . json_encode($m);
@@ -88,8 +100,8 @@ if (!is_array($p) || array_is_list($p)) {
     } else {
         foreach ($p['their_team'] as $m) {
             // puuid adverse : "" (classée/normale) ou puuid fourni par le client (Clash, personnalisée).
-            if (!is_array($m) || $keys($m) !== 'cell,puuid,champion_key' || !$isInt($m['cell'], 0, 20)
-                || !is_string($m['puuid']) || ($m['puuid'] !== '' && preg_match('/^[A-Za-z0-9_-]{40,100}$/D', $m['puuid']) !== 1)
+            if (!is_array($m) || !$slotKeys($m, 'cell,puuid,champion_key') || !$isInt($m['cell'], 0, 20)
+                || !$lcuPuuid($m['puuid'])
                 || !$isInt($m['champion_key'], 0, 2000)) {
                 $errors[] = 'their_team entry ' . json_encode($m);
             }
@@ -121,8 +133,9 @@ if ($errors) {
     out(400, ['detail' => 'Données invalides : ' . implode('; ', $errors)]);
     return true;
 }
-if (!in_array($p['puuid'], $known, true)) {
-    out(404, ['detail' => "Ce compte Riot n'est pas dans la liste des joueurs du site."]);
+$who = $p['riot_id']['game_name'] . '#' . $p['riot_id']['tag_line'];
+if (!in_array(mb_strtolower($who), $known, true)) {
+    out(404, ['detail' => "Le compte $who n'est pas dans la liste des joueurs du site."]);
     return true;
 }
 out(200, ['ok' => true, 'player_id' => 'p1']);

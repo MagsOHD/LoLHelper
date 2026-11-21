@@ -57,9 +57,10 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def _send(self, status, obj):
-        body = json.dumps(obj).encode()
+        # Comme le vrai client : JSON UTF-8 non échappé (pseudos accentués).
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

@@ -462,6 +462,10 @@ check(($live['their_team'] ?? null) === [
     ['cell' => 8, 'puuid' => '', 'champion_key' => 0],
 ], 'their_team canonical (revealed puuid kept, absent/null -> "")', json_encode($live['their_team'] ?? null));
 check(($live['my_team'][3]['champion_key'] ?? null) === 2000 && ($live['my_team'][4]['position'] ?? null) === '', 'my_team kept');
+check(array_column($live['my_team'] ?? [], 'player_id') === [null, 'p-2', 'p-1', null, null]
+    && ($live['my_team'][1]['puuid'] ?? null) === PUUID2 && array_keys($live['my_team'][0]) === ['cell', 'player_id', 'puuid', 'champion_key', 'intent_key', 'position'],
+    'v1: per-entry player_id (local cell, exact puuid), puuid kept', json_encode($live['my_team'] ?? null));
+check(($live['version'] ?? null) === 1 && !array_key_exists('riot_id', $live), 'v1 doc shape unchanged');
 check(($live['bans'] ?? null) === ['mine' => [55, 0], 'theirs' => [238]] && count($live['actions'] ?? []) === 2, 'bans/actions kept');
 check(($live['timer_remaining_ms'] ?? null) === 21000 && ($live['sent_at'] ?? null) === '2026-11-10T20:00:00Z' && ($live['queue_id'] ?? null) === 420, 'scalars kept');
 
@@ -470,7 +474,8 @@ $team6 = array_fill(0, 6, ['cell' => 0, 'champion_key' => 0]);
 $action = ['type' => 'pick', 'champion_key' => 1, 'completed' => false, 'ally' => true, 'cell' => 0, 'in_progress' => false];
 $slot = fn (array $o) => [array_replace(['cell' => 0, 'puuid' => '', 'champion_key' => 0, 'intent_key' => 0, 'position' => 'top'], $o)];
 $bad = [
-    'version 2' => companion(['version' => 2]),
+    'version 3' => companion(['version' => 3]),
+    'version 0' => companion(['version' => 0]),
     'version string' => companion(['version' => '1']),
     'puuid short' => companion(['puuid' => 'abc']),
     'puuid traversal' => companion(['puuid' => '../' . substr(PUUID, 3)]),
@@ -572,6 +577,128 @@ $r = req('GET', api($A, 'r=live-draft&players=p-1'), auth());
 check(($r['json']['live']['phase'] ?? '') === 'none', 'phase none stored and returned');
 $docs = json_decode((string) file_get_contents($liveFile), true);
 check(array_column($docs, 'id') === ['live-p-1', 'live-p-2'], 'one live doc per player', json_encode(array_column($docs, 'id')));
+
+// ---------------------------------------------------------------- live draft v2 (Riot ID, LCU puuids)
+// Le client League fournit des puuid « UUID » (jamais égaux aux puuid chiffrés de l'API Riot) : le site
+// reconnaît les joueurs par identifiant Riot.
+const LCU_LOCAL = '306d7e00-ed52-5d9b-9b9a-52f301a9b060';
+const LCU_ALLY = ['0caf1d2d-6c17-5af5-8416-59df62cc3ff6', '9cf36c74-03fb-5770-b069-e5e65d8fd5aa', '7ccd0e1c-c614-5b2d-b9ec-a057b69d07f7', '75b91374-a6e0-5568-a8d3-8915d50aa9d3'];
+const LCU_ENEMY = 'b7e2c1a4-5d3f-4e6a-9b8c-0f1e2d3c4b5a';
+const PUUID4 = 'Zz9Yy8Xx7Ww6Vv5Uu4Tt3Ss2Rr1Qq0Pp9Oo8Nn7Mm6Ll5Kk4Jj3Ii2Hh1Gg0Ff9Ee8Dd7Cc6Bb5Aa4';
+$rid = fn (string $gn, string $tl) => ['game_name' => $gn, 'tag_line' => $tl];
+
+function companion2(array $over = []): array
+{
+    $rid = fn (string $gn, string $tl) => ['game_name' => $gn, 'tag_line' => $tl];
+    return array_replace(companion([
+        'version' => 2,
+        'puuid' => LCU_LOCAL,
+        'local_cell' => 2,
+        'my_team' => [
+            ['cell' => 0, 'puuid' => LCU_ALLY[0], 'champion_key' => 86, 'intent_key' => 0, 'position' => 'top'],
+            ['cell' => 1, 'puuid' => LCU_ALLY[1], 'riot_id' => $rid('AMI ', 'eUw1'), 'champion_key' => 0, 'intent_key' => 64, 'position' => 'jungle'],
+            ['cell' => 2, 'puuid' => LCU_LOCAL, 'riot_id' => $rid('le fou élégant', 'euw'), 'champion_key' => 0, 'intent_key' => 103, 'position' => 'middle'],
+            ['cell' => 3, 'puuid' => LCU_ALLY[2], 'riot_id' => $rid('Inconnu Du Groupe', 'EUW'), 'champion_key' => 0, 'intent_key' => 222, 'position' => 'bottom'],
+            ['cell' => 4, 'puuid' => LCU_ALLY[3], 'champion_key' => 0, 'intent_key' => 0, 'position' => 'utility'],
+        ],
+        'their_team' => [
+            ['cell' => 5, 'puuid' => LCU_ENEMY, 'riot_id' => $rid('Rival Clash', 'CLA'), 'champion_key' => 122, 'summonerId' => 880005],
+            ['cell' => 6, 'puuid' => '', 'champion_key' => 0, 'gameName' => 'Masqué'],
+            ['cell' => 7, 'champion_key' => 7, 'riot_id' => null],
+        ],
+    ]), ['riot_id' => $rid('Le Fou Élégant', 'EUW')], $over);
+}
+
+expect(req('PUT', api($A, 'r=store/players/p-4'), auth(), json_encode(['game_name' => 'Le Fou Élégant', 'tag_line' => 'EUW', 'puuid' => PUUID4])), 200, 'player p-4 (Riot ID)');
+expect(req('PUT', api($A, 'r=store/players/p-5'), auth(), json_encode(['game_name' => 'Ami', 'tag_line' => 'EUW1', 'puuid' => null])), 200, 'player p-5 (friend, no puuid)');
+
+$r = push($A, companion2(['riot_id' => $rid('Inconnu', 'EUW')]));
+expect($r, 404, 'v2 unknown Riot ID', "Le compte Inconnu#EUW n'est pas dans la liste des joueurs du site.");
+check(!str_contains((string) file_get_contents($liveFile), 'Inconnu'), 'v2 unknown Riot ID not stored');
+
+@unlink($FAKE_LOG);
+$r = push($A, companion2(['riot_id' => $rid(' le FOU élégant ', 'euw')]));
+expect($r, 200, 'v2 PUT matched by Riot ID (case-insensitive, UUID puuid)');
+check($r['json'] === ['ok' => true, 'player_id' => 'p-4'], 'v2 response unchanged', $r['body']);
+check(fake_log() === [], 'v2 PUT makes no Riot call');
+$stored = (string) file_get_contents($liveFile);
+check(!str_contains($stored, 'Inconnu Du Groupe') && !str_contains($stored, 'AMI') && !str_contains($stored, 'Masqué') && !str_contains($stored, '880005'),
+    'v2: ally names (friends or not) and unknown fields not stored', $stored);
+check(array_filter(LCU_ALLY, fn ($u) => str_contains($stored, $u)) === [] && !str_contains($stored, LCU_ENEMY), 'v2: raw LCU ally/enemy puuids not stored');
+$live = req('GET', api($A, 'r=live-draft&players=p-4'), auth())['json']['live'] ?? [];
+check(($live['player_id'] ?? '') === 'p-4' && ($live['version'] ?? 0) === 2 && ($live['puuid'] ?? '') === LCU_LOCAL
+    && ($live['riot_id'] ?? null) === $rid('le FOU élégant', 'euw'), 'v2 doc: local identity', json_encode($live));
+check(($live['my_team'] ?? null) === [
+    ['cell' => 0, 'player_id' => null, 'champion_key' => 86, 'intent_key' => 0, 'position' => 'top'],
+    ['cell' => 1, 'player_id' => 'p-5', 'champion_key' => 0, 'intent_key' => 64, 'position' => 'jungle'],
+    ['cell' => 2, 'player_id' => 'p-4', 'champion_key' => 0, 'intent_key' => 103, 'position' => 'middle'],
+    ['cell' => 3, 'player_id' => null, 'champion_key' => 0, 'intent_key' => 222, 'position' => 'bottom'],
+    ['cell' => 4, 'player_id' => null, 'champion_key' => 0, 'intent_key' => 0, 'position' => 'utility'],
+], 'v2 my_team: player_id only (friend by Riot ID, local cell), riot_id/puuid dropped', json_encode($live['my_team'] ?? null));
+check(($live['their_team'] ?? null) === [
+    ['cell' => 5, 'riot_id' => $rid('Rival Clash', 'CLA'), 'champion_key' => 122],
+    ['cell' => 6, 'champion_key' => 0],
+    ['cell' => 7, 'champion_key' => 7],
+], 'v2 their_team: shown riot_id kept, raw puuid dropped', json_encode($live['their_team'] ?? null));
+
+// Cellule locale prioritaire, un joueur au plus une fois ; local reconnu par puuid exact (secours).
+$dup = companion2();
+$dup['my_team'][0]['riot_id'] = $rid('Le Fou Élégant', 'EUW');
+$dup['my_team'][3]['riot_id'] = $rid('ami', 'euw1');
+$r = push($A, $dup);
+$live = req('GET', api($A, 'r=live-draft&players=p-4'), auth())['json']['live'] ?? [];
+check(array_column($live['my_team'] ?? [], 'player_id') === [null, 'p-5', 'p-4', null, null], 'v2: each player matched once, local cell first', json_encode($live['my_team'] ?? null));
+$r = push($A, companion2(['riot_id' => $rid('Deux', 'XYZ'), 'puuid' => PUUID2, 'local_cell' => 4]));
+expect($r, 200, 'v2: Riot ID unknown but exact puuid -> legacy match');
+check(($r['json']['player_id'] ?? '') === 'p-2', 'v2 legacy puuid -> p-2', $r['body']);
+$r = push($A, companion2(['puuid' => '', 'riot_id' => $rid('Ami', 'EUW1'), 'local_cell' => 1]));
+check(($r['json']['player_id'] ?? '') === 'p-5', 'v2: empty LCU puuid accepted (Riot ID only)', $r['body']);
+$r = push($A, companion2(['riot_id' => $rid(str_repeat('é', 32), 'ÉÉÉÉÉÉÉÉ')]));
+expect($r, 404, 'v2: 32/8-character multibyte Riot ID valid (unknown)');
+$r = push($A, companion2(['phase' => 'none', 'my_team' => [], 'their_team' => [], 'actions' => []]));
+expect($r, 200, 'v2 phase none');
+$r = push($A, ['version' => 2, 'puuid' => LCU_LOCAL, 'riot_id' => $rid('Le Fou Élégant', 'EUW'), 'phase' => 'none']);
+expect($r, 200, 'v2 minimal');
+
+$s2 = fn (array $o) => companion2(['my_team' => [array_replace(['cell' => 0, 'puuid' => '', 'champion_key' => 0, 'intent_key' => 0, 'position' => 'top'], $o)]]);
+$e2 = fn (array $o) => companion2(['their_team' => [array_replace(['cell' => 5, 'puuid' => '', 'champion_key' => 0], $o)]]);
+$noRid = companion2();
+unset($noRid['riot_id']);
+$bad2 = [
+    'riot_id missing' => $noRid,
+    'riot_id null and puuid empty' => companion2(['riot_id' => null, 'puuid' => '']),
+    'riot_id string' => companion2(['riot_id' => 'Le Fou Élégant#EUW']),
+    'riot_id list' => companion2(['riot_id' => ['Le Fou Élégant', 'EUW']]),
+    'riot_id tag missing' => companion2(['riot_id' => ['game_name' => 'Le Fou Élégant']]),
+    'riot_id name empty' => companion2(['riot_id' => $rid('  ', 'EUW')]),
+    'riot_id tag empty' => companion2(['riot_id' => $rid('Moi', '')]),
+    'riot_id name 33' => companion2(['riot_id' => $rid(str_repeat('a', 33), 'EUW')]),
+    'riot_id tag 9' => companion2(['riot_id' => $rid('Moi', 'ABCDEFGHI')]),
+    'riot_id name huge' => companion2(['riot_id' => $rid(str_repeat('a', 5000), 'EUW')]),
+    'riot_id control char' => companion2(['riot_id' => $rid("Mo\u{7}i", 'EUW')]),
+    'riot_id newline' => companion2(['riot_id' => $rid("Moi\nAdmin", 'EUW')]),
+    'riot_id trailing NUL' => companion2(['riot_id' => $rid("Moi\u{0}", 'EUW')]),
+    'riot_id leading tab' => companion2(['riot_id' => $rid("\tMoi", 'EUW')]),
+    'riot_id zero-width' => companion2(['riot_id' => $rid("Moi\u{200B}", 'EUW')]),
+    'riot_id bidi override' => companion2(['riot_id' => $rid("Moi\u{202E}", 'EUW')]),
+    'riot_id hash' => companion2(['riot_id' => $rid('Moi#EUW', 'EUW')]),
+    'riot_id name int' => companion2(['riot_id' => ['game_name' => 12, 'tag_line' => 'EUW']]),
+    'v2 puuid short' => companion2(['puuid' => 'abc']),
+    'v2 puuid slash' => companion2(['puuid' => 'abcd/efgh-ijkl']),
+    'v2 puuid newline' => companion2(['puuid' => LCU_LOCAL . "\n"]),
+    'v2 puuid null' => companion2(['puuid' => null]),
+    'v2 ally riot_id bad' => $s2(['riot_id' => $rid('', 'EUW')]),
+    'v2 ally riot_id string' => $s2(['riot_id' => 'Ami#EUW1']),
+    'v2 ally puuid bad' => $s2(['puuid' => 'x/y']),
+    'v2 enemy riot_id bad' => $e2(['riot_id' => $rid("Rival\u{0}", 'CLA')]),
+    'v2 enemy puuid bad' => $e2(['puuid' => 'SECRET ENEMY']),
+];
+foreach ($bad2 as $label => $p) {
+    $r = push($A, $p);
+    expect($r, 400, "live v2 invalid: $label");
+    check(str_starts_with($r['json']['detail'] ?? '', MSG_LIVE_INVALID), "live v2 invalid: $label detail", $r['body']);
+}
+check(!str_contains((string) file_get_contents($liveFile), 'Admin'), 'invalid v2 pushes not stored');
 
 // no password configured (B): open, default data dir
 expect(req('PUT', api($B, 'r=store/players/b-1'), [], json_encode(['puuid' => PUUID])), 200, 'B player');
