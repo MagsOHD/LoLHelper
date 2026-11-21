@@ -54,7 +54,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$script:CompanionVersion = '1.1.0'
+$script:CompanionVersion = '1.2.0'
 $script:IsModernPowerShell = $PSVersionTable.PSVersion.Major -ge 6
 $script:OnWindows = (-not $script:IsModernPowerShell) -or ($IsWindows -eq $true)
 $script:DefaultLockfile = 'C:\Riot Games\League of Legends\lockfile'
@@ -988,6 +988,7 @@ function Start-Companion {
         Identity      = ''
         Account       = ''
         NoRiotIdSince = $null
+        SummonerErrorSince = $null
         QueueId       = 0
         QueueGameKey  = $null
         LocalCell     = 0
@@ -1014,15 +1015,19 @@ function Start-Companion {
             # 1. Connexion au client (découverte à chaque fois qu'elle est perdue).
             if ($null -eq $state.Connection) {
                 $script:ElevatedClientHint = $false
+                # Plusieurs candidats possibles (ancien lockfile, plusieurs installations) : on garde en priorité
+                # celui qui renvoie le compte (200), sinon le premier qui répond.
+                $fallback = $null
                 foreach ($cand in (Get-LcuCandidates $lockfiles)) {
                     $conn = New-LcuConnection $cand
                     $probe = Invoke-Lcu $conn '/lol-summoner/v1/current-summoner'
-                    if ($probe.Status -ne 0 -and $probe.Status -ne 401 -and $probe.Status -ne 403) {
-                        $state.Connection = $conn
-                        $state.StatusKey = ''
-                        Write-Info "Client League trouvé ($($conn.Source), port $($conn.Port))." 'Green'
-                        break
-                    }
+                    if ($probe.Status -eq 200) { $state.Connection = $conn; break }
+                    if ($null -eq $fallback -and $probe.Status -ne 0 -and $probe.Status -ne 401 -and $probe.Status -ne 403) { $fallback = $conn }
+                }
+                if ($null -eq $state.Connection -and $null -ne $fallback) { $state.Connection = $fallback }
+                if ($null -ne $state.Connection) {
+                    $state.StatusKey = ''
+                    Write-Info "Client League trouvé ($($state.Connection.Source), port $($state.Connection.Port))." 'Green'
                 }
                 if ($null -eq $state.Connection) {
                     if ($script:ElevatedClientHint) {
@@ -1045,6 +1050,7 @@ function Start-Companion {
                     $lcuLost = $true
                 } elseif ($null -ne $riotId) {
                     $state.NoRiotIdSince = $null
+                    $state.SummonerErrorSince = $null
                     $puuid = Get-SafePuuid $sum.Body.puuid
                     $identity = (Format-RiotId $riotId).ToLowerInvariant() + '|' + $puuid
                     if ($identity -ne $state.Identity) {
@@ -1110,9 +1116,21 @@ function Start-Companion {
                         Set-Status $state 'starting' 'Client League en cours de démarrage...'
                     }
                 } else {
+                    # Le client répond mais refuse la lecture du compte : normal quelques secondes au démarrage.
                     $sleep = 2
                     $state.NoRiotIdSince = $null
-                    Set-Status $state 'starting' 'Client League en cours de démarrage...'
+                    if ($null -eq $state.SummonerErrorSince) { $state.SummonerErrorSince = Get-Date }
+                    if (((Get-Date) - $state.SummonerErrorSince).TotalSeconds -ge $NoRiotIdWarnSeconds) {
+                        Set-Status $state "summoner-$($sum.Status)" ("Le client League répond ($($state.Connection.Source), port $($state.Connection.Port)) " +
+                            "mais la lecture du compte échoue (code HTTP $($sum.Status)). Nouvelle recherche du client... " +
+                            "Si le message revient, redémarrez le client League ou relancez avec -Diagnostic " +
+                            "(Lancer-LoLHelper-Draft.bat -Diagnostic) et transmettez le fichier indiqué.") 'Yellow'
+                        # Peut-être un mauvais candidat (ancien lockfile) : on relance la découverte.
+                        $state.Connection = $null
+                        $state.SummonerErrorSince = $null
+                    } else {
+                        Set-Status $state 'starting' 'Client League en cours de démarrage...'
+                    }
                 }
             }
 
