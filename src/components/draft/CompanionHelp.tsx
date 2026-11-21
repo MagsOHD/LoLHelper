@@ -1,8 +1,13 @@
 /** Download links (relative: the site may live in a sub-folder) and a short how-to for the companion. */
+/** Must match $script:CompanionVersion in companion/lolhelper-draft.ps1 (cache-busting of the downloads). */
+export const COMPANION_VERSION = '1.2.0';
+
 export const COMPANION_FILES = {
   launcher: 'companion/Lancer-LoLHelper-Draft.bat',
   script: 'companion/lolhelper-draft.ps1',
 } as const;
+
+const fresh = (path: string): string => `${path}?v=${COMPANION_VERSION}`;
 
 function siteAddress(): string {
   if (typeof window === 'undefined') return '';
@@ -18,10 +23,10 @@ export function CompanionHelp({ open }: { open?: boolean }) {
       </summary>
       <div className="companion__body">
         <div className="row">
-          <a className="btn btn--primary btn--sm" href={COMPANION_FILES.launcher} download>
+          <a className="btn btn--primary btn--sm" href={fresh(COMPANION_FILES.launcher)} download="Lancer-LoLHelper-Draft.bat">
             Télécharger le programme compagnon (Windows)
           </a>
-          <a className="btn btn--ghost btn--sm" href={COMPANION_FILES.script} download>
+          <a className="btn btn--ghost btn--sm" href={fresh(COMPANION_FILES.script)} download="lolhelper-draft.ps1">
             + script lolhelper-draft.ps1
           </a>
         </div>
@@ -36,6 +41,10 @@ export function CompanionHelp({ open }: { open?: boolean }) {
           </li>
           <li>Laisse la fenêtre ouverte : dès la sélection des champions, la draft s’affiche ici pour toute l’équipe.</li>
         </ol>
+        <p className="hint">
+          Version actuelle : <strong>v{COMPANION_VERSION}</strong>, affichée sur la première ligne de la fenêtre du programme.
+          Si tu y vois un autre numéro, supprime tes anciens fichiers et retélécharge-les.
+        </p>
         <p className="hint">
           Lecture seule : le programme lit la sélection des champions du client et n’envoie que les champions, bans et rôles —
           jamais l’identité des adversaires. Ton Riot ID doit faire partie des joueurs du site.
