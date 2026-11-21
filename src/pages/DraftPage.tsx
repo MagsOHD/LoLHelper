@@ -58,17 +58,17 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
     [initial.player_ids, players],
   );
   const engine = useDraftEngine(friendRanks);
-  const { session, snap } = useDraftSession(initial, players, engine.data);
+  const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  // Enemy profiles: same server as the draft's friends (Riot IDs can be looked up elsewhere when scouting).
+  const canFetchProfiles = MOCK_MODE || Boolean(meta.data?.riot_configured);
+  const platform = initial.player_ids.map((id) => byId.get(id)?.platform).find(Boolean) ?? meta.data?.platform ?? 'euw1';
+  const { session, snap, enemyNotes } = useDraftSession(initial, players, engine.data, { platform, resolveEnemies: canFetchProfiles });
   const draft = snap?.draft;
   const { advice, error: adviceError } = useDraftAdvice(draft, players, engine.data);
   const [detect, setDetect] = useState<{ busy: boolean; msg: string | null; error: string | null }>({ busy: false, msg: null, error: null });
   const draftRef = useRef<DraftState | undefined>(draft);
   draftRef.current = draft;
 
-  const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
-  // Enemy profiles: same server as the draft's friends (Riot IDs can be looked up elsewhere when scouting).
-  const canFetchProfiles = MOCK_MODE || Boolean(meta.data?.riot_configured);
-  const platform = initial.player_ids.map((id) => byId.get(id)?.platform).find(Boolean) ?? meta.data?.platform ?? 'euw1';
   const enemyProfiles = useEnemyProfiles(session, draft, platform, canFetchProfiles);
   // Friends selectable in a slot: the draft's friends, plus anyone already placed (companion match).
   const friends = useMemo(() => {
@@ -238,6 +238,7 @@ function DraftView({ initial, title, subtitle, players }: { initial: DraftState;
             profiles={scouted}
             clash={clashProfiles(draft)}
             clashNotes={enemyProfiles.clashNotes}
+            clientNotes={snap.liveFresh ? enemyNotes : []}
             statuses={enemyProfiles.statuses}
             insights={advice?.enemy_players ?? []}
             platforms={meta.data?.platforms ?? [platform]}

@@ -48,6 +48,7 @@ import {
 import { detectActiveGame, type DetectedGame, type DetectFriend, type DetectOptions } from './spectator';
 import { buildEnemyProfile, type ProfileProgress, type ProfileRequest } from './enemyProfile';
 import { riotClashFetcher, type ClashFetcher } from './clash';
+import { getAccount, type RiotAccount } from './riot';
 import { fetchRiotLimits, type RiotKeyLimits } from './riotLimits';
 
 export { ApiError, AUTH_REQUIRED_EVENT, getPassword, setPassword } from './backend';
@@ -159,6 +160,9 @@ export const api = {
     MOCK_MODE
       ? import('./mock').then((m) => m.mockEnemyProfile(req, onProgress))
       : getCatalog().then(({ catalog }) => buildEnemyProfile(req, catalog, { onProgress })).then((r) => r.profile),
+  /** Riot ID -> Riot API account (riot/account through the shared limiter); 404 = unknown Riot ID. */
+  riotAccount: (gameName: string, tagLine: string, platform: string): Promise<RiotAccount> =>
+    MOCK_MODE ? import('./mock').then((m) => m.mockAccount(gameName, tagLine)) : getAccount(gameName, tagLine, platform),
   /** Clash routes (riot/clash-*) behind the shared limiter; wrap in a ClashDirectory for the session cache. */
   clashFetcher: (): ClashFetcher => (MOCK_MODE ? lazyMockClash : riotClashFetcher()),
   /** Key limits recorded by the PHP gate (r=riot-limits); null when the route is not deployed. */

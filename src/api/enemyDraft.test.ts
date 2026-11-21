@@ -48,29 +48,42 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('their_team puuid (client-revealed enemies)', () => {
-  it('maps a non-empty puuid to the enemy slot, nothing when "" (ranked) or invalid', () => {
+describe('their_team (client-revealed enemies)', () => {
+  const resolve = (id: { game_name: string; tag_line: string }) => (id.game_name === 'Zed Main' ? PUUID_A : null);
+
+  it('ignores raw LCU puuids; a visible Riot ID gives the resolved Riot API puuid', () => {
     const m = mapCompanionPayload(payload([
-      { cell: 5, puuid: PUUID_A, champion_key: 122 },
-      { cell: 6, puuid: '', champion_key: 99 },
-      { cell: 7, champion_key: 0 },
-      { cell: 8, puuid: 'pas un puuid !', champion_key: 0 },
-    ]), catalog, []);
+      { cell: 5, puuid: PUUID_A, champion_key: 122 }, // raw LCU value: never a Riot API puuid
+      { cell: 6, puuid: '', champion_key: 99, riot_id: { game_name: 'Zed Main', tag_line: 'EUW' } },
+      { cell: 7, champion_key: 0, riot_id: { game_name: 'Pas Encore', tag_line: 'EUW' } }, // not resolved yet
+      { cell: 8, puuid: 'pas un puuid !', champion_key: 0, riot_id: { game_name: '', tag_line: 'EUW' } }, // hidden
+    ]), catalog, [], resolve);
     expect(m.enemy).toEqual([
-      { champion_id: 'Darius', role: null, locked: true, puuid: PUUID_A },
-      { champion_id: 'Lux', role: null, locked: false },
-      { champion_id: null, role: null, locked: false },
+      { champion_id: 'Darius', role: null, locked: true },
+      { champion_id: 'Lux', role: null, locked: false, puuid: PUUID_A, riot_id: 'Zed Main#EUW' },
+      { champion_id: null, role: null, locked: false, riot_id: 'Pas Encore#EUW' },
       { champion_id: null, role: null, locked: false },
     ]);
-    expect('puuid' in m.enemy[1]).toBe(false);
+    // Without a resolver nothing is identified.
+    expect(mapCompanionPayload(payload([{ cell: 6, champion_key: 99, riot_id: { game_name: 'Zed Main', tag_line: 'EUW' } }]), catalog, []).enemy[0].puuid).toBeUndefined();
   });
 
-  it('mergeCompanion stores the puuid; the next ranked payload clears it', () => {
+  it('mergeCompanion stores the resolved puuid (never the Riot ID); the next ranked payload clears it', () => {
     const base = emptyDraft('team-t1', ['p1'], 't1', NOW);
-    const revealed = mergeCompanion(base, mapCompanionPayload(payload([{ cell: 5, puuid: PUUID_A, champion_key: 122 }]), catalog, []));
-    expect(revealed.enemy[0].puuid).toBe(PUUID_A);
-    const anon = mergeCompanion(revealed, mapCompanionPayload(payload([{ cell: 5, puuid: '', champion_key: 122 }]), catalog, []));
+    const shown = [{ cell: 5, champion_key: 122, riot_id: { game_name: 'Zed Main', tag_line: 'EUW' } }];
+    const revealed = mergeCompanion(base, mapCompanionPayload(payload(shown), catalog, [], resolve));
+    expect(revealed.enemy[0]).toEqual({ champion_id: 'Darius', role: null, locked: true, puuid: PUUID_A });
+    const anon = mergeCompanion(revealed, mapCompanionPayload(payload([{ cell: 5, puuid: 'lcu-raw', champion_key: 122 }]), catalog, [], resolve));
     expect(anon.enemy[0].puuid).toBeUndefined();
+  });
+
+  it('a Riot ID not resolved here yet keeps the puuid of a profile a friend stored with that Riot ID', () => {
+    const base = { ...emptyDraft('team-t1', ['p1'], 't1', NOW), enemy_profiles: [profile(PUUID_A, 'client', { riot_id: 'Zed Main#EUW' })] };
+    const shown = [{ cell: 5, champion_key: 122, riot_id: { game_name: 'zed main', tag_line: 'euw' } }];
+    const merged = mergeCompanion(base, mapCompanionPayload(payload(shown), catalog, [], () => null));
+    expect(merged.enemy[0].puuid).toBe(PUUID_A);
+    const other = mergeCompanion(base, mapCompanionPayload(payload([{ cell: 5, champion_key: 122, riot_id: { game_name: 'Autre', tag_line: 'EUW' } }]), catalog, [], () => null));
+    expect(other.enemy[0].puuid).toBeUndefined();
   });
 
   it('normalizeDraft keeps valid slot puuids only', () => {
